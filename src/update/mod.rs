@@ -69,7 +69,6 @@ mod tests {
         confirm: ConfirmFn,
         error: MsgFn,
         success: MsgFn,
-        message: MsgFn,
         config: ConfigFn,
     }
 
@@ -85,9 +84,6 @@ mod tests {
         }
         fn success(&self, msg: &str) -> Result<(), Error> {
             (self.success)(msg)
-        }
-        fn message(&self, msg: &str) -> Result<(), Error> {
-            (self.message)(msg)
         }
         fn config(&self, config: &Config) -> Result<(), Error> {
             (self.config)(config)
@@ -123,11 +119,10 @@ mod tests {
         }
     }
 
-    /// UI where every method succeeds and error/success/message are logged.
+    /// UI where every method succeeds and error/success are logged.
     fn ok_ui(log: &Log) -> MockUi {
         let error_log = log.clone();
         let success_log = log.clone();
-        let message_log = log.clone();
         MockUi {
             title: Box::new(|_| Ok(())),
             confirm: Box::new(|_, _| Ok(true)),
@@ -137,10 +132,6 @@ mod tests {
             }),
             success: Box::new(move |m| {
                 success_log.record(m);
-                Ok(())
-            }),
-            message: Box::new(move |m| {
-                message_log.record(m);
                 Ok(())
             }),
             config: Box::new(|_| Ok(())),
@@ -437,7 +428,7 @@ mod tests {
     #[test]
     fn run_stage_add_failure_output_error_propagates() {
         let ui = MockUi {
-            message: Box::new(|_| Err(Error::GitPullFailed)),
+            error: Box::new(|_| Err(Error::GitPullFailed)),
             ..ok_ui(&Log::default())
         };
         let cmd = MockCmd {

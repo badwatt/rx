@@ -137,7 +137,7 @@ tests/
 ### 100% test coverage — every branch, every error path
 
 ```
-164 tests: 154 unit + 10 integration — all passing ✅
+163 tests: 153 unit + 10 integration — all passing ✅
 ```
 
 Unit tests cover:

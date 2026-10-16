@@ -31,11 +31,6 @@ impl UserIo for TerminalIo {
         write_line(&mut out, &format!("{}{}{}", ansi::GREEN, msg, ansi::RESET))
     }
 
-    fn message(&self, msg: &str) -> Result<(), Error> {
-        let mut out = io::stdout();
-        write_line(&mut out, msg)
-    }
-
     fn config(&self, config: &Config) -> Result<(), Error> {
         let mut out = io::stdout();
         print_config(&mut out, config)
@@ -430,11 +425,6 @@ mod tests {
     #[test]
     fn terminal_io_success_does_not_panic() {
         TerminalIo.success("ok").expect("success");
-    }
-
-    #[test]
-    fn terminal_io_message_does_not_panic() {
-        TerminalIo.message("plain").expect("message");
     }
 
     #[test]

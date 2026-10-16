@@ -17,7 +17,7 @@ pub fn run(repo: &str, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), E
     }
     match cmd.run(&commands::git_add(repo), true) {
         Ok(_) => ui.success("Changes added to git stage successfully")?,
-        Err(e) => ui.message(&format!("Failed to add changes to the stage: {e}"))?,
+        Err(e) => ui.error(&format!("Failed to add changes to the stage: {e}"))?,
     }
     Ok(())
 }

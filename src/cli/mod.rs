@@ -70,9 +70,6 @@ mod tests {
         fn success(&self, _: &str) -> Result<(), Error> {
             Ok(())
         }
-        fn message(&self, _: &str) -> Result<(), Error> {
-            Ok(())
-        }
         fn config(&self, _: &Config) -> Result<(), Error> {
             Ok(())
         }
@@ -128,7 +125,6 @@ mod tests {
         assert!(OkUi.confirm(true, None).is_ok());
         assert!(OkUi.error("e").is_ok());
         assert!(OkUi.success("s").is_ok());
-        assert!(OkUi.message("m").is_ok());
         assert!(OkUi.config(&defaults::default_config()).is_ok());
     }
 }
