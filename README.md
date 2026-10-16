@@ -157,7 +157,7 @@ tests/
 ### 100% coverage — every branch, every error path
 
 ```
-221 tests: 209 unit + 12 integration — all passing ✅
+222 tests: 210 unit + 12 integration — all passing ✅
 ```
 
 Coverage counts tests too: `--no-default-ignore-filename-regex` disables

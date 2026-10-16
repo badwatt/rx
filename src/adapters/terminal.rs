@@ -101,7 +101,7 @@ fn write_confirm_prompt(
     };
     let text = match msg {
         Some(value) => format!("\n{}{}{} {}: ", ansi::YELLOW, value, ansi::RESET, hint),
-        None => format!("\n\n{}Proceed?{} {}: ", ansi::YELLOW, ansi::RESET, hint),
+        None => format!("\n{}Proceed?{} {}: ", ansi::YELLOW, ansi::RESET, hint),
     };
     ansi::write_flush(writer, &text)?;
     Ok(())
@@ -119,34 +119,28 @@ pub(crate) fn parse_confirm_response(line: &str, default: bool) -> bool {
     }
 }
 
-/// Print all `config` fields with ANSI styling.
+/// Print all `config` fields with ANSI styling, each terminated by a newline.
 pub(crate) fn print_config(writer: &mut dyn Write, config: &Config) -> Result<(), Error> {
-    print_config_line(writer, "repo", &config.repo, true)?;
-    print_config_line(writer, "hostname", &config.hostname, true)?;
-    print_config_line(writer, "keep", &config.keep.to_string(), true)?;
-    print_config_line(writer, "update", &config.update.to_string(), true)?;
-    print_config_line(writer, "diff", &config.diff.to_string(), false)?;
+    print_config_line(writer, "repo", &config.repo)?;
+    print_config_line(writer, "hostname", &config.hostname)?;
+    print_config_line(writer, "keep", &config.keep.to_string())?;
+    print_config_line(writer, "update", &config.update.to_string())?;
+    print_config_line(writer, "diff", &config.diff.to_string())?;
     Ok(())
 }
 
-fn print_config_line(
-    writer: &mut dyn Write,
-    label: &str,
-    value: &str,
-    new_line: bool,
-) -> Result<(), Error> {
+fn print_config_line(writer: &mut dyn Write, label: &str, value: &str) -> Result<(), Error> {
     ansi::write_flush(
         writer,
         &format!(
-            "{}◉ {}{}{} = {}{}{}{}",
+            "{}◉ {}{}{} = {}{}{}\n",
             ansi::CYAN,
             ansi::RED,
             label,
             ansi::RESET,
             ansi::CYAN,
             value,
-            ansi::RESET,
-            if new_line { "\n" } else { "" }
+            ansi::RESET
         ),
     )?;
     Ok(())

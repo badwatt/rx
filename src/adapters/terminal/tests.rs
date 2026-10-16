@@ -188,12 +188,23 @@ fn print_config_renders_all_fields() {
 }
 
 #[test]
-fn print_config_last_field_has_no_trailing_newline() {
+fn print_config_last_field_has_trailing_newline() {
     let mut buf = Vec::new();
     let config = test_config();
     assert!(print_config(&mut buf, &config).is_ok());
     let s = String::from_utf8_lossy(&buf);
-    assert!(!s.ends_with('\n'));
+    assert!(s.ends_with('\n'));
+}
+
+#[test]
+fn print_config_block_is_separated_from_following_title_by_blank_line() {
+    let mut buf = Vec::new();
+    let config = test_config();
+    assert!(print_config(&mut buf, &config).is_ok());
+    assert!(print_title(&mut buf, "Git Pull").is_ok());
+    let s = String::from_utf8_lossy(&buf);
+    let separator = format!("{}\n{}\n", ansi::RESET, ansi::BLUE);
+    assert!(s.contains(&separator));
 }
 
 struct CountingWriter {
@@ -263,7 +274,7 @@ fn print_config_error_propagation_line_5() {
 #[test]
 fn print_config_line_error_propagation() {
     let mut writer = crate::test_helpers::FailingWriter;
-    assert!(print_config_line(&mut writer, "k", "v", true).is_err());
+    assert!(print_config_line(&mut writer, "k", "v").is_err());
 }
 
 // ------------------------------------------------------------------
