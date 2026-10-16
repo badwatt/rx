@@ -87,7 +87,8 @@ Proceed? (Y/n)
 | `--help`       | `-h`  | Print help                                | —             |
 | `--version`    | `-v`  | Print version                             | —             |
 
-`--keep` must be at least `1`.
+`--keep` must be at least `1`. If the hostname cannot be detected, `rx` stops
+before rebuilding; pass `--hostname` explicitly.
 
 Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` → `$HOSTNAME` env → `hostname` command → `"unknown"`.
 
@@ -170,7 +171,8 @@ Integration tests cover:
 - Unknown flags → exit code 2
 - `--keep 0` → exit code 2
 - `--dry-run` prints commands without executing
-- Piped stdin doesn't panic
+- Non-git `--repo` → non-zero exit
+- Piped stdin `n` declines and exits 0
 - Subcommand words (`rx help`, `rx version`)
 
 ```bash
