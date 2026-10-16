@@ -5,7 +5,7 @@ use std::fmt;
 /// Uses a manual `Display` + `Error` impl to keep the dependency tree empty.
 /// `From<std::io::Error>` enables the `?` operator for IO fallibility.
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     Io(std::io::Error),
     GitPullFailed,
     GitStatusFailed,

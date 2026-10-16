@@ -6,7 +6,7 @@ use crate::error::Error;
 use crate::ports::user_io::UserIo;
 
 /// Production [`UserIo`] backed by stdin/stdout.
-pub struct TerminalIo;
+pub(crate) struct TerminalIo;
 
 impl UserIo for TerminalIo {
     fn title(&self, text: &str) -> Result<(), Error> {
@@ -56,7 +56,7 @@ fn write_raw(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
 ///
 /// Note: `text.len()` counts bytes, not graphemes. Non-ASCII text
 /// will misalign borders. Acceptable for ASCII-only CLI output.
-pub fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
+pub(crate) fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
     let border: String = "*".repeat(text.len() + 4);
     ansi::write_flush(
         writer,
@@ -77,7 +77,7 @@ pub fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
 /// Prompt user for confirmation on `reader`/`writer`.
 ///
 /// `default` is returned when the user sends an empty line.
-pub fn confirm(
+pub(crate) fn confirm(
     reader: &mut dyn BufRead,
     writer: &mut dyn Write,
     default: bool,
@@ -111,7 +111,7 @@ fn write_confirm_prompt(
 ///
 /// Returns `default` for empty input, `true` for "y"/"yes", `false` for
 /// "n"/"no" or any other input.
-pub fn parse_confirm_response(line: &str, default: bool) -> bool {
+pub(crate) fn parse_confirm_response(line: &str, default: bool) -> bool {
     match line.trim().to_lowercase().as_str() {
         "y" | "yes" => true,
         "" => default,
@@ -120,7 +120,7 @@ pub fn parse_confirm_response(line: &str, default: bool) -> bool {
 }
 
 /// Print all `config` fields with ANSI styling.
-pub fn print_config(writer: &mut dyn Write, config: &Config) -> Result<(), Error> {
+pub(crate) fn print_config(writer: &mut dyn Write, config: &Config) -> Result<(), Error> {
     print_config_line(writer, "repo", &config.repo, true)?;
     print_config_line(writer, "hostname", &config.hostname, true)?;
     print_config_line(writer, "keep", &config.keep.to_string(), true)?;

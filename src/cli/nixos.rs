@@ -5,7 +5,7 @@
 //! so we must pick the command form accordingly.
 
 /// Return `true` when the running system is NixOS >= 25.11 (ng `nixos-rebuild`).
-pub fn supports_elevate() -> bool {
+pub(crate) fn supports_elevate() -> bool {
     supports_elevate_from(read_os_release().as_deref())
 }
 

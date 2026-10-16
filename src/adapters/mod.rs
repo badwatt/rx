@@ -1,5 +1,5 @@
 //! Driven adapters: concrete implementations of the application ports.
 
-pub mod dry_run;
-pub mod process;
-pub mod terminal;
+pub(crate) mod dry_run;
+pub(crate) mod process;
+pub(crate) mod terminal;

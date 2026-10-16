@@ -1,8 +1,8 @@
 //! Individual steps of the update pipeline.
 
-pub mod cleanup;
-pub mod diff;
-pub mod flake;
-pub mod pull;
-pub mod rebuild;
-pub mod stage;
+pub(crate) mod cleanup;
+pub(crate) mod diff;
+pub(crate) mod flake;
+pub(crate) mod pull;
+pub(crate) mod rebuild;
+pub(crate) mod stage;

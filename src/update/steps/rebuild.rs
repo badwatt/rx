@@ -5,7 +5,7 @@ use crate::ports::command::CommandRunner;
 use crate::ports::user_io::UserIo;
 
 /// Rebuild and switch the NixOS system for `config.hostname`.
-pub fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
+pub(crate) fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
     if config.hostname == "unknown" {
         return Err(Error::HostnameUnknown);
     }

@@ -6,7 +6,7 @@ use crate::error::Error;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Print the help banner.
-pub fn print_help(writer: &mut dyn Write) -> Result<(), Error> {
+pub(crate) fn print_help(writer: &mut dyn Write) -> Result<(), Error> {
     ansi::write_flush(
         writer,
         "\n*****************************************************\n RX - A simple CLI tool to update your nixos system\n*****************************************************\n-r, --repo        : set repo path (default is $HOME/.dotfiles)\n-n, --hostname    : set hostname (default is OS hostname)\n-k, --keep        : set generations to keep (default is 10)\n-u, --update      : set update to true (default is false)\n-d, --diff        : set diff to true (default is false)\n-y, --yes         : assume yes for all prompts (default is false)\n    --dry-run     : print commands without executing them\n-h, --help        : Display this help message\n-v, --version     : Display the current version\n\n",
@@ -15,7 +15,7 @@ pub fn print_help(writer: &mut dyn Write) -> Result<(), Error> {
 }
 
 /// Print the version line.
-pub fn print_version(writer: &mut dyn Write) -> Result<(), Error> {
+pub(crate) fn print_version(writer: &mut dyn Write) -> Result<(), Error> {
     ansi::write_flush(
         writer,
         &format!("{}RX version: {}{}\n", ansi::YELLOW, VERSION, ansi::RESET),

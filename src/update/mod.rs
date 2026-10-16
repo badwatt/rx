@@ -4,7 +4,7 @@
 //! cleanup → diff) through the [`CommandRunner`] and [`UserIo`] ports. Contains
 //! no I/O of its own.
 
-pub mod steps;
+pub(crate) mod steps;
 
 use crate::config::Config;
 use crate::error::Error;
@@ -12,7 +12,7 @@ use crate::ports::command::CommandRunner;
 use crate::ports::user_io::UserIo;
 
 /// Run the full NixOS update workflow.
-pub fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
+pub(crate) fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
     ui.title("RX Configuration")?;
     ui.config(config)?;
 

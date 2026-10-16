@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::ports::command::CommandRunner;
 
 /// Adapter that echoes each command instead of running it.
-pub struct DryRunRunner;
+pub(crate) struct DryRunRunner;
 
 impl CommandRunner for DryRunRunner {
     fn run(&self, cmd: &[String]) -> Result<i32, Error> {

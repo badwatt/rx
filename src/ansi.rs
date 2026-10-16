@@ -1,30 +1,30 @@
 use std::io::Write;
 
 // ANSI escape codes used in rx output styling.
-pub const RED: &str = "\x1b[31m";
-pub const GREEN: &str = "\x1b[32m";
-pub const YELLOW: &str = "\x1b[33m";
-pub const BLUE: &str = "\x1b[34m";
+pub(crate) const RED: &str = "\x1b[31m";
+pub(crate) const GREEN: &str = "\x1b[32m";
+pub(crate) const YELLOW: &str = "\x1b[33m";
+pub(crate) const BLUE: &str = "\x1b[34m";
 // Used only in tests; kept for future styling needs.
 #[allow(dead_code)]
-pub const MAGENTA: &str = "\x1b[35m";
-pub const CYAN: &str = "\x1b[36m";
+pub(crate) const MAGENTA: &str = "\x1b[35m";
+pub(crate) const CYAN: &str = "\x1b[36m";
 // Used only in tests; kept for future styling needs.
 #[allow(dead_code)]
-pub const GRAY: &str = "\x1b[37m";
+pub(crate) const GRAY: &str = "\x1b[37m";
 // Used only in tests; kept for future styling needs.
 #[allow(dead_code)]
-pub const BLACK: &str = "\x1b[30m";
-pub const RESET: &str = "\x1b[0m";
+pub(crate) const BLACK: &str = "\x1b[30m";
+pub(crate) const RESET: &str = "\x1b[0m";
 // Used only in tests; kept for future styling needs.
 #[allow(dead_code)]
-pub const BOLD: &str = "\x1b[1m";
+pub(crate) const BOLD: &str = "\x1b[1m";
 // Used only in tests; kept for future styling needs.
 #[allow(dead_code)]
-pub const UNDERLINE: &str = "\x1b[4m";
+pub(crate) const UNDERLINE: &str = "\x1b[4m";
 
 /// Write `msg` to `writer` and flush immediately.
-pub fn write_flush(writer: &mut dyn Write, msg: &str) -> Result<(), std::io::Error> {
+pub(crate) fn write_flush(writer: &mut dyn Write, msg: &str) -> Result<(), std::io::Error> {
     writer.write_all(msg.as_bytes())?;
     writer.flush()
 }

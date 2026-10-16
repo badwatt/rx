@@ -25,7 +25,7 @@ fn write_parse_error(writer: &mut dyn Write, msg: &str) {
 /// Parse `args` (including the program name at index 0).
 ///
 /// Prints error messages directly to `writer` for invalid flags/arguments.
-pub fn parse(args: &[String], writer: &mut dyn Write) -> Intent {
+pub(crate) fn parse(args: &[String], writer: &mut dyn Write) -> Intent {
     if args.len() <= 1 {
         return Intent::Run(default_config());
     }

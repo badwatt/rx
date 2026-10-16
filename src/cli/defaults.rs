@@ -5,7 +5,7 @@ use crate::config::{Config, DEFAULT_KEEP, DEFAULT_REPO};
 /// Build a fresh [`Config`] from defaults: repo `~/.dotfiles`, hostname resolved
 /// from the OS, keep `10`, update/diff `false`, elevation detected from the
 /// running NixOS release.
-pub fn default_config() -> Config {
+pub(crate) fn default_config() -> Config {
     Config {
         repo: expand_tilde(DEFAULT_REPO),
         hostname: hostname::resolve(),
@@ -21,7 +21,7 @@ pub fn default_config() -> Config {
 /// Expand `~` at the start of a path to the user's home directory.
 /// Returns the path unchanged if `~` is not the leading character
 /// or if `$HOME` is not set.
-pub fn expand_tilde(path: &str) -> String {
+pub(crate) fn expand_tilde(path: &str) -> String {
     if let Some(rest) = path.strip_prefix('~')
         && let Ok(home) = std::env::var("HOME")
     {

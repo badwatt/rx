@@ -1,10 +1,10 @@
 /// Build a `git pull` command argv for `repo`.
-pub fn git_pull(repo: &str) -> Vec<String> {
+pub(crate) fn git_pull(repo: &str) -> Vec<String> {
     vec!["git".into(), "-C".into(), repo.into(), "pull".into()]
 }
 
 /// Build a `git status --porcelain` command argv for `repo`.
-pub fn git_status(repo: &str) -> Vec<String> {
+pub(crate) fn git_status(repo: &str) -> Vec<String> {
     vec![
         "git".into(),
         "-C".into(),
@@ -15,7 +15,7 @@ pub fn git_status(repo: &str) -> Vec<String> {
 }
 
 /// Build a `git rev-parse --is-inside-work-tree` command argv for `repo`.
-pub fn git_rev_parse(repo: &str) -> Vec<String> {
+pub(crate) fn git_rev_parse(repo: &str) -> Vec<String> {
     vec![
         "git".into(),
         "-C".into(),
@@ -26,7 +26,7 @@ pub fn git_rev_parse(repo: &str) -> Vec<String> {
 }
 
 /// Build a `git add .` command argv for `repo`.
-pub fn git_add(repo: &str) -> Vec<String> {
+pub(crate) fn git_add(repo: &str) -> Vec<String> {
     vec![
         "git".into(),
         "-C".into(),
@@ -37,7 +37,7 @@ pub fn git_add(repo: &str) -> Vec<String> {
 }
 
 /// Build a `nix flake update` command argv for `repo`.
-pub fn nix_update(repo: &str) -> Vec<String> {
+pub(crate) fn nix_update(repo: &str) -> Vec<String> {
     vec![
         "nix".into(),
         "flake".into(),
@@ -52,7 +52,7 @@ pub fn nix_update(repo: &str) -> Vec<String> {
 /// When `elevate` is set (NixOS >= 25.11), run as the user and let
 /// `nixos-rebuild` elevate only the activation via `--elevate=sudo`, skipping
 /// the self-rebuild re-exec with `--no-reexec`. Otherwise prefix with `sudo`.
-pub fn nix_rebuild(repo: &str, hostname: &str, elevate: bool) -> Vec<String> {
+pub(crate) fn nix_rebuild(repo: &str, hostname: &str, elevate: bool) -> Vec<String> {
     let flake = format!("{repo}#{hostname}");
     if elevate {
         vec![
@@ -77,7 +77,7 @@ pub fn nix_rebuild(repo: &str, hostname: &str, elevate: bool) -> Vec<String> {
 }
 
 /// Build a `nix-env --delete-generations` command argv keeping `generations`.
-pub fn nix_keep(generations: u8) -> Vec<String> {
+pub(crate) fn nix_keep(generations: u8) -> Vec<String> {
     vec![
         "sudo".into(),
         "nix-env".into(),
@@ -89,12 +89,12 @@ pub fn nix_keep(generations: u8) -> Vec<String> {
 }
 
 /// Build a `nix-collect-garbage` command argv to free unreferenced store paths.
-pub fn nix_collect_garbage() -> Vec<String> {
+pub(crate) fn nix_collect_garbage() -> Vec<String> {
     vec!["sudo".into(), "nix-collect-garbage".into()]
 }
 
 /// Build a `nix profile diff-closures` command argv for the system profile.
-pub fn nix_diff_closures() -> Vec<String> {
+pub(crate) fn nix_diff_closures() -> Vec<String> {
     vec![
         "nix".into(),
         "profile".into(),
@@ -108,7 +108,7 @@ pub fn nix_diff_closures() -> Vec<String> {
 ///
 /// Mirrors the former `tac | awk '/Version/{print; exit} 1' | tac` pipeline:
 /// when no `Version` line exists, the whole output is returned unchanged.
-pub fn tail_from_last_version(output: &str) -> String {
+pub(crate) fn tail_from_last_version(output: &str) -> String {
     let lines: Vec<&str> = output.lines().collect();
     match lines.iter().rposition(|line| line.contains("Version")) {
         Some(start) => {

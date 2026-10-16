@@ -5,7 +5,7 @@ use crate::error::Error;
 ///
 /// Production wires [`crate::adapters::terminal::TerminalIo`]; tests inject
 /// mock implementations.
-pub trait UserIo {
+pub(crate) trait UserIo {
     /// Print a banner title.
     fn title(&self, text: &str) -> Result<(), Error>;
     /// Prompt for a yes/no confirmation, returning `default` on empty input.

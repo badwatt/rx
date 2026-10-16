@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::ports::command::CommandRunner;
 
 /// Production [`CommandRunner`] backed by `std::process`.
-pub struct ProcessRunner;
+pub(crate) struct ProcessRunner;
 
 impl CommandRunner for ProcessRunner {
     fn run(&self, cmd: &[String]) -> Result<i32, Error> {
@@ -19,7 +19,7 @@ impl CommandRunner for ProcessRunner {
 /// Run a command via argv list (stdio inherited) and return its exit code.
 ///
 /// A process killed by a signal returns `1`.
-pub fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
+pub(crate) fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
     let status = Command::new(&cmd[0])
         .args(&cmd[1..])
         .stdin(Stdio::inherit())
@@ -33,7 +33,7 @@ pub fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
 /// Run a command via argv list and return its exit code and lossy-UTF-8 stdout.
 ///
 /// stderr is inherited so diagnostics stay visible.
-pub fn capture_cmd(cmd: &[String]) -> Result<(i32, String), Error> {
+pub(crate) fn capture_cmd(cmd: &[String]) -> Result<(i32, String), Error> {
     let output = Command::new(&cmd[0])
         .args(&cmd[1..])
         .stdin(Stdio::null())

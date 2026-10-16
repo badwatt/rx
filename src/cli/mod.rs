@@ -3,11 +3,11 @@
 //! Parses arguments into an [`Intent`] and dispatches it to the update
 //! workflow or to help/version output.
 
-pub mod defaults;
-pub mod help;
-pub mod hostname;
-pub mod nixos;
-pub mod parse;
+pub(crate) mod defaults;
+pub(crate) mod help;
+pub(crate) mod hostname;
+pub(crate) mod nixos;
+pub(crate) mod parse;
 
 use std::io::Write;
 
@@ -19,7 +19,7 @@ use crate::update;
 
 /// Result of interpreting command-line arguments.
 #[derive(Debug, PartialEq)]
-pub enum Intent {
+pub(crate) enum Intent {
     Help,
     Version,
     Run(Config),
@@ -27,7 +27,7 @@ pub enum Intent {
 }
 
 /// Dispatch parsed arguments to help, version, workflow, or error.
-pub fn dispatch(
+pub(crate) fn dispatch(
     args: &[String],
     writer: &mut dyn Write,
     cmd: &dyn CommandRunner,

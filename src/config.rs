@@ -1,9 +1,9 @@
 use std::fmt;
 
 /// Default dotfiles repository path (before `~` expansion).
-pub const DEFAULT_REPO: &str = "~/.dotfiles";
+pub(crate) const DEFAULT_REPO: &str = "~/.dotfiles";
 /// Default number of generations to keep during cleanup.
-pub const DEFAULT_KEEP: u8 = 10;
+pub(crate) const DEFAULT_KEEP: u8 = 10;
 
 /// Parsed CLI configuration.
 #[expect(
@@ -11,18 +11,18 @@ pub const DEFAULT_KEEP: u8 = 10;
     reason = "independent CLI flags are naturally boolean"
 )]
 #[derive(Debug, PartialEq, Clone)]
-pub struct Config {
-    pub repo: String,
-    pub hostname: String,
-    pub keep: u8,
-    pub update: bool,
-    pub diff: bool,
+pub(crate) struct Config {
+    pub(crate) repo: String,
+    pub(crate) hostname: String,
+    pub(crate) keep: u8,
+    pub(crate) update: bool,
+    pub(crate) diff: bool,
     /// Assume "yes" for all confirmation prompts.
-    pub yes: bool,
+    pub(crate) yes: bool,
     /// Print commands instead of executing them.
-    pub dry_run: bool,
+    pub(crate) dry_run: bool,
     /// Use `nixos-rebuild --elevate=sudo --no-reexec` (NixOS >= 25.11).
-    pub elevate: bool,
+    pub(crate) elevate: bool,
 }
 
 impl fmt::Display for Config {

@@ -5,7 +5,7 @@
 use std::io::{self, Write};
 
 /// A `Write` implementation that always fails on `write` but succeeds on `flush`.
-pub struct FailingWriter;
+pub(crate) struct FailingWriter;
 
 impl Write for FailingWriter {
     fn write(&mut self, _: &[u8]) -> io::Result<usize> {
@@ -17,7 +17,7 @@ impl Write for FailingWriter {
 }
 
 /// A `Write` implementation that fails on both `write` and `flush`.
-pub struct FailingFlushWriter;
+pub(crate) struct FailingFlushWriter;
 
 impl Write for FailingFlushWriter {
     fn write(&mut self, _: &[u8]) -> io::Result<usize> {
@@ -29,7 +29,7 @@ impl Write for FailingFlushWriter {
 }
 
 /// A `Write` implementation where `write` succeeds but `flush` fails.
-pub struct FlushFailingWriter;
+pub(crate) struct FlushFailingWriter;
 
 impl Write for FlushFailingWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

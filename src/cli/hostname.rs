@@ -1,6 +1,6 @@
 /// Resolve the hostname: `/proc/sys/kernel/hostname` → `HOSTNAME` env →
 /// `hostname` command → `"unknown"`.
-pub fn resolve() -> String {
+pub(crate) fn resolve() -> String {
     resolve_from(
         || std::fs::read_to_string(resolve_path()).ok(),
         || std::env::var("HOSTNAME").ok(),
@@ -35,7 +35,7 @@ fn resolve_path() -> &'static str {
 /// `env_hostname` falls back to the `HOSTNAME` env var,
 /// `cmd_hostname` falls back to the `hostname` command output,
 /// and all failing yields `"unknown"`.
-pub fn resolve_from(
+pub(crate) fn resolve_from(
     proc_hostname: impl FnOnce() -> Option<String>,
     env_hostname: impl FnOnce() -> Option<String>,
     cmd_hostname: impl FnOnce() -> Option<String>,
