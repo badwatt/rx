@@ -13,6 +13,9 @@ use crate::ports::user_io::UserIo;
 
 /// Run the full NixOS update workflow.
 pub(crate) fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
+    if let Some(msg) = config.validate() {
+        return Err(Error::InvalidConfig(msg));
+    }
     ui.title("RX Configuration")?;
     ui.config(config)?;
 

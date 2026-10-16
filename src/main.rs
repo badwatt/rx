@@ -16,7 +16,7 @@ use std::{env, io::stdout};
 
 fn exit_code_for(error: &error::Error) -> i32 {
     match error {
-        error::Error::InvalidArgs => 2,
+        error::Error::InvalidArgs | error::Error::InvalidConfig(_) => 2,
         _ => 1,
     }
 }
@@ -52,5 +52,10 @@ mod tests {
             exit_code_for(&crate::error::Error::Io(std::io::Error::other("x"))),
             1
         );
+    }
+
+    #[test]
+    fn exit_code_invalid_config_is_2() {
+        assert_eq!(exit_code_for(&crate::error::Error::InvalidConfig("bad")), 2);
     }
 }

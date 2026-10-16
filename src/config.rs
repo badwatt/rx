@@ -33,6 +33,20 @@ impl fmt::Display for Config {
     }
 }
 
+impl Config {
+    /// Check invariants before running the workflow.
+    /// Returns a user-facing message when the config is invalid.
+    pub(crate) fn validate(&self) -> Option<&'static str> {
+        if self.repo.is_empty() {
+            return Some("repo path cannot be empty");
+        }
+        if self.keep == 0 {
+            return Some("generations to keep must be > 0");
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,5 +74,28 @@ mod tests {
             sample().to_string(),
             "Config { repo: repo, hostname: host, keep: 5, update: true, diff: false }"
         );
+    }
+
+    #[test]
+    fn validate_accepts_valid_config() {
+        assert!(sample().validate().is_none());
+    }
+
+    #[test]
+    fn validate_rejects_empty_repo() {
+        let config = Config {
+            repo: String::new(),
+            ..sample()
+        };
+        assert_eq!(config.validate(), Some("repo path cannot be empty"));
+    }
+
+    #[test]
+    fn validate_rejects_zero_keep() {
+        let config = Config {
+            keep: 0,
+            ..sample()
+        };
+        assert_eq!(config.validate(), Some("generations to keep must be > 0"));
     }
 }

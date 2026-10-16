@@ -736,3 +736,12 @@ fn run_rebuild_ng_flavor_when_probe_zero() {
     let cmd = probe_returns(0);
     assert!(run(&default_config(), &cmd, &ok_ui(&Log::default())).is_ok());
 }
+
+#[test]
+fn run_invalid_config_returns_error() {
+    let config = Config {
+        repo: String::new(),
+        ..default_config()
+    };
+    assert!(run(&config, &ok_cmd(), &ok_ui(&Log::default())).is_err());
+}

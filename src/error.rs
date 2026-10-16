@@ -16,6 +16,7 @@ pub(crate) enum Error {
     CleanupFailed,
     GitAddFailed,
     InvalidArgs,
+    InvalidConfig(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -33,6 +34,7 @@ impl fmt::Display for Error {
             Error::CleanupFailed => write!(f, "Cleanup failed"),
             Error::GitAddFailed => write!(f, "Failed to add changes to the stage"),
             Error::InvalidArgs => write!(f, "Invalid arguments"),
+            Error::InvalidConfig(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -49,7 +51,8 @@ impl std::error::Error for Error {
             | Error::HostnameUnknown
             | Error::CleanupFailed
             | Error::GitAddFailed
-            | Error::InvalidArgs => None,
+            | Error::InvalidArgs
+            | Error::InvalidConfig(_) => None,
         }
     }
 }
@@ -126,6 +129,14 @@ mod tests {
     }
 
     #[test]
+    fn display_invalid_config_matches_message() {
+        assert_eq!(
+            Error::InvalidConfig("repo path cannot be empty").to_string(),
+            "repo path cannot be empty"
+        );
+    }
+
+    #[test]
     fn display_invalid_args_matches_literal() {
         assert_eq!(Error::InvalidArgs.to_string(), "Invalid arguments");
     }
@@ -147,6 +158,7 @@ mod tests {
         assert!(std::error::Error::source(&Error::CleanupFailed).is_none());
         assert!(std::error::Error::source(&Error::GitAddFailed).is_none());
         assert!(std::error::Error::source(&Error::InvalidArgs).is_none());
+        assert!(std::error::Error::source(&Error::InvalidConfig("x")).is_none());
     }
 
     #[test]
