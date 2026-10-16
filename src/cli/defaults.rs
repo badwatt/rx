@@ -1,8 +1,10 @@
 use crate::cli::hostname;
+use crate::cli::nixos;
 use crate::config::{Config, DEFAULT_KEEP, DEFAULT_REPO};
 
 /// Build a fresh [`Config`] from defaults: repo `~/.dotfiles`, hostname resolved
-/// from the OS, keep `10`, update/diff `false`.
+/// from the OS, keep `10`, update/diff `false`, elevation detected from the
+/// running NixOS release.
 pub fn default_config() -> Config {
     Config {
         repo: expand_tilde(DEFAULT_REPO),
@@ -10,6 +12,7 @@ pub fn default_config() -> Config {
         keep: DEFAULT_KEEP,
         update: false,
         diff: false,
+        elevate: nixos::supports_elevate(),
     }
 }
 

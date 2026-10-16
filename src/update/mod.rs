@@ -113,6 +113,7 @@ mod tests {
             keep: 1,
             update: false,
             diff: false,
+            elevate: false,
         }
     }
 

@@ -6,6 +6,7 @@
 pub mod defaults;
 pub mod help;
 pub mod hostname;
+pub mod nixos;
 pub mod parse;
 
 use std::io::Write;

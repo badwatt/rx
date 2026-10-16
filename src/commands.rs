@@ -37,15 +37,32 @@ pub fn nix_update(repo: &str) -> Vec<String> {
 }
 
 /// Build a `nixos-rebuild switch` command argv for `repo` and `hostname`.
-pub fn nix_rebuild(repo: &str, hostname: &str) -> Vec<String> {
-    vec![
-        "sudo".into(),
-        "nixos-rebuild".into(),
-        "switch".into(),
-        "--flake".into(),
-        format!("{repo}#{hostname}"),
-        "--show-trace".into(),
-    ]
+///
+/// When `elevate` is set (NixOS >= 25.11), run as the user and let
+/// `nixos-rebuild` elevate only the activation via `--elevate=sudo`, skipping
+/// the self-rebuild re-exec with `--no-reexec`. Otherwise prefix with `sudo`.
+pub fn nix_rebuild(repo: &str, hostname: &str, elevate: bool) -> Vec<String> {
+    let flake = format!("{repo}#{hostname}");
+    if elevate {
+        vec![
+            "nixos-rebuild".into(),
+            "switch".into(),
+            "--flake".into(),
+            flake,
+            "--show-trace".into(),
+            "--elevate=sudo".into(),
+            "--no-reexec".into(),
+        ]
+    } else {
+        vec![
+            "sudo".into(),
+            "nixos-rebuild".into(),
+            "switch".into(),
+            "--flake".into(),
+            flake,
+            "--show-trace".into(),
+        ]
+    }
 }
 
 /// Build a `nix-env --delete-generations` command argv keeping `generations`.
@@ -123,9 +140,9 @@ mod tests {
     }
 
     #[test]
-    fn nix_rebuild_argv() {
+    fn nix_rebuild_argv_legacy_uses_sudo() {
         assert_eq!(
-            nix_rebuild("/repo", "host"),
+            nix_rebuild("/repo", "host", false),
             vec![
                 "sudo",
                 "nixos-rebuild",
@@ -133,6 +150,22 @@ mod tests {
                 "--flake",
                 "/repo#host",
                 "--show-trace"
+            ]
+        );
+    }
+
+    #[test]
+    fn nix_rebuild_argv_elevate_uses_ng_flags() {
+        assert_eq!(
+            nix_rebuild("/repo", "host", true),
+            vec![
+                "nixos-rebuild",
+                "switch",
+                "--flake",
+                "/repo#host",
+                "--show-trace",
+                "--elevate=sudo",
+                "--no-reexec"
             ]
         );
     }

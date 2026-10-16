@@ -23,7 +23,9 @@
 1. **Git Pull** — pulls latest changes from your dotfiles repo
 2. **Nix Flake Update** — `nix flake update` *(optional)*
 3. **Git Stage** — detects changes (incl. untracked files), asks confirmation, `git add .`
-4. **NixOS Rebuild** — `sudo nixos-rebuild switch --flake ...#{hostname}`
+4. **NixOS Rebuild** — `nixos-rebuild switch --flake ...#{hostname}`. On NixOS >= 25.11
+   (`nixos-rebuild-ng`) it runs as your user with `--elevate=sudo --no-reexec`;
+   older releases fall back to `sudo nixos-rebuild switch ...`
 5. **Cleanup** — `nix-env --delete-generations +N` then `nix-collect-garbage`
 6. **Diff** — shows closure diff between old/new generations *(optional)*
 
@@ -115,6 +117,7 @@ src/
 │   ├── parse.rs         # Argument parser
 │   ├── defaults.rs      # Default config + tilde expansion
 │   ├── hostname.rs      # Hostname resolution
+│   ├── nixos.rs         # NixOS release detection (ng elevation)
 │   └── help.rs          # Help/version banners
 tests/
 └── integration.rs        # End-to-end binary tests
@@ -128,6 +131,9 @@ tests/
 - **Single output channel** — all user-facing output flows through the `UserIo` port.
 - **Command builders return `Vec<String>`** — argv lists, not shell strings. No injection risk.
 - **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
+- **Release-aware rebuild** — `rx` reads `/etc/os-release` and uses the ng
+  `--elevate=sudo --no-reexec` form only on NixOS >= 25.11; older systems fall
+  back to an external `sudo`.
 - **Clippy pedantic** — `#[warn(clippy::pedantic)]` enforced at compile time.
 
 ---
@@ -137,7 +143,7 @@ tests/
 ### 100% test coverage — every branch, every error path
 
 ```
-170 tests: 160 unit + 10 integration — all passing ✅
+184 tests: 174 unit + 10 integration — all passing ✅
 ```
 
 Unit tests cover:
@@ -146,7 +152,7 @@ Unit tests cover:
 - Command builders (every `git_*` and `nix_*` function)
 - Process execution (exit codes, signals, suppressed output)
 - User IO (confirm prompt, parse responses, banners, config rendering, error propagation)
-- Config (hostname resolution chain, tilde expansion)
+- Config (hostname resolution chain, NixOS release detection, tilde expansion)
 - Update workflow (pull, flake, stage, rebuild, cleanup, diff — with mock ports)
 - Error type (Display, Error::source, From impl)
 

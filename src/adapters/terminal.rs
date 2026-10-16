@@ -164,6 +164,7 @@ mod tests {
             keep: 1,
             update: false,
             diff: false,
+            elevate: false,
         }
     }
 
@@ -329,6 +330,7 @@ mod tests {
             keep: 10,
             update: false,
             diff: true,
+            elevate: true,
         };
         assert!(print_config(&mut buf, &config).is_ok());
         let s = String::from_utf8_lossy(&buf);

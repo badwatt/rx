@@ -13,6 +13,8 @@ pub struct Config {
     pub keep: u8,
     pub update: bool,
     pub diff: bool,
+    /// Use `nixos-rebuild --elevate=sudo --no-reexec` (NixOS >= 25.11).
+    pub elevate: bool,
 }
 
 impl fmt::Display for Config {
@@ -36,6 +38,7 @@ mod tests {
             keep: 5,
             update: true,
             diff: false,
+            elevate: false,
         }
     }
 
