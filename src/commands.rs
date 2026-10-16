@@ -1,3 +1,10 @@
+//! Command vocabulary: argv specs for the external tools rx drives (git, nix).
+//!
+//! Kept at the crate root on purpose. The `update` use-case needs to name the
+//! commands it runs, and moving these specs into `adapters/` would invert the
+//! hexagonal dependency direction (domain -> adapter). They are pure data
+//! (no I/O); execution goes through the `CommandRunner` port.
+
 /// Build a `git pull` command argv for `repo`.
 pub(crate) fn git_pull(repo: &str) -> Vec<String> {
     vec!["git".into(), "-C".into(), repo.into(), "pull".into()]

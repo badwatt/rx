@@ -20,7 +20,7 @@ impl CommandRunner for ProcessRunner {
 ///
 /// A process killed by a signal returns `1`.
 pub(crate) fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
-    let status = Command::new(&cmd[0])
+    let status = Command::new(program(cmd)?)
         .args(&cmd[1..])
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
@@ -34,7 +34,7 @@ pub(crate) fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
 ///
 /// stderr is inherited so diagnostics stay visible.
 pub(crate) fn capture_cmd(cmd: &[String]) -> Result<(i32, String), Error> {
-    let output = Command::new(&cmd[0])
+    let output = Command::new(program(cmd)?)
         .args(&cmd[1..])
         .stdin(Stdio::null())
         .stderr(Stdio::inherit())
@@ -44,6 +44,16 @@ pub(crate) fn capture_cmd(cmd: &[String]) -> Result<(i32, String), Error> {
         exit_code(output.status),
         String::from_utf8_lossy(&output.stdout).into_owned(),
     ))
+}
+
+/// Return the program name, or an error when `cmd` is empty.
+fn program(cmd: &[String]) -> Result<&str, Error> {
+    cmd.first().map(String::as_str).ok_or_else(|| {
+        Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "empty command",
+        ))
+    })
 }
 
 /// Extract exit code from process status; signal-killed processes return 1.
@@ -101,6 +111,16 @@ mod tests {
     #[test]
     fn capture_cmd_not_found_returns_io_error() {
         assert!(capture_cmd(&["nonexistent_cmd_zxy123".into()]).is_err());
+    }
+
+    #[test]
+    fn run_cmd_empty_returns_error() {
+        assert!(run_cmd(&[]).is_err());
+    }
+
+    #[test]
+    fn capture_cmd_empty_returns_error() {
+        assert!(capture_cmd(&[]).is_err());
     }
 
     #[test]
