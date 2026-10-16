@@ -119,21 +119,39 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_no_args_reaches_workflow() {
+    fn dispatch_hostname_reaches_workflow() {
         let mut buf = Vec::new();
-        dispatch(&args(&["rx"]), &mut buf, &OkCmd, &OkUi).expect("workflow");
+        dispatch(
+            &args(&["rx", "--hostname", "testhost"]),
+            &mut buf,
+            &OkCmd,
+            &OkUi,
+        )
+        .expect("workflow");
     }
 
     #[test]
     fn dispatch_flags_reach_workflow() {
         let mut buf = Vec::new();
-        dispatch(&args(&["rx", "-d", "-u"]), &mut buf, &OkCmd, &OkUi).expect("flags");
+        dispatch(
+            &args(&["rx", "-d", "-u", "--hostname", "testhost"]),
+            &mut buf,
+            &OkCmd,
+            &OkUi,
+        )
+        .expect("flags");
     }
 
     #[test]
     fn dispatch_dry_run_uses_dry_runner() {
         let mut buf = Vec::new();
-        dispatch(&args(&["rx", "--dry-run", "-y"]), &mut buf, &OkCmd, &OkUi).expect("dry run");
+        dispatch(
+            &args(&["rx", "--dry-run", "-y", "--hostname", "testhost"]),
+            &mut buf,
+            &OkCmd,
+            &OkUi,
+        )
+        .expect("dry run");
     }
 
     #[test]
