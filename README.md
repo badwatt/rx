@@ -197,7 +197,7 @@ cargo llvm-cov --all-targets   # 100% coverage (inside `nix develop`)
 
 Cross-compilation targets:
 - `x86_64-linux` / `x86_64-linux-musl`
-- `aarch64-linux` / `aarch64-linux-android`
+- `aarch64-linux`
 - `x86_64-darwin` / `aarch64-darwin`
 
 ---
