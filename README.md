@@ -89,21 +89,33 @@ Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` �
 
 ## 🏗 Architecture
 
+Hexagonal (ports & adapters) core organized into vertical slices. Top-level
+directories scream the use cases (`update`, `cli`); the hexagonal layers
+(`ports`, `adapters`) hold the shared boundaries.
+
 ```
 src/
-├── main.rs              # Entry point, exit codes
+├── main.rs              # Composition root: wires adapters, maps exit codes
 ├── error.rs             # Error type (Io, GitPullFailed, InvalidArgs)
+├── config.rs            # Config entity (pure domain)
+├── commands.rs          # Command argv specs (git, nix)
+├── ansi.rs              # ANSI color helpers + write_flush
 ├── test_helpers.rs      # FailingWriter / FailingFlushWriter etc.
-├── app/
-│   ├── mod.rs
-│   ├── cli.rs           # Main workflow, Deps trait, RealDeps
-│   └── init.rs          # Config, arg parsing, help/version banners
-├── core/
-│   ├── mod.rs
-│   ├── ansi.rs          # ANSI color helpers + write_flush
-│   ├── commands.rs      # Command builder functions (git, nix)
-│   ├── process.rs       # Command execution (argv + shell pipelines)
-│   └── ui.rs            # print_title, confirm prompt
+├── ports/               # Interfaces the core depends on
+│   ├── command.rs       # CommandRunner port (argv + shell pipelines)
+│   └── user_io.rs       # UserIo port (title, confirm, output, config)
+├── adapters/            # Driven adapter implementations
+│   ├── process.rs       # ProcessRunner (std::process)
+│   └── terminal.rs      # TerminalIo (stdin/stdout) + config rendering
+├── update/              # Use-case slice: NixOS update workflow
+│   ├── mod.rs           # Pipeline orchestration
+│   └── steps/           # pull, flake, stage, rebuild, cleanup, diff
+├── cli/                 # Driving adapter: command-line interface
+│   ├── mod.rs           # Intent + dispatch
+│   ├── parse.rs         # Argument parser
+│   ├── defaults.rs      # Default config + tilde expansion
+│   ├── hostname.rs      # Hostname resolution
+│   └── help.rs          # Help/version banners
 tests/
 └── integration.rs        # End-to-end binary tests
 ```
@@ -111,7 +123,9 @@ tests/
 ### Design decisions
 
 - **Zero dependencies** — no crates, pure `std`. Compile fast, audit easy.
-- **`Deps` trait** — all I/O behind a trait. Tests inject mocks, production uses `RealDeps`.
+- **Ports & adapters** — the workflow depends only on the `CommandRunner` and `UserIo`
+  traits. Tests inject mocks; production wires `ProcessRunner` / `TerminalIo` in `main`.
+- **Single output channel** — all user-facing output flows through the `UserIo` port.
 - **Command builders return `Vec<String>`** — argv lists, not shell strings. No injection risk.
 - **Shell pipelines only when necessary** — `nix_diff` is the sole `sh -c` call (requires `tac` + `awk`).
 - **Clippy pedantic** — `#[warn(clippy::pedantic)]` enforced at compile time.
@@ -123,7 +137,7 @@ tests/
 ### 100% test coverage — every branch, every error path
 
 ```
-161 tests: 151 unit + 10 integration — all passing ✅
+164 tests: 154 unit + 10 integration — all passing ✅
 ```
 
 Unit tests cover:
@@ -131,9 +145,9 @@ Unit tests cover:
 - ANSI helpers (color codes, flush behavior, failing writers)
 - Command builders (every `git_*` and `nix_*` function)
 - Process execution (exit codes, signals, suppressed output)
-- UI (confirm prompt, parse responses, banners, error propagation)
+- User IO (confirm prompt, parse responses, banners, config rendering, error propagation)
 - Config (hostname resolution chain, tilde expansion)
-- CLI workflow (pull, update, stage, rebuild, cleanup, diff — with mock deps)
+- Update workflow (pull, flake, stage, rebuild, cleanup, diff — with mock ports)
 - Error type (Display, Error::source, From impl)
 
 Integration tests cover:
