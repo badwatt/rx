@@ -12,7 +12,9 @@ const DEFAULT_KEEP: u8 = 10;
 /// Returns the path unchanged if `~` is not the leading character
 /// or if `$HOME` is not set.
 fn expand_tilde(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix('~') && let Ok(home) = std::env::var("HOME") {
+    if let Some(rest) = path.strip_prefix('~')
+        && let Ok(home) = std::env::var("HOME")
+    {
         format!("{home}{rest}")
     } else {
         path.to_owned()
@@ -187,7 +189,7 @@ pub fn parse_args(args: &[String], writer: &mut dyn Write) -> Parsed {
     }
 
     if !args[1].starts_with('-') {
-        write_parse_error(writer, &format!("Unknown argument \"{}\"", &args[1]));
+        write_parse_error(writer, &format!("Unknown argument \"{}\"", args[1]));
         return Parsed::Invalid;
     }
 

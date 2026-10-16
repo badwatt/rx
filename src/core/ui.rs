@@ -156,8 +156,6 @@ mod tests {
         assert!(confirm(&mut reader, &mut writer, true, None).expect("confirm"));
     }
 
-
-
     #[test]
     fn failing_writer_flush_is_ok() {
         let mut writer = crate::test_helpers::FailingWriter;

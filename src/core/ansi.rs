@@ -48,8 +48,6 @@ mod tests {
         assert!(!UNDERLINE.is_empty());
     }
 
-
-
     #[test]
     fn failing_writer_flush_is_err() {
         let mut w = crate::test_helpers::FailingFlushWriter;

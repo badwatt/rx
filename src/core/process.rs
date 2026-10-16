@@ -75,10 +75,7 @@ mod tests {
 
     #[test]
     fn run_cmd_signal_returns_one() {
-        let result = run_cmd(
-            &["sh".into(), "-c".into(), "kill -9 $$".into()],
-            false,
-        );
+        let result = run_cmd(&["sh".into(), "-c".into(), "kill -9 $$".into()], false);
         assert!(result.is_ok());
         assert_eq!(result.expect("run cmd signal"), 1);
     }
@@ -122,6 +119,4 @@ mod tests {
         let status = Command::new("false").status().expect("spawn false");
         assert_eq!(exit_code(status), 1);
     }
-
-
 }

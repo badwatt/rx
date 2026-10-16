@@ -5,22 +5,46 @@ pub fn git_pull(repo: &str) -> Vec<String> {
 
 /// Build a `git diff --exit-code` command argv for `repo`.
 pub fn git_diff(repo: &str) -> Vec<String> {
-    vec!["git".into(), "-C".into(), repo.into(), "diff".into(), "--exit-code".into()]
+    vec![
+        "git".into(),
+        "-C".into(),
+        repo.into(),
+        "diff".into(),
+        "--exit-code".into(),
+    ]
 }
 
 /// Build a `git status --porcelain` command argv for `repo`.
 pub fn git_status(repo: &str) -> Vec<String> {
-    vec!["git".into(), "-C".into(), repo.into(), "status".into(), "--porcelain".into()]
+    vec![
+        "git".into(),
+        "-C".into(),
+        repo.into(),
+        "status".into(),
+        "--porcelain".into(),
+    ]
 }
 
 /// Build a `git add .` command argv for `repo`.
 pub fn git_add(repo: &str) -> Vec<String> {
-    vec!["git".into(), "-C".into(), repo.into(), "add".into(), ".".into()]
+    vec![
+        "git".into(),
+        "-C".into(),
+        repo.into(),
+        "add".into(),
+        ".".into(),
+    ]
 }
 
 /// Build a `nix flake update` command argv for `repo`.
 pub fn nix_update(repo: &str) -> Vec<String> {
-    vec!["nix".into(), "flake".into(), "update".into(), "--flake".into(), repo.into()]
+    vec![
+        "nix".into(),
+        "flake".into(),
+        "update".into(),
+        "--flake".into(),
+        repo.into(),
+    ]
 }
 
 /// Build a `nixos-rebuild switch` command argv for `repo` and `hostname`.
@@ -64,12 +88,18 @@ mod tests {
 
     #[test]
     fn git_diff_argv() {
-        assert_eq!(git_diff("/repo"), vec!["git", "-C", "/repo", "diff", "--exit-code"]);
+        assert_eq!(
+            git_diff("/repo"),
+            vec!["git", "-C", "/repo", "diff", "--exit-code"]
+        );
     }
 
     #[test]
     fn git_status_argv() {
-        assert_eq!(git_status("/repo"), vec!["git", "-C", "/repo", "status", "--porcelain"]);
+        assert_eq!(
+            git_status("/repo"),
+            vec!["git", "-C", "/repo", "status", "--porcelain"]
+        );
     }
 
     #[test]
@@ -79,14 +109,24 @@ mod tests {
 
     #[test]
     fn nix_update_argv() {
-        assert_eq!(nix_update("/repo"), vec!["nix", "flake", "update", "--flake", "/repo"]);
+        assert_eq!(
+            nix_update("/repo"),
+            vec!["nix", "flake", "update", "--flake", "/repo"]
+        );
     }
 
     #[test]
     fn nix_rebuild_argv() {
         assert_eq!(
             nix_rebuild("/repo", "host"),
-            vec!["sudo", "nixos-rebuild", "switch", "--flake", "/repo#host", "--show-trace"]
+            vec![
+                "sudo",
+                "nixos-rebuild",
+                "switch",
+                "--flake",
+                "/repo#host",
+                "--show-trace"
+            ]
         );
     }
 
@@ -94,7 +134,14 @@ mod tests {
     fn nix_keep_argv() {
         assert_eq!(
             nix_keep(5),
-            vec!["sudo", "nix-env", "--profile", "/nix/var/nix/profiles/system", "--delete-generations", "+5"]
+            vec![
+                "sudo",
+                "nix-env",
+                "--profile",
+                "/nix/var/nix/profiles/system",
+                "--delete-generations",
+                "+5"
+            ]
         );
     }
 

@@ -42,6 +42,9 @@ mod tests {
 
     #[test]
     fn exit_code_io_error_is_1() {
-        assert_eq!(exit_code_for(&crate::error::Error::Io(std::io::Error::other("x"))), 1);
+        assert_eq!(
+            exit_code_for(&crate::error::Error::Io(std::io::Error::other("x"))),
+            1
+        );
     }
 }

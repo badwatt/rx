@@ -89,7 +89,10 @@ fn stage(writer: &mut dyn Write, repo: &str, deps: &dyn Deps) -> Result<(), Erro
     match deps.run_cmd(&commands::git_add(repo), true) {
         Ok(_) => print_success(writer, "Changes added to git stage successfully")?,
         Err(e) => {
-            ansi::write_flush(writer, &format!("Failed to add changes to the stage: {e}\n"))?;
+            ansi::write_flush(
+                writer,
+                &format!("Failed to add changes to the stage: {e}\n"),
+            )?;
         }
     }
     Ok(())
@@ -318,8 +321,6 @@ mod tests {
     // error propagation via crate::test_helpers::FailingWriter
     // ------------------------------------------------------------------
 
-
-
     #[test]
     fn failing_writer_flush_method_is_callable() {
         let mut writer = crate::test_helpers::FailingWriter;
@@ -506,23 +507,20 @@ mod tests {
     #[test]
     fn cli_print_title_git_pull_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config(),
-            &deps_print_title_fails_on("Git Pull"),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &default_config(),
+                &deps_print_title_fails_on("Git Pull"),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn cli_run_cmd_git_pull_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config(),
-            &deps_run_cmd_fails_on("pull"),
-        )
-        .is_err());
+        assert!(cli(&mut buf, &default_config(), &deps_run_cmd_fails_on("pull"),).is_err());
     }
 
     #[test]
@@ -530,12 +528,14 @@ mod tests {
         let mut mut_config = default_config();
         mut_config.update = true;
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &mut_config,
-            &deps_print_title_fails_on("Nix Update"),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &mut_config,
+                &deps_print_title_fails_on("Nix Update"),
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -543,12 +543,7 @@ mod tests {
         let mut config = default_config();
         config.update = true;
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &config,
-            &deps_run_cmd_fails_on("flake"),
-        )
-        .is_err());
+        assert!(cli(&mut buf, &config, &deps_run_cmd_fails_on("flake"),).is_err());
     }
 
     #[test]
@@ -636,57 +631,65 @@ mod tests {
     #[test]
     fn cli_run_cmd_nixrebuild_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config(),
-            &deps_run_cmd_fails_on("nixos-rebuild"),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &default_config(),
+                &deps_run_cmd_fails_on("nixos-rebuild"),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn cli_run_cmd_nixkeep_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config(),
-            &deps_run_cmd_fails_on("nix-env"),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &default_config(),
+                &deps_run_cmd_fails_on("nix-env"),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn cli_run_pipeline_nix_diff_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config_diff(),
-            &deps_run_pipeline_fails_on(),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &default_config_diff(),
+                &deps_run_pipeline_fails_on(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn cli_print_title_nix_rebuild_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config(),
-            &deps_print_title_fails_on("Nixos Rebuild"),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &default_config(),
+                &deps_print_title_fails_on("Nixos Rebuild"),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn cli_print_title_nix_diff_error_propagates() {
         let mut buf = Vec::new();
-        assert!(cli(
-            &mut buf,
-            &default_config_diff(),
-            &deps_print_title_fails_on("Nix Diff"),
-        )
-        .is_err());
+        assert!(
+            cli(
+                &mut buf,
+                &default_config_diff(),
+                &deps_print_title_fails_on("Nix Diff"),
+            )
+            .is_err()
+        );
     }
-
-
 }
