@@ -16,7 +16,7 @@ pub fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<
     ui.title("RX Configuration")?;
     ui.config(config)?;
 
-    if !ui.confirm(true, None)? {
+    if !config.yes && !ui.confirm(true, None)? {
         return Ok(());
     }
 
@@ -26,7 +26,7 @@ pub fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<
         steps::flake::run(config, cmd, ui)?;
     }
 
-    steps::stage::run(&config.repo, cmd, ui)?;
+    steps::stage::run(&config.repo, config.yes, cmd, ui)?;
     steps::rebuild::run(config, cmd, ui)?;
     steps::cleanup::run(config, cmd, ui)?;
 
@@ -113,6 +113,8 @@ mod tests {
             keep: 1,
             update: false,
             diff: false,
+            yes: false,
+            dry_run: false,
             elevate: false,
         }
     }
@@ -238,14 +240,18 @@ mod tests {
         }
     }
 
-    /// UI where every method succeeds; error/success/output are logged.
+    /// UI where every method succeeds; confirm/error/success/output are logged.
     fn ok_ui(log: &Log) -> MockUi {
+        let confirm_log = log.clone();
         let error_log = log.clone();
         let success_log = log.clone();
         let output_log = log.clone();
         MockUi {
             title: Box::new(|_| Ok(())),
-            confirm: Box::new(|_, _| Ok(true)),
+            confirm: Box::new(move |_, _| {
+                confirm_log.record("confirm");
+                Ok(true)
+            }),
             error: Box::new(move |m| {
                 error_log.record(m);
                 Ok(())
@@ -287,6 +293,31 @@ mod tests {
             ..ok_ui(&Log::default())
         };
         assert!(run(&default_config(), &ok_cmd(), &ui).is_ok());
+    }
+
+    #[test]
+    fn run_yes_true_skips_top_confirmation() {
+        let log = Log::default();
+        let ui = ok_ui(&log);
+        let config = Config {
+            yes: true,
+            ..default_config()
+        };
+        assert!(run(&config, &ok_cmd(), &ui).is_ok());
+        assert!(!log.contains("confirm"));
+    }
+
+    #[test]
+    fn run_yes_true_skips_stage_confirmation() {
+        let log = Log::default();
+        let ui = ok_ui(&log);
+        let config = Config {
+            yes: true,
+            ..default_config()
+        };
+        assert!(run(&config, &changes_cmd(), &ui).is_ok());
+        assert!(log.contains("Changes added to git stage successfully"));
+        assert!(!log.contains("confirm"));
     }
 
     #[test]

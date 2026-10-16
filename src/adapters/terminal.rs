@@ -164,6 +164,8 @@ mod tests {
             keep: 1,
             update: false,
             diff: false,
+            yes: false,
+            dry_run: false,
             elevate: false,
         }
     }
@@ -330,6 +332,8 @@ mod tests {
             keep: 10,
             update: false,
             diff: true,
+            yes: false,
+            dry_run: false,
             elevate: true,
         };
         assert!(print_config(&mut buf, &config).is_ok());

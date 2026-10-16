@@ -90,3 +90,22 @@ fn version_long_flag_prints_semver() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("0.1.0"));
 }
+
+#[test]
+fn zero_keep_flag_exits_nonzero() {
+    let output = Command::new(RX).args(["-k", "0"]).output().expect("run rx");
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn dry_run_prints_commands_without_executing() {
+    let output = Command::new(RX)
+        .args(["--dry-run", "-y", "--hostname", "testhost"])
+        .output()
+        .expect("run rx");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("$ "));
+    assert!(stdout.contains("nixos-rebuild"));
+}

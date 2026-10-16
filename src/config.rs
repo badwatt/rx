@@ -6,6 +6,10 @@ pub const DEFAULT_REPO: &str = "~/.dotfiles";
 pub const DEFAULT_KEEP: u8 = 10;
 
 /// Parsed CLI configuration.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent CLI flags are naturally boolean"
+)]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Config {
     pub repo: String,
@@ -13,6 +17,10 @@ pub struct Config {
     pub keep: u8,
     pub update: bool,
     pub diff: bool,
+    /// Assume "yes" for all confirmation prompts.
+    pub yes: bool,
+    /// Print commands instead of executing them.
+    pub dry_run: bool,
     /// Use `nixos-rebuild --elevate=sudo --no-reexec` (NixOS >= 25.11).
     pub elevate: bool,
 }
@@ -38,6 +46,8 @@ mod tests {
             keep: 5,
             update: true,
             diff: false,
+            yes: false,
+            dry_run: false,
             elevate: false,
         }
     }

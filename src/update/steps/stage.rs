@@ -4,7 +4,7 @@ use crate::ports::command::CommandRunner;
 use crate::ports::user_io::UserIo;
 
 /// Detect changes (including untracked files) and, if confirmed, stage them.
-pub fn run(repo: &str, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
+pub fn run(repo: &str, yes: bool, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
     let (status, output) = cmd.capture(&commands::git_status(repo))?;
     if status != 0 {
         return Err(Error::GitStatusFailed);
@@ -14,7 +14,7 @@ pub fn run(repo: &str, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), E
     }
     ui.title("Git Changes")?;
     ui.output(&output)?;
-    if !ui.confirm(true, Some("Do you want to add these changes to the stage?"))? {
+    if !yes && !ui.confirm(true, Some("Do you want to add these changes to the stage?"))? {
         ui.error("Changes not added to stage")?;
         return Ok(());
     }

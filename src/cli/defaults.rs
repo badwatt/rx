@@ -12,6 +12,8 @@ pub fn default_config() -> Config {
         keep: DEFAULT_KEEP,
         update: false,
         diff: false,
+        yes: false,
+        dry_run: false,
         elevate: nixos::supports_elevate(),
     }
 }

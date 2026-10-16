@@ -37,7 +37,16 @@ pub fn dispatch(
         Intent::Help => help::print_help(writer),
         Intent::Version => help::print_version(writer),
         Intent::Invalid => Err(Error::InvalidArgs),
-        Intent::Run(config) => update::run(&config, cmd, ui),
+        Intent::Run(config) => run_intent(&config, cmd, ui),
+    }
+}
+
+/// Run the workflow, selecting the dry-run command adapter when requested.
+fn run_intent(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
+    if config.dry_run {
+        update::run(config, &crate::adapters::dry_run::DryRunRunner, ui)
+    } else {
+        update::run(config, cmd, ui)
     }
 }
 
@@ -119,6 +128,12 @@ mod tests {
     fn dispatch_flags_reach_workflow() {
         let mut buf = Vec::new();
         dispatch(&args(&["rx", "-d", "-u"]), &mut buf, &OkCmd, &OkUi).expect("flags");
+    }
+
+    #[test]
+    fn dispatch_dry_run_uses_dry_runner() {
+        let mut buf = Vec::new();
+        dispatch(&args(&["rx", "--dry-run", "-y"]), &mut buf, &OkCmd, &OkUi).expect("dry run");
     }
 
     #[test]

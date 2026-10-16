@@ -99,6 +99,14 @@ fn parse_long(
             config.diff = true;
             Ok(0)
         }
+        "--yes" => {
+            config.yes = true;
+            Ok(0)
+        }
+        "--dry-run" => {
+            config.dry_run = true;
+            Ok(0)
+        }
         "--repo" | "--hostname" | "--keep" => {
             let value = take_value(args, i, arg, writer)?;
             set_value(long_value_key(arg), value, arg, config, writer)
@@ -136,6 +144,7 @@ fn parse_short(
             'v' => return Err(Intent::Version),
             'd' => config.diff = true,
             'u' => config.update = true,
+            'y' => config.yes = true,
             'r' | 'n' | 'k' => {
                 let label = format!("-{flag}");
                 let value = take_value(args, i, &label, writer)?;
@@ -353,6 +362,14 @@ mod tests {
     }
 
     #[test]
+    fn parse_y_flag_sets_yes() {
+        let mut buf = Vec::new();
+        let mut expected = default_config();
+        expected.yes = true;
+        assert_eq!(parse(&args(&["rx", "-y"]), &mut buf), Intent::Run(expected));
+    }
+
+    #[test]
     fn parse_d_and_u_together() {
         let mut buf = Vec::new();
         let mut expected = default_config();
@@ -448,6 +465,28 @@ mod tests {
         expected.diff = true;
         assert_eq!(
             parse(&args(&["rx", "--diff"]), &mut buf),
+            Intent::Run(expected)
+        );
+    }
+
+    #[test]
+    fn parse_yes_long_sets_yes() {
+        let mut buf = Vec::new();
+        let mut expected = default_config();
+        expected.yes = true;
+        assert_eq!(
+            parse(&args(&["rx", "--yes"]), &mut buf),
+            Intent::Run(expected)
+        );
+    }
+
+    #[test]
+    fn parse_dry_run_long_sets_dry_run() {
+        let mut buf = Vec::new();
+        let mut expected = default_config();
+        expected.dry_run = true;
+        assert_eq!(
+            parse(&args(&["rx", "--dry-run"]), &mut buf),
             Intent::Run(expected)
         );
     }
