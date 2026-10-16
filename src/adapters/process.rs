@@ -1,6 +1,20 @@
 use std::process::{Command, Stdio};
 
 use crate::error::Error;
+use crate::ports::command::CommandRunner;
+
+/// Production [`CommandRunner`] backed by `std::process`.
+pub struct ProcessRunner;
+
+impl CommandRunner for ProcessRunner {
+    fn run(&self, cmd: &[String], output: bool) -> Result<i32, Error> {
+        run_cmd(cmd, output)
+    }
+
+    fn run_pipeline(&self, cmd: &str, output: bool) -> Result<i32, Error> {
+        run_pipeline(cmd, output)
+    }
+}
 
 /// Run a command via argv list and return its exit code.
 ///
@@ -118,5 +132,17 @@ mod tests {
     fn exit_code_returns_code_for_normal_exit() {
         let status = Command::new("false").status().expect("spawn false");
         assert_eq!(exit_code(status), 1);
+    }
+
+    #[test]
+    fn process_runner_run_true_returns_zero() {
+        let runner = ProcessRunner;
+        assert_eq!(runner.run(&["true".into()], false).expect("run true"), 0);
+    }
+
+    #[test]
+    fn process_runner_run_pipeline_true_returns_zero() {
+        let runner = ProcessRunner;
+        assert_eq!(runner.run_pipeline("true", false).expect("run true"), 0);
     }
 }

@@ -1,17 +1,22 @@
-mod app;
-mod core;
+mod adapters;
+mod ansi;
+mod cli;
+mod commands;
+mod config;
 mod error;
+mod ports;
+mod update;
 
 #[cfg(test)]
 mod test_helpers;
 
-use app::cli::RealDeps;
-use app::init;
+use adapters::process::ProcessRunner;
+use adapters::terminal::TerminalIo;
 use std::{env, io::stdout};
 
-fn exit_code_for(error: &crate::error::Error) -> i32 {
+fn exit_code_for(error: &error::Error) -> i32 {
     match error {
-        crate::error::Error::InvalidArgs => 2,
+        error::Error::InvalidArgs => 2,
         _ => 1,
     }
 }
@@ -19,8 +24,9 @@ fn exit_code_for(error: &crate::error::Error) -> i32 {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut out = stdout();
-    let deps = RealDeps;
-    if let Err(e) = init::run(&args, &mut out, &deps) {
+    let runner = ProcessRunner;
+    let ui = TerminalIo;
+    if let Err(e) = cli::dispatch(&args, &mut out, &runner, &ui) {
         eprintln!("Error: {e}");
         std::process::exit(exit_code_for(&e));
     }

@@ -1,0 +1,55 @@
+use std::io::Write;
+
+use crate::ansi;
+use crate::error::Error;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Print the help banner.
+pub fn print_help(writer: &mut dyn Write) -> Result<(), Error> {
+    ansi::write_flush(
+        writer,
+        "\n*****************************************************\n RX - A simple CLI tool to update your nixos system\n*****************************************************\n-r, --repo        : set repo path (default is $HOME/.dotfiles)\n-n, --hostname    : set hostname (default is OS hostname)\n-k, --keep        : set generations to keep (default is 10)\n-u, --update      : set update to true (default is false)\n-d, --diff        : set diff to true (default is false)\n-h, --help        : Display this help message\n-v, --version     : Display the current version\n\n",
+    )?;
+    Ok(())
+}
+
+/// Print the version line.
+pub fn print_version(writer: &mut dyn Write) -> Result<(), Error> {
+    ansi::write_flush(
+        writer,
+        &format!("{}RX version: {}{}\n", ansi::YELLOW, VERSION, ansi::RESET),
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_help_contains_rx() {
+        let mut buf = Vec::new();
+        assert!(print_help(&mut buf).is_ok());
+        assert!(String::from_utf8_lossy(&buf).contains("RX"));
+    }
+
+    #[test]
+    fn print_version_contains_semver() {
+        let mut buf = Vec::new();
+        assert!(print_version(&mut buf).is_ok());
+        assert!(String::from_utf8_lossy(&buf).contains(VERSION));
+    }
+
+    #[test]
+    fn print_help_error_propagation() {
+        let mut writer = crate::test_helpers::FailingWriter;
+        assert!(print_help(&mut writer).is_err());
+    }
+
+    #[test]
+    fn print_version_error_propagation() {
+        let mut writer = crate::test_helpers::FailingWriter;
+        assert!(print_version(&mut writer).is_err());
+    }
+}
