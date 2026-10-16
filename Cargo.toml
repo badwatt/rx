@@ -2,6 +2,11 @@
 name = "rx"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
+description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system"
+license = "MIT"
+repository = "https://github.com/badwatt/rx"
+readme = "README.md"
 
 [dependencies]
 
@@ -10,4 +15,3 @@ pedantic = "warn"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
-

@@ -82,8 +82,12 @@ Proceed? (Y/n)
 | `--keep`       | `-k`  | Generations to keep during cleanup       | `10`          |
 | `--update`    | `-u`  | Run `nix flake update` before rebuild    | `false`       |
 | `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
+| `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
+| `--dry-run`    |       | Print commands without executing them     | `false`       |
 | `--help`       | `-h`  | Print help                                | —             |
 | `--version`    | `-v`  | Print version                             | —             |
+
+`--keep` must be at least `1`.
 
 Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` → `$HOSTNAME` env → `hostname` command → `"unknown"`.
 
@@ -104,10 +108,11 @@ src/
 ├── ansi.rs              # ANSI color helpers + write_flush
 ├── test_helpers.rs      # FailingWriter / FailingFlushWriter etc.
 ├── ports/               # Interfaces the core depends on
-│   ├── command.rs       # CommandRunner port (argv + shell pipelines)
+│   ├── command.rs       # CommandRunner port (run + capture)
 │   └── user_io.rs       # UserIo port (title, confirm, output, config)
 ├── adapters/            # Driven adapter implementations
 │   ├── process.rs       # ProcessRunner (std::process)
+│   ├── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
 │   └── terminal.rs      # TerminalIo (stdin/stdout) + config rendering
 ├── update/              # Use-case slice: NixOS update workflow
 │   ├── mod.rs           # Pipeline orchestration
@@ -146,22 +151,25 @@ tests/
 ### 100% test coverage — every branch, every error path
 
 ```
-193 tests: 183 unit + 10 integration — all passing ✅
+215 tests: 203 unit + 12 integration — all passing ✅
 ```
 
 Unit tests cover:
-- Arg parsing (valid, invalid, edge cases, defaults)
+- Arg parsing (valid, invalid, edge cases, defaults, `--keep 0` guard)
 - ANSI helpers (color codes, flush behavior, failing writers)
 - Command builders (every `git_*` and `nix_*` function)
-- Process execution (exit codes, signals, suppressed output)
+- Process execution (exit codes, signals, capture)
 - User IO (confirm prompt, parse responses, banners, config rendering, error propagation)
 - Config (hostname resolution chain, NixOS release detection, tilde expansion)
 - Update workflow (pull, flake, stage, rebuild, cleanup, diff — with mock ports)
+- Dry-run runner (command echoing)
 - Error type (Display, Error::source, From impl)
 
 Integration tests cover:
 - Help/version flags (short and long)
 - Unknown flags → exit code 2
+- `--keep 0` → exit code 2
+- `--dry-run` prints commands without executing
 - Piped stdin doesn't panic
 - Subcommand words (`rx help`, `rx version`)
 
@@ -169,6 +177,7 @@ Integration tests cover:
 cargo test          # run all tests
 cargo clippy        # lint
 cargo fmt --check   # format check
+cargo llvm-cov --all-targets   # 100% coverage (inside `nix develop`)
 ```
 
 ---
@@ -180,9 +189,9 @@ cargo fmt --check   # format check
   inputs.nixpkgs.url = "github:nixos/nixpkgs";
 
   outputs = { self, nixpkgs, ... }:
-    # Build: nix build .#default
+    # Build: nix build        (or nix build .#rx / .#default)
     # Cross: nix build .#cross.x86_64-linux-musl.default --impure
-    # Dev:   nix develop
+    # Dev:   nix develop       (includes cargo-llvm-cov + LLVM tools)
 }
 ```
 

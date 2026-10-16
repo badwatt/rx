@@ -19,12 +19,21 @@
         "x86_64-linux-musl"
         "aarch64-linux"
         "aarch64-linux-android"
-        "i86_64-linux"
+        "i686-linux"
       ];
       allSystems = darwin ++ linux;
 
       forEachSystem = systems: f: lib.genAttrs systems (system: f system);
       forAllSystems = forEachSystem allSystems;
+
+      mkRx =
+        pkgs:
+        pkgs.rustPlatform.buildRustPackage {
+          pname = "rx";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+        };
     in
     {
       packages = forAllSystems (
@@ -33,35 +42,31 @@
           pkgs = import nixpkgs { inherit system; };
         in
         {
-          # e.g. nix build .#rx
-          default = pkgs.rustPlatform.buildRustPackage {
-            name = "rx";
-            src = ./.;
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-            };
-          };
+          # e.g. nix build .#rx  (or plain: nix build)
+          default = mkRx pkgs;
+          rx = mkRx pkgs;
 
-          # e.g. nix build .#cross.x86_64-linux-musl.rx --impure
+          # e.g. nix build .#cross.x86_64-linux-musl.default --impure
           cross = forEachSystem (lib.filter (sys: sys != system) allSystems) (
             targetSystem:
             let
               crossPkgs = import nixpkgs {
-                localSystem = system;
+                inherit system;
                 crossSystem = targetSystem;
               };
             in
             {
-              inherit (crossPkgs) rx;
+              default = mkRx crossPkgs;
             }
           );
         }
       );
-      defaultPackage = forAllSystems (system: self.packages.${system}.default);
+
       devShells = forAllSystems (
         system:
         let
           pkgs = import nixpkgs { inherit system; };
+          llvm = pkgs.llvmPackages.llvm;
           devRequirements = with pkgs; [
             gcc
             gnumake
@@ -70,6 +75,8 @@
             cargo
             rustfmt
             rust-analyzer
+            cargo-llvm-cov
+            llvm
           ];
         in
         {
@@ -78,6 +85,10 @@
 
             # For cross compilation
             NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM = 1;
+
+            # Let cargo-llvm-cov find the LLVM tools.
+            LLVM_COV = "${llvm}/bin/llvm-cov";
+            LLVM_PROFDATA = "${llvm}/bin/llvm-profdata";
 
             buildInputs = devRequirements;
             packages = devRequirements;
