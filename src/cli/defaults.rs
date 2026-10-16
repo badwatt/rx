@@ -67,6 +67,6 @@ mod tests {
 
     #[test]
     fn default_config_hostname_is_non_empty() {
-        assert!(!default_config().hostname.is_empty());
+        assert_ne!(default_config().hostname, "");
     }
 }

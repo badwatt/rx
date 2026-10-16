@@ -35,17 +35,17 @@ mod tests {
 
     #[test]
     fn style_constants_are_non_empty() {
-        assert!(!RED.is_empty());
-        assert!(!GREEN.is_empty());
-        assert!(!YELLOW.is_empty());
-        assert!(!BLUE.is_empty());
-        assert!(!MAGENTA.is_empty());
-        assert!(!CYAN.is_empty());
-        assert!(!GRAY.is_empty());
-        assert!(!BLACK.is_empty());
-        assert!(!RESET.is_empty());
-        assert!(!BOLD.is_empty());
-        assert!(!UNDERLINE.is_empty());
+        assert_ne!(RED, "");
+        assert_ne!(GREEN, "");
+        assert_ne!(YELLOW, "");
+        assert_ne!(BLUE, "");
+        assert_ne!(MAGENTA, "");
+        assert_ne!(CYAN, "");
+        assert_ne!(GRAY, "");
+        assert_ne!(BLACK, "");
+        assert_ne!(RESET, "");
+        assert_ne!(BOLD, "");
+        assert_ne!(UNDERLINE, "");
     }
 
     #[test]

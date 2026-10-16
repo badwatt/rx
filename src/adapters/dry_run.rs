@@ -56,6 +56,6 @@ mod tests {
     fn dry_run_runner_capture_returns_empty() {
         let (status, out) = DryRunRunner.capture(&["true".into()]).expect("capture");
         assert_eq!(status, 0);
-        assert!(out.is_empty());
+        assert_eq!(out, "");
     }
 }

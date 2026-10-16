@@ -90,7 +90,7 @@ mod tests {
         });
         let result = from_cmd_inner(output);
         assert!(result.is_some());
-        assert!(!result.expect("hostname").trim().is_empty());
+        assert_ne!(result.expect("hostname").trim(), "");
     }
 
     #[test]
