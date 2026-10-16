@@ -8,6 +8,10 @@ use std::fmt;
 pub enum Error {
     Io(std::io::Error),
     GitPullFailed,
+    FlakeUpdateFailed,
+    RebuildFailed,
+    CleanupFailed,
+    GitAddFailed,
     InvalidArgs,
 }
 
@@ -16,6 +20,10 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::GitPullFailed => write!(f, "Failed to pull changes"),
+            Error::FlakeUpdateFailed => write!(f, "Failed to update flake inputs"),
+            Error::RebuildFailed => write!(f, "Nixos rebuild failed"),
+            Error::CleanupFailed => write!(f, "Cleanup failed"),
+            Error::GitAddFailed => write!(f, "Failed to add changes to the stage"),
             Error::InvalidArgs => write!(f, "Invalid arguments"),
         }
     }
@@ -25,7 +33,12 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Io(e) => Some(e),
-            Error::GitPullFailed | Error::InvalidArgs => None,
+            Error::GitPullFailed
+            | Error::FlakeUpdateFailed
+            | Error::RebuildFailed
+            | Error::CleanupFailed
+            | Error::GitAddFailed
+            | Error::InvalidArgs => None,
         }
     }
 }
@@ -52,14 +65,29 @@ mod tests {
     }
 
     #[test]
-    fn source_io_error_yields_some() {
-        let err = Error::Io(std::io::Error::other("test"));
-        assert!(std::error::Error::source(&err).is_some());
+    fn display_flake_update_failed_matches_literal() {
+        assert_eq!(
+            Error::FlakeUpdateFailed.to_string(),
+            "Failed to update flake inputs"
+        );
     }
 
     #[test]
-    fn source_git_pull_failed_yields_none() {
-        assert!(std::error::Error::source(&Error::GitPullFailed).is_none());
+    fn display_rebuild_failed_matches_literal() {
+        assert_eq!(Error::RebuildFailed.to_string(), "Nixos rebuild failed");
+    }
+
+    #[test]
+    fn display_cleanup_failed_matches_literal() {
+        assert_eq!(Error::CleanupFailed.to_string(), "Cleanup failed");
+    }
+
+    #[test]
+    fn display_git_add_failed_matches_literal() {
+        assert_eq!(
+            Error::GitAddFailed.to_string(),
+            "Failed to add changes to the stage"
+        );
     }
 
     #[test]
@@ -68,7 +96,18 @@ mod tests {
     }
 
     #[test]
-    fn source_invalid_args_yields_none() {
+    fn source_io_error_yields_some() {
+        let err = Error::Io(std::io::Error::other("test"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn source_non_io_variants_yield_none() {
+        assert!(std::error::Error::source(&Error::GitPullFailed).is_none());
+        assert!(std::error::Error::source(&Error::FlakeUpdateFailed).is_none());
+        assert!(std::error::Error::source(&Error::RebuildFailed).is_none());
+        assert!(std::error::Error::source(&Error::CleanupFailed).is_none());
+        assert!(std::error::Error::source(&Error::GitAddFailed).is_none());
         assert!(std::error::Error::source(&Error::InvalidArgs).is_none());
     }
 

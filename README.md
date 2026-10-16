@@ -134,6 +134,9 @@ tests/
 - **Release-aware rebuild** — `rx` reads `/etc/os-release` and uses the ng
   `--elevate=sudo --no-reexec` form only on NixOS >= 25.11; older systems fall
   back to an external `sudo`.
+- **Fail-fast** — every step checks the command exit status; a failed pull,
+  flake update, rebuild or cleanup aborts before the next step (so cleanup never
+  runs after a failed rebuild).
 - **Clippy pedantic** — `#[warn(clippy::pedantic)]` enforced at compile time.
 
 ---
@@ -143,7 +146,7 @@ tests/
 ### 100% test coverage — every branch, every error path
 
 ```
-184 tests: 174 unit + 10 integration — all passing ✅
+193 tests: 183 unit + 10 integration — all passing ✅
 ```
 
 Unit tests cover:

@@ -163,6 +163,36 @@ mod tests {
         }
     }
 
+    /// Command mock whose `run` returns exit code 1 on `sub`.
+    fn run_nonzero_on(sub: &str) -> MockCmd {
+        let sub = sub.to_owned();
+        MockCmd {
+            run: Box::new(move |cmd| {
+                if cmd.iter().any(|a| a.contains(&sub)) {
+                    Ok(1)
+                } else {
+                    Ok(0)
+                }
+            }),
+            capture: Box::new(no_capture),
+        }
+    }
+
+    /// Changes present and `run` returning exit code 1 on `sub`.
+    fn changes_run_nonzero_on(sub: &str) -> MockCmd {
+        let sub = sub.to_owned();
+        MockCmd {
+            run: Box::new(move |cmd| {
+                if cmd.iter().any(|a| a.contains(&sub)) {
+                    Ok(1)
+                } else {
+                    Ok(0)
+                }
+            }),
+            capture: Box::new(|_| Ok(String::from(" M file\n"))),
+        }
+    }
+
     /// Command mock whose `run` fails on `sub`.
     fn run_fails_on(sub: &str) -> MockCmd {
         let sub = sub.to_owned();
@@ -286,8 +316,25 @@ mod tests {
         let log = Log::default();
         let ui = ok_ui(&log);
         let cmd = changes_run_fails_on("add");
-        assert!(run(&default_config(), &cmd, &ui).is_ok());
+        assert!(run(&default_config(), &cmd, &ui).is_err());
         assert!(log.contains("Failed to add changes to the stage"));
+    }
+
+    #[test]
+    fn run_stage_add_nonzero_returns_error() {
+        let log = Log::default();
+        let ui = ok_ui(&log);
+        assert!(run(&default_config(), &changes_run_nonzero_on("add"), &ui).is_err());
+        assert!(log.contains("Failed to add changes to the stage"));
+    }
+
+    #[test]
+    fn run_stage_add_nonzero_output_error_propagates() {
+        let ui = MockUi {
+            error: Box::new(|_| Err(Error::GitPullFailed)),
+            ..ok_ui(&Log::default())
+        };
+        assert!(run(&default_config(), &changes_run_nonzero_on("add"), &ui).is_err());
     }
 
     // ------------------------------------------------------------------
@@ -389,6 +436,15 @@ mod tests {
     }
 
     #[test]
+    fn run_flake_nonzero_returns_error() {
+        let config = Config {
+            update: true,
+            ..default_config()
+        };
+        assert!(run(&config, &run_nonzero_on("flake"), &ok_ui(&Log::default())).is_err());
+    }
+
+    #[test]
     fn run_stage_capture_error_propagates() {
         assert!(
             run(
@@ -477,6 +533,18 @@ mod tests {
     }
 
     #[test]
+    fn run_rebuild_nonzero_returns_error() {
+        assert!(
+            run(
+                &default_config(),
+                &run_nonzero_on("nixos-rebuild"),
+                &ok_ui(&Log::default())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn run_cleanup_cmd_error_propagates() {
         assert!(
             run(
@@ -494,6 +562,30 @@ mod tests {
             run(
                 &default_config(),
                 &run_fails_on("nix-collect-garbage"),
+                &ok_ui(&Log::default())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn run_cleanup_keep_nonzero_returns_error() {
+        assert!(
+            run(
+                &default_config(),
+                &run_nonzero_on("nix-env"),
+                &ok_ui(&Log::default())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn run_cleanup_gc_nonzero_returns_error() {
+        assert!(
+            run(
+                &default_config(),
+                &run_nonzero_on("nix-collect-garbage"),
                 &ok_ui(&Log::default())
             )
             .is_err()
