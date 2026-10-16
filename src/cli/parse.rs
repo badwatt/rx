@@ -191,15 +191,25 @@ fn set_value(
     Ok(1)
 }
 
-/// Parse a numeric `--keep` / `-k` value, or report a non-numeric error.
+/// Parse a numeric `--keep` / `-k` value (>= 1), or report an error.
 fn parse_keep(value: &str, label: &str, writer: &mut dyn Write) -> Result<u8, Intent> {
-    value.parse::<u8>().map_err(|_| {
-        write_parse_error(
-            writer,
-            &format!("Value of \"{label}\" flag is not numeric."),
-        );
-        Intent::Invalid
-    })
+    match value.parse::<u8>() {
+        Ok(num) if num >= 1 => Ok(num),
+        Ok(_) => {
+            write_parse_error(
+                writer,
+                &format!("Value of \"{label}\" flag must be at least 1."),
+            );
+            Err(Intent::Invalid)
+        }
+        Err(_) => {
+            write_parse_error(
+                writer,
+                &format!("Value of \"{label}\" flag is not numeric."),
+            );
+            Err(Intent::Invalid)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -280,6 +290,13 @@ mod tests {
             Intent::Invalid
         );
         assert!(String::from_utf8_lossy(&buf).contains("not numeric"));
+    }
+
+    #[test]
+    fn parse_k_zero_returns_error() {
+        let mut buf = Vec::new();
+        assert_eq!(parse(&args(&["rx", "-k", "0"]), &mut buf), Intent::Invalid);
+        assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
     }
 
     #[test]
@@ -476,6 +493,16 @@ mod tests {
             Intent::Invalid
         );
         assert!(String::from_utf8_lossy(&buf).contains("not numeric"));
+    }
+
+    #[test]
+    fn parse_keep_long_zero_returns_error() {
+        let mut buf = Vec::new();
+        assert_eq!(
+            parse(&args(&["rx", "--keep", "0"]), &mut buf),
+            Intent::Invalid
+        );
+        assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
     }
 
     #[test]

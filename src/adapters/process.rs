@@ -11,7 +11,7 @@ impl CommandRunner for ProcessRunner {
         run_cmd(cmd)
     }
 
-    fn capture(&self, cmd: &[String]) -> Result<String, Error> {
+    fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
         capture_cmd(cmd)
     }
 }
@@ -30,17 +30,20 @@ pub fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
     Ok(exit_code(status))
 }
 
-/// Run a command via argv list and return its stdout as a lossy UTF-8 string.
+/// Run a command via argv list and return its exit code and lossy-UTF-8 stdout.
 ///
 /// stderr is inherited so diagnostics stay visible.
-pub fn capture_cmd(cmd: &[String]) -> Result<String, Error> {
+pub fn capture_cmd(cmd: &[String]) -> Result<(i32, String), Error> {
     let output = Command::new(&cmd[0])
         .args(&cmd[1..])
         .stdin(Stdio::null())
         .stderr(Stdio::inherit())
         .output()
         .map_err(Error::Io)?;
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    Ok((
+        exit_code(output.status),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+    ))
 }
 
 /// Extract exit code from process status; signal-killed processes return 1.
@@ -81,22 +84,23 @@ mod tests {
     }
 
     #[test]
-    fn capture_cmd_echo_returns_stdout() {
-        let out = capture_cmd(&["echo".into(), "hello".into()]).expect("capture echo");
+    fn capture_cmd_echo_returns_status_and_stdout() {
+        let (status, out) = capture_cmd(&["echo".into(), "hello".into()]).expect("capture echo");
+        assert_eq!(status, 0);
         assert_eq!(out, "hello\n");
     }
 
     #[test]
-    fn capture_cmd_not_found_returns_io_error() {
-        let result = capture_cmd(&["nonexistent_cmd_zxy123".into()]);
-        assert!(result.is_err());
+    fn capture_cmd_nonzero_returns_status_and_stdout() {
+        let (status, out) =
+            capture_cmd(&["sh".into(), "-c".into(), "echo x; exit 3".into()]).expect("capture");
+        assert_eq!(status, 3);
+        assert_eq!(out, "x\n");
     }
 
     #[test]
-    fn capture_cmd_nonzero_still_returns_stdout() {
-        let out =
-            capture_cmd(&["sh".into(), "-c".into(), "echo x; exit 3".into()]).expect("capture sh");
-        assert_eq!(out, "x\n");
+    fn capture_cmd_not_found_returns_io_error() {
+        assert!(capture_cmd(&["nonexistent_cmd_zxy123".into()]).is_err());
     }
 
     #[test]
@@ -122,13 +126,12 @@ mod tests {
     }
 
     #[test]
-    fn process_runner_capture_echo_returns_stdout() {
+    fn process_runner_capture_echo_returns_status_and_stdout() {
         let runner = ProcessRunner;
-        assert_eq!(
-            runner
-                .capture(&["echo".into(), "hi".into()])
-                .expect("capture"),
-            "hi\n"
-        );
+        let (status, out) = runner
+            .capture(&["echo".into(), "hi".into()])
+            .expect("capture");
+        assert_eq!(status, 0);
+        assert_eq!(out, "hi\n");
     }
 }

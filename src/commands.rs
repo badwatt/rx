@@ -14,6 +14,17 @@ pub fn git_status(repo: &str) -> Vec<String> {
     ]
 }
 
+/// Build a `git rev-parse --is-inside-work-tree` command argv for `repo`.
+pub fn git_rev_parse(repo: &str) -> Vec<String> {
+    vec![
+        "git".into(),
+        "-C".into(),
+        repo.into(),
+        "rev-parse".into(),
+        "--is-inside-work-tree".into(),
+    ]
+}
+
 /// Build a `git add .` command argv for `repo`.
 pub fn git_add(repo: &str) -> Vec<String> {
     vec![
@@ -123,6 +134,14 @@ mod tests {
         assert_eq!(
             git_status("/repo"),
             vec!["git", "-C", "/repo", "status", "--porcelain"]
+        );
+    }
+
+    #[test]
+    fn git_rev_parse_argv() {
+        assert_eq!(
+            git_rev_parse("/repo"),
+            vec!["git", "-C", "/repo", "rev-parse", "--is-inside-work-tree"]
         );
     }
 

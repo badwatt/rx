@@ -51,8 +51,8 @@ mod tests {
         fn run(&self, _: &[String]) -> Result<i32, Error> {
             Ok(0)
         }
-        fn capture(&self, _: &[String]) -> Result<String, Error> {
-            Ok(String::new())
+        fn capture(&self, _: &[String]) -> Result<(i32, String), Error> {
+            Ok((0, String::new()))
         }
     }
 

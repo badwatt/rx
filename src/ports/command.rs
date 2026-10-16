@@ -7,6 +7,6 @@ use crate::error::Error;
 pub trait CommandRunner {
     /// Run a command via argv list, inheriting stdio, and return its exit code.
     fn run(&self, cmd: &[String]) -> Result<i32, Error>;
-    /// Run a command via argv list and capture its stdout as a `String`.
-    fn capture(&self, cmd: &[String]) -> Result<String, Error>;
+    /// Run a command via argv list and capture its exit code and stdout.
+    fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error>;
 }

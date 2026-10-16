@@ -44,7 +44,7 @@ mod tests {
     use std::rc::Rc;
 
     type RunFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
-    type CaptureFn = Box<dyn Fn(&[String]) -> Result<String, Error>>;
+    type CaptureFn = Box<dyn Fn(&[String]) -> Result<(i32, String), Error>>;
     type TitleFn = Box<dyn Fn(&str) -> Result<(), Error>>;
     type ConfirmFn = Box<dyn Fn(bool, Option<&str>) -> Result<bool, Error>>;
     type MsgFn = Box<dyn Fn(&str) -> Result<(), Error>>;
@@ -59,7 +59,7 @@ mod tests {
         fn run(&self, cmd: &[String]) -> Result<i32, Error> {
             (self.run)(cmd)
         }
-        fn capture(&self, cmd: &[String]) -> Result<String, Error> {
+        fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
             (self.capture)(cmd)
         }
     }
@@ -129,8 +129,8 @@ mod tests {
         clippy::unnecessary_wraps,
         reason = "mock must match the CommandRunner trait signature"
     )]
-    fn no_capture(_: &[String]) -> Result<String, Error> {
-        Ok(String::new())
+    fn no_capture(_: &[String]) -> Result<(i32, String), Error> {
+        Ok((0, String::new()))
     }
 
     fn ok_cmd() -> MockCmd {
@@ -144,7 +144,7 @@ mod tests {
     fn changes_cmd() -> MockCmd {
         MockCmd {
             run: Box::new(|_| Ok(0)),
-            capture: Box::new(|_| Ok(String::from(" M file\n"))),
+            capture: Box::new(|_| Ok((0, String::from(" M file\n")))),
         }
     }
 
@@ -159,7 +159,7 @@ mod tests {
                     Ok(0)
                 }
             }),
-            capture: Box::new(|_| Ok(String::from(" M file\n"))),
+            capture: Box::new(|_| Ok((0, String::from(" M file\n")))),
         }
     }
 
@@ -189,7 +189,7 @@ mod tests {
                     Ok(0)
                 }
             }),
-            capture: Box::new(|_| Ok(String::from(" M file\n"))),
+            capture: Box::new(|_| Ok((0, String::from(" M file\n")))),
         }
     }
 
@@ -204,7 +204,7 @@ mod tests {
                     Ok(0)
                 }
             }),
-            capture: Box::new(|_| Ok(String::new())),
+            capture: Box::new(no_capture),
         }
     }
 
@@ -212,12 +212,27 @@ mod tests {
     fn capture_fails_on(sub: &str) -> MockCmd {
         let sub = sub.to_owned();
         MockCmd {
-            run: Box::new(|_| Ok(0)),
+            run: Box::new(no_run),
             capture: Box::new(move |cmd| {
                 if cmd.iter().any(|a| a.contains(&sub)) {
                     Err(Error::GitPullFailed)
                 } else {
-                    Ok(String::new())
+                    Ok((0, String::new()))
+                }
+            }),
+        }
+    }
+
+    /// Command mock whose `capture` returns exit code 1 on `sub`.
+    fn capture_nonzero_on(sub: &str) -> MockCmd {
+        let sub = sub.to_owned();
+        MockCmd {
+            run: Box::new(no_run),
+            capture: Box::new(move |cmd| {
+                if cmd.iter().any(|a| a.contains(&sub)) {
+                    Ok((1, String::new()))
+                } else {
+                    Ok((0, String::new()))
                 }
             }),
         }
@@ -350,6 +365,30 @@ mod tests {
         assert!(run(&default_config(), &cmd, &ok_ui(&Log::default())).is_err());
     }
 
+    #[test]
+    fn run_not_a_git_repo_returns_error() {
+        assert!(
+            run(
+                &default_config(),
+                &capture_nonzero_on("rev-parse"),
+                &ok_ui(&Log::default())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn run_pull_rev_parse_capture_error_propagates() {
+        assert!(
+            run(
+                &default_config(),
+                &capture_fails_on("rev-parse"),
+                &ok_ui(&Log::default())
+            )
+            .is_err()
+        );
+    }
+
     // ------------------------------------------------------------------
     // error propagation — top-level UI calls
     // ------------------------------------------------------------------
@@ -457,6 +496,18 @@ mod tests {
     }
 
     #[test]
+    fn run_stage_git_status_nonzero_returns_error() {
+        assert!(
+            run(
+                &default_config(),
+                &capture_nonzero_on("--porcelain"),
+                &ok_ui(&Log::default())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn run_stage_title_error_propagates() {
         let ui = title_fails_on("Git Changes");
         assert!(run(&default_config(), &changes_cmd(), &ui).is_err());
@@ -542,6 +593,15 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn run_rebuild_hostname_unknown_returns_error() {
+        let config = Config {
+            hostname: String::from("unknown"),
+            ..default_config()
+        };
+        assert!(run(&config, &ok_cmd(), &ok_ui(&Log::default())).is_err());
     }
 
     #[test]

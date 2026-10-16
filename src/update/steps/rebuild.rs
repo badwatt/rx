@@ -6,6 +6,9 @@ use crate::ports::user_io::UserIo;
 
 /// Rebuild and switch the NixOS system for `config.hostname`.
 pub fn run(config: &Config, cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
+    if config.hostname == "unknown" {
+        return Err(Error::HostnameUnknown);
+    }
     ui.title("Nixos Rebuild")?;
     let status = cmd.run(&commands::nix_rebuild(
         &config.repo,

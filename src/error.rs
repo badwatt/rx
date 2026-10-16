@@ -8,8 +8,11 @@ use std::fmt;
 pub enum Error {
     Io(std::io::Error),
     GitPullFailed,
+    GitStatusFailed,
+    NotAGitRepo,
     FlakeUpdateFailed,
     RebuildFailed,
+    HostnameUnknown,
     CleanupFailed,
     GitAddFailed,
     InvalidArgs,
@@ -20,8 +23,13 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::GitPullFailed => write!(f, "Failed to pull changes"),
+            Error::GitStatusFailed => write!(f, "Failed to read repository status"),
+            Error::NotAGitRepo => write!(f, "Repository is not a git working tree"),
             Error::FlakeUpdateFailed => write!(f, "Failed to update flake inputs"),
             Error::RebuildFailed => write!(f, "Nixos rebuild failed"),
+            Error::HostnameUnknown => {
+                write!(f, "Could not determine hostname; pass --hostname")
+            }
             Error::CleanupFailed => write!(f, "Cleanup failed"),
             Error::GitAddFailed => write!(f, "Failed to add changes to the stage"),
             Error::InvalidArgs => write!(f, "Invalid arguments"),
@@ -34,8 +42,11 @@ impl std::error::Error for Error {
         match self {
             Error::Io(e) => Some(e),
             Error::GitPullFailed
+            | Error::GitStatusFailed
+            | Error::NotAGitRepo
             | Error::FlakeUpdateFailed
             | Error::RebuildFailed
+            | Error::HostnameUnknown
             | Error::CleanupFailed
             | Error::GitAddFailed
             | Error::InvalidArgs => None,
@@ -62,6 +73,30 @@ mod tests {
     #[test]
     fn display_git_pull_failed_matches_literal() {
         assert_eq!(Error::GitPullFailed.to_string(), "Failed to pull changes");
+    }
+
+    #[test]
+    fn display_git_status_failed_matches_literal() {
+        assert_eq!(
+            Error::GitStatusFailed.to_string(),
+            "Failed to read repository status"
+        );
+    }
+
+    #[test]
+    fn display_not_a_git_repo_matches_literal() {
+        assert_eq!(
+            Error::NotAGitRepo.to_string(),
+            "Repository is not a git working tree"
+        );
+    }
+
+    #[test]
+    fn display_hostname_unknown_matches_literal() {
+        assert_eq!(
+            Error::HostnameUnknown.to_string(),
+            "Could not determine hostname; pass --hostname"
+        );
     }
 
     #[test]
@@ -104,8 +139,11 @@ mod tests {
     #[test]
     fn source_non_io_variants_yield_none() {
         assert!(std::error::Error::source(&Error::GitPullFailed).is_none());
+        assert!(std::error::Error::source(&Error::GitStatusFailed).is_none());
+        assert!(std::error::Error::source(&Error::NotAGitRepo).is_none());
         assert!(std::error::Error::source(&Error::FlakeUpdateFailed).is_none());
         assert!(std::error::Error::source(&Error::RebuildFailed).is_none());
+        assert!(std::error::Error::source(&Error::HostnameUnknown).is_none());
         assert!(std::error::Error::source(&Error::CleanupFailed).is_none());
         assert!(std::error::Error::source(&Error::GitAddFailed).is_none());
         assert!(std::error::Error::source(&Error::InvalidArgs).is_none());
