@@ -136,6 +136,9 @@ tests/
   traits. Tests inject mocks; production wires `ProcessRunner` / `TerminalIo` in `main`.
 - **Single output channel** — all user-facing output flows through the `UserIo` port.
 - **Command builders return `Vec<String>`** — argv lists, not shell strings. No injection risk.
+- **Command vocabulary at the root** — `commands.rs` holds the pure argv specs the
+  use-case names; moving them under `adapters/` would invert the hexagonal
+  dependency direction (domain → adapter).
 - **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Release-aware rebuild** — `rx` reads `/etc/os-release` and uses the ng
   `--elevate=sudo --no-reexec` form only on NixOS >= 25.11; older systems fall
@@ -149,11 +152,15 @@ tests/
 
 ## 🧪 Testing
 
-### 100% test coverage — every branch, every error path
+### 100% coverage of production code — every branch, every error path
 
 ```
-215 tests: 203 unit + 12 integration — all passing ✅
+217 tests: 205 unit + 12 integration — all passing ✅
 ```
+
+Measured with `cargo llvm-cov`. Test modules (`tests.rs`) are excluded by
+cargo-llvm-cov's default filename filter, so the 100% applies to the shipped
+code.
 
 Unit tests cover:
 - Arg parsing (valid, invalid, edge cases, defaults, `--keep 0` guard)

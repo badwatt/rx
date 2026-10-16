@@ -39,11 +39,12 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
+          rx = mkRx pkgs;
         in
         {
           # e.g. nix build .#rx  (or plain: nix build)
-          default = mkRx pkgs;
-          rx = mkRx pkgs;
+          default = rx;
+          rx = rx;
         }
       );
 
