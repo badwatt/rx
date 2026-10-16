@@ -23,9 +23,10 @@
 1. **Git Pull** — pulls latest changes from your dotfiles repo
 2. **Nix Flake Update** — `nix flake update` *(optional)*
 3. **Git Stage** — detects changes (incl. untracked files), asks confirmation, `git add .`
-4. **NixOS Rebuild** — `nixos-rebuild switch --flake ...#{hostname}`. On NixOS >= 25.11
-   (`nixos-rebuild-ng`) it runs as your user with `--elevate=sudo --no-reexec`;
-   older releases fall back to `sudo nixos-rebuild switch ...`
+4. **NixOS Rebuild** — `nixos-rebuild switch --flake ...#{hostname}`. The installed
+   `nixos-rebuild` is probed (`--elevate=none list-generations`): the `-ng`
+   rewrite runs as your user with `--elevate=sudo --no-reexec`, the classic
+   script uses `sudo ... --fast`. Either way the self-rebuild re-exec is skipped.
 5. **Cleanup** — `nix-env --delete-generations +N` then `nix-collect-garbage`
 6. **Diff** — shows closure diff between old/new generations *(optional)*
 
@@ -123,7 +124,6 @@ src/
 │   ├── parse.rs         # Argument parser
 │   ├── defaults.rs      # Default config + tilde expansion
 │   ├── hostname.rs      # Hostname resolution
-│   ├── nixos.rs         # NixOS release detection (ng elevation)
 │   └── help.rs          # Help/version banners
 tests/
 └── integration.rs        # End-to-end binary tests
@@ -140,9 +140,11 @@ tests/
   use-case names; moving them under `adapters/` would invert the hexagonal
   dependency direction (domain → adapter).
 - **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
-- **Release-aware rebuild** — `rx` reads `/etc/os-release` and uses the ng
-  `--elevate=sudo --no-reexec` form only on NixOS >= 25.11; older systems fall
-  back to an external `sudo`.
+- **Capability-probed rebuild** — `rx` probes the installed `nixos-rebuild`
+  (`--elevate=none list-generations`, read-only) instead of trusting the OS
+  version; `-ng` gets `--elevate=sudo --no-reexec`, classic gets `sudo --fast`.
+- **Validated config** — `Config::validate()` rejects an empty repo/hostname or
+  `keep == 0` up front with a clear message.
 - **Fail-fast** — every step checks the command exit status; a failed pull,
   flake update, rebuild or cleanup aborts before the next step (so cleanup never
   runs after a failed rebuild).
@@ -155,7 +157,7 @@ tests/
 ### 100% coverage — every branch, every error path
 
 ```
-217 tests: 205 unit + 12 integration — all passing ✅
+221 tests: 209 unit + 12 integration — all passing ✅
 ```
 
 Coverage counts tests too: `--no-default-ignore-filename-regex` disables
@@ -207,6 +209,21 @@ Cross-compilation targets:
 - `x86_64-linux` / `x86_64-linux-musl`
 - `aarch64-linux`
 - `x86_64-darwin` / `aarch64-darwin`
+
+### Add as a flake input
+
+```nix
+{
+  inputs.rx.url = "github:badwatt/rx";
+}
+```
+
+```nix
+{ inputs, pkgs, ... }:
+{
+  home.packages = [ inputs.rx.packages.${pkgs.system}.default ];
+}
+```
 
 ---
 

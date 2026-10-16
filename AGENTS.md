@@ -75,7 +75,7 @@ src/
 ├── error.rs             # Error enum
 ├── ansi.rs              # ANSI color helpers + write_flush
 ├── ports/               # interfaces the core depends on
-│   ├── command.rs       # CommandRunner: run(argv), capture(argv)
+│   ├── command.rs       # CommandRunner: run(argv), capture(argv), probe(argv)
 │   └── user_io.rs       # UserIo: title/confirm/error/success/output/config
 ├── adapters/            # driven adapters
 │   ├── process.rs       # ProcessRunner (std::process)
@@ -93,13 +93,14 @@ src/
     └── help.rs          # help/version banners
 ```
 
-- **Ports**: `CommandRunner` (run/capture), `UserIo`. Core depends only on these.
+- **Ports**: `CommandRunner` (run/capture/probe), `UserIo`. Core depends only on these.
 - **Single output channel**: all user-facing output flows through `UserIo`.
 - **`commands.rs` at the crate root on purpose**: the use-case names the commands it runs; moving these specs into `adapters/` would invert the hexagonal dependency direction. They are pure data (no I/O).
-- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `InvalidArgs`.
+- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `InvalidArgs`, `InvalidConfig`.
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
-- **Release-aware rebuild**: `rx` reads `/etc/os-release`; NixOS >= 25.11 uses `nixos-rebuild --elevate=sudo --no-reexec`, older falls back to an external `sudo`.
+- **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
+- **Validated config**: `Config::validate()` rejects empty repo/hostname or `keep == 0` with `Error::InvalidConfig` (exit code 2).
 - **Cleanup**: `nix-env --delete-generations +N` then `nix-collect-garbage` (no `-d`, so `--keep N` is respected).
 
 ## Build / packaging
