@@ -44,8 +44,15 @@
           # e.g. nix build .#rx  (or plain: nix build)
           default = mkRx pkgs;
           rx = mkRx pkgs;
+        }
+      );
 
-          # e.g. nix build .#cross.x86_64-linux-musl.default --impure
+      # Cross builds live under legacyPackages so `packages` stays purely
+      # derivations and `nix flake show` stays quiet.
+      # e.g. nix build .#cross.x86_64-linux-musl.default --impure
+      legacyPackages = forAllSystems (
+        system:
+        {
           cross = forEachSystem (lib.filter (sys: sys != system) allSystems) (
             targetSystem:
             let
