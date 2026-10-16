@@ -40,6 +40,9 @@ impl Config {
         if self.repo.is_empty() {
             return Some("repo path cannot be empty");
         }
+        if self.hostname.is_empty() {
+            return Some("hostname cannot be empty");
+        }
         if self.keep == 0 {
             return Some("generations to keep must be > 0");
         }
@@ -97,5 +100,14 @@ mod tests {
             ..sample()
         };
         assert_eq!(config.validate(), Some("generations to keep must be > 0"));
+    }
+
+    #[test]
+    fn validate_rejects_empty_hostname() {
+        let config = Config {
+            hostname: String::new(),
+            ..sample()
+        };
+        assert_eq!(config.validate(), Some("hostname cannot be empty"));
     }
 }
