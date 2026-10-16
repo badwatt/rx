@@ -12,7 +12,7 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.98
         with:
           components: rustfmt
@@ -21,7 +21,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.98
         with:
           components: clippy
@@ -30,20 +30,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.98
       - run: cargo test --all-targets
 
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.98
         with:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@cargo-llvm-cov
+      # Tests are counted too: --no-default-ignore-filename-regex disables
+      # cargo-llvm-cov's built-in exclusion of tests.rs / tests/.
       - run: >-
-          cargo llvm-cov --all-targets
+          cargo llvm-cov --all-targets --no-default-ignore-filename-regex
           --fail-under-lines 100
           --fail-under-functions 100
           --fail-under-regions 100

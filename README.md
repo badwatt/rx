@@ -152,15 +152,14 @@ tests/
 
 ## 🧪 Testing
 
-### 100% coverage of production code — every branch, every error path
+### 100% coverage — every branch, every error path
 
 ```
 217 tests: 205 unit + 12 integration — all passing ✅
 ```
 
-Measured with `cargo llvm-cov`. Test modules (`tests.rs`) are excluded by
-cargo-llvm-cov's default filename filter, so the 100% applies to the shipped
-code.
+Coverage counts tests too: `--no-default-ignore-filename-regex` disables
+cargo-llvm-cov's built-in exclusion of `tests.rs` / `tests/`.
 
 Unit tests cover:
 - Arg parsing (valid, invalid, edge cases, defaults, `--keep 0` guard)
@@ -186,7 +185,7 @@ Integration tests cover:
 cargo test          # run all tests
 cargo clippy        # lint
 cargo fmt --check   # format check
-cargo llvm-cov --all-targets   # 100% coverage (inside `nix develop`)
+cargo llvm-cov --all-targets --no-default-ignore-filename-regex   # 100% (incl. tests)
 ```
 
 ---

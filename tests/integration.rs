@@ -92,10 +92,9 @@ fn piped_stdin_decline_exits_zero() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn rx");
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(b"n\n");
-        drop(stdin);
-    }
+    let mut stdin = child.stdin.take().expect("child stdin");
+    let _ = stdin.write_all(b"n\n");
+    drop(stdin);
     let status = child.wait().expect("wait rx");
     assert!(status.success());
 }
