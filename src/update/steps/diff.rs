@@ -6,6 +6,7 @@ use crate::ports::user_io::UserIo;
 /// Show the closure diff between the previous and current generation.
 pub fn run(cmd: &dyn CommandRunner, ui: &dyn UserIo) -> Result<(), Error> {
     ui.title("Nix Diff")?;
-    cmd.run_pipeline(commands::nix_diff(), true)?;
+    let output = cmd.capture(&commands::nix_diff_closures())?;
+    ui.output(&commands::tail_from_last_version(&output))?;
     Ok(())
 }

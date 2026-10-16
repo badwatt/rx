@@ -5,8 +5,8 @@ use crate::error::Error;
 /// Production wires [`crate::adapters::process::ProcessRunner`]; tests inject
 /// mock implementations.
 pub trait CommandRunner {
-    /// Run a command via argv list (no shell, no injection risk).
-    fn run(&self, cmd: &[String], output: bool) -> Result<i32, Error>;
-    /// Run a shell pipeline string (only for commands requiring pipes).
-    fn run_pipeline(&self, cmd: &str, output: bool) -> Result<i32, Error>;
+    /// Run a command via argv list, inheriting stdio, and return its exit code.
+    fn run(&self, cmd: &[String]) -> Result<i32, Error>;
+    /// Run a command via argv list and capture its stdout as a `String`.
+    fn capture(&self, cmd: &[String]) -> Result<String, Error>;
 }

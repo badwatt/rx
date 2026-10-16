@@ -47,11 +47,11 @@ mod tests {
     struct OkCmd;
 
     impl CommandRunner for OkCmd {
-        fn run(&self, _: &[String], _: bool) -> Result<i32, Error> {
+        fn run(&self, _: &[String]) -> Result<i32, Error> {
             Ok(0)
         }
-        fn run_pipeline(&self, _: &str, _: bool) -> Result<i32, Error> {
-            Ok(0)
+        fn capture(&self, _: &[String]) -> Result<String, Error> {
+            Ok(String::new())
         }
     }
 
@@ -68,6 +68,9 @@ mod tests {
             Ok(())
         }
         fn success(&self, _: &str) -> Result<(), Error> {
+            Ok(())
+        }
+        fn output(&self, _: &str) -> Result<(), Error> {
             Ok(())
         }
         fn config(&self, _: &Config) -> Result<(), Error> {
@@ -119,12 +122,13 @@ mod tests {
 
     #[test]
     fn ok_adapters_cover_all_methods() {
-        assert!(OkCmd.run(&[], false).is_ok());
-        assert!(OkCmd.run_pipeline("true", false).is_ok());
+        assert!(OkCmd.run(&[]).is_ok());
+        assert!(OkCmd.capture(&[]).is_ok());
         assert!(OkUi.title("t").is_ok());
         assert!(OkUi.confirm(true, None).is_ok());
         assert!(OkUi.error("e").is_ok());
         assert!(OkUi.success("s").is_ok());
+        assert!(OkUi.output("o").is_ok());
         assert!(OkUi.config(&defaults::default_config()).is_ok());
     }
 }

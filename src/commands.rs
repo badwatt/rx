@@ -3,17 +3,6 @@ pub fn git_pull(repo: &str) -> Vec<String> {
     vec!["git".into(), "-C".into(), repo.into(), "pull".into()]
 }
 
-/// Build a `git diff --exit-code` command argv for `repo`.
-pub fn git_diff(repo: &str) -> Vec<String> {
-    vec![
-        "git".into(),
-        "-C".into(),
-        repo.into(),
-        "diff".into(),
-        "--exit-code".into(),
-    ]
-}
-
 /// Build a `git status --porcelain` command argv for `repo`.
 pub fn git_status(repo: &str) -> Vec<String> {
     vec![
@@ -71,10 +60,36 @@ pub fn nix_keep(generations: u8) -> Vec<String> {
     ]
 }
 
-/// Return the `nix profile diff-closures` pipeline string.
-/// This requires shell execution (uses pipes).
-pub fn nix_diff() -> &'static str {
-    "nix profile diff-closures --profile /nix/var/nix/profiles/system | tac | awk '/Version/{print; exit} 1' | tac"
+/// Build a `nix-collect-garbage` command argv to free unreferenced store paths.
+pub fn nix_collect_garbage() -> Vec<String> {
+    vec!["sudo".into(), "nix-collect-garbage".into()]
+}
+
+/// Build a `nix profile diff-closures` command argv for the system profile.
+pub fn nix_diff_closures() -> Vec<String> {
+    vec![
+        "nix".into(),
+        "profile".into(),
+        "diff-closures".into(),
+        "--profile".into(),
+        "/nix/var/nix/profiles/system".into(),
+    ]
+}
+
+/// Return the tail of `output`, starting at the last line containing `Version`.
+///
+/// Mirrors the former `tac | awk '/Version/{print; exit} 1' | tac` pipeline:
+/// when no `Version` line exists, the whole output is returned unchanged.
+pub fn tail_from_last_version(output: &str) -> String {
+    let lines: Vec<&str> = output.lines().collect();
+    match lines.iter().rposition(|line| line.contains("Version")) {
+        Some(start) => {
+            let mut result = lines[start..].join("\n");
+            result.push('\n');
+            result
+        }
+        None => output.to_owned(),
+    }
 }
 
 #[cfg(test)]
@@ -84,14 +99,6 @@ mod tests {
     #[test]
     fn git_pull_argv() {
         assert_eq!(git_pull("/repo"), vec!["git", "-C", "/repo", "pull"]);
-    }
-
-    #[test]
-    fn git_diff_argv() {
-        assert_eq!(
-            git_diff("/repo"),
-            vec!["git", "-C", "/repo", "diff", "--exit-code"]
-        );
     }
 
     #[test]
@@ -146,7 +153,46 @@ mod tests {
     }
 
     #[test]
-    fn nix_diff_contains_diff_closures() {
-        assert!(nix_diff().contains("diff-closures"));
+    fn nix_collect_garbage_argv() {
+        assert_eq!(nix_collect_garbage(), vec!["sudo", "nix-collect-garbage"]);
+    }
+
+    #[test]
+    fn nix_diff_closures_argv() {
+        assert_eq!(
+            nix_diff_closures(),
+            vec![
+                "nix",
+                "profile",
+                "diff-closures",
+                "--profile",
+                "/nix/var/nix/profiles/system"
+            ]
+        );
+    }
+
+    #[test]
+    fn tail_from_last_version_keeps_from_last_match() {
+        let output = "old Version 1\nnoise\nVersion 2\nline a\nline b\n";
+        assert_eq!(
+            tail_from_last_version(output),
+            "Version 2\nline a\nline b\n"
+        );
+    }
+
+    #[test]
+    fn tail_from_last_version_without_match_returns_all() {
+        let output = "line a\nline b\n";
+        assert_eq!(tail_from_last_version(output), "line a\nline b\n");
+    }
+
+    #[test]
+    fn tail_from_last_version_empty_returns_empty() {
+        assert_eq!(tail_from_last_version(""), "");
+    }
+
+    #[test]
+    fn tail_from_last_version_match_on_last_line() {
+        assert_eq!(tail_from_last_version("a\nVersion 3\n"), "Version 3\n");
     }
 }

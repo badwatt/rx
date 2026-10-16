@@ -31,6 +31,11 @@ impl UserIo for TerminalIo {
         write_line(&mut out, &format!("{}{}{}", ansi::GREEN, msg, ansi::RESET))
     }
 
+    fn output(&self, text: &str) -> Result<(), Error> {
+        let mut out = io::stdout();
+        write_raw(&mut out, text)
+    }
+
     fn config(&self, config: &Config) -> Result<(), Error> {
         let mut out = io::stdout();
         print_config(&mut out, config)
@@ -39,6 +44,11 @@ impl UserIo for TerminalIo {
 
 fn write_line(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
     ansi::write_flush(writer, &format!("{text}\n"))?;
+    Ok(())
+}
+
+fn write_raw(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
+    ansi::write_flush(writer, text)?;
     Ok(())
 }
 
@@ -433,6 +443,11 @@ mod tests {
     }
 
     #[test]
+    fn terminal_io_output_does_not_panic() {
+        TerminalIo.output("raw\n").expect("output");
+    }
+
+    #[test]
     fn write_line_writes_text_with_newline() {
         let mut buf = Vec::new();
         assert!(write_line(&mut buf, "plain").is_ok());
@@ -443,5 +458,18 @@ mod tests {
     fn write_line_error_propagation() {
         let mut writer = crate::test_helpers::FailingWriter;
         assert!(write_line(&mut writer, "plain").is_err());
+    }
+
+    #[test]
+    fn write_raw_writes_text_verbatim() {
+        let mut buf = Vec::new();
+        assert!(write_raw(&mut buf, "raw").is_ok());
+        assert_eq!(buf, b"raw");
+    }
+
+    #[test]
+    fn write_raw_error_propagation() {
+        let mut writer = crate::test_helpers::FailingWriter;
+        assert!(write_raw(&mut writer, "raw").is_err());
     }
 }

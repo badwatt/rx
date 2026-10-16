@@ -22,9 +22,9 @@
 
 1. **Git Pull** — pulls latest changes from your dotfiles repo
 2. **Nix Flake Update** — `nix flake update` *(optional)*
-3. **Git Stage** — detects diff, asks confirmation, `git add .`
+3. **Git Stage** — detects changes (incl. untracked files), asks confirmation, `git add .`
 4. **NixOS Rebuild** — `sudo nixos-rebuild switch --flake ...#{hostname}`
-5. **Cleanup** — `nix-env --delete-generations +N`
+5. **Cleanup** — `nix-env --delete-generations +N` then `nix-collect-garbage`
 6. **Diff** — shows closure diff between old/new generations *(optional)*
 
 Every step — interactive confirmation, colored ANSI output, clean error handling.
@@ -127,7 +127,7 @@ tests/
   traits. Tests inject mocks; production wires `ProcessRunner` / `TerminalIo` in `main`.
 - **Single output channel** — all user-facing output flows through the `UserIo` port.
 - **Command builders return `Vec<String>`** — argv lists, not shell strings. No injection risk.
-- **Shell pipelines only when necessary** — `nix_diff` is the sole `sh -c` call (requires `tac` + `awk`).
+- **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Clippy pedantic** — `#[warn(clippy::pedantic)]` enforced at compile time.
 
 ---
@@ -137,7 +137,7 @@ tests/
 ### 100% test coverage — every branch, every error path
 
 ```
-163 tests: 153 unit + 10 integration — all passing ✅
+170 tests: 160 unit + 10 integration — all passing ✅
 ```
 
 Unit tests cover:

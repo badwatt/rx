@@ -7,46 +7,40 @@ use crate::ports::command::CommandRunner;
 pub struct ProcessRunner;
 
 impl CommandRunner for ProcessRunner {
-    fn run(&self, cmd: &[String], output: bool) -> Result<i32, Error> {
-        run_cmd(cmd, output)
+    fn run(&self, cmd: &[String]) -> Result<i32, Error> {
+        run_cmd(cmd)
     }
 
-    fn run_pipeline(&self, cmd: &str, output: bool) -> Result<i32, Error> {
-        run_pipeline(cmd, output)
+    fn capture(&self, cmd: &[String]) -> Result<String, Error> {
+        capture_cmd(cmd)
     }
 }
 
-/// Run a command via argv list and return its exit code.
+/// Run a command via argv list (stdio inherited) and return its exit code.
 ///
-/// When `output` is `false`, stdout and stderr are redirected to `/dev/null`.
 /// A process killed by a signal returns `1`.
-pub fn run_cmd(cmd: &[String], output: bool) -> Result<i32, Error> {
+pub fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
     let status = Command::new(&cmd[0])
         .args(&cmd[1..])
         .stdin(Stdio::inherit())
-        .stdout(stdio_for(output))
-        .stderr(stdio_for(output))
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .status()
         .map_err(Error::Io)?;
     Ok(exit_code(status))
 }
 
-/// Run a shell pipeline string via `sh -c`.
+/// Run a command via argv list and return its stdout as a lossy UTF-8 string.
 ///
-/// Used only for commands requiring pipes (e.g. `nix_diff`).
-/// When `output` is `false`, stdout and stderr are redirected to `/dev/null`.
-/// A process killed by a signal returns `1`.
-pub fn run_pipeline(cmd: &str, output: bool) -> Result<i32, Error> {
-    run_cmd(&["sh".into(), "-c".into(), cmd.into()], output)
-}
-
-/// Select `Stdio` based on whether output should be visible.
-fn stdio_for(output: bool) -> Stdio {
-    if output {
-        Stdio::inherit()
-    } else {
-        Stdio::null()
-    }
+/// stderr is inherited so diagnostics stay visible.
+pub fn capture_cmd(cmd: &[String]) -> Result<String, Error> {
+    let output = Command::new(&cmd[0])
+        .args(&cmd[1..])
+        .stdin(Stdio::null())
+        .stderr(Stdio::inherit())
+        .output()
+        .map_err(Error::Io)?;
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Extract exit code from process status; signal-killed processes return 1.
@@ -60,25 +54,17 @@ mod tests {
 
     #[test]
     fn run_cmd_true_returns_zero() {
-        assert_eq!(run_cmd(&["true".into()], true).expect("run true"), 0);
+        assert_eq!(run_cmd(&["true".into()]).expect("run true"), 0);
     }
 
     #[test]
     fn run_cmd_false_returns_one() {
-        assert_eq!(run_cmd(&["false".into()], true).expect("run false"), 1);
-    }
-
-    #[test]
-    fn run_cmd_echo_no_output_returns_zero() {
-        assert_eq!(
-            run_cmd(&["echo".into(), "hello".into()], false).expect("run echo"),
-            0
-        );
+        assert_eq!(run_cmd(&["false".into()]).expect("run false"), 1);
     }
 
     #[test]
     fn run_cmd_not_found_returns_io_error() {
-        let result = run_cmd(&["nonexistent_cmd_zxy123".into()], false);
+        let result = run_cmd(&["nonexistent_cmd_zxy123".into()]);
         assert!(result.is_err());
         let err = result.expect_err("expected io err");
         assert_eq!(
@@ -89,33 +75,28 @@ mod tests {
 
     #[test]
     fn run_cmd_signal_returns_one() {
-        let result = run_cmd(&["sh".into(), "-c".into(), "kill -9 $$".into()], false);
+        let result = run_cmd(&["sh".into(), "-c".into(), "kill -9 $$".into()]);
         assert!(result.is_ok());
         assert_eq!(result.expect("run cmd signal"), 1);
     }
 
     #[test]
-    fn run_pipeline_true_returns_zero() {
-        assert_eq!(run_pipeline("true", true).expect("run true"), 0);
+    fn capture_cmd_echo_returns_stdout() {
+        let out = capture_cmd(&["echo".into(), "hello".into()]).expect("capture echo");
+        assert_eq!(out, "hello\n");
     }
 
     #[test]
-    fn run_pipeline_echo_no_output_returns_zero() {
-        assert_eq!(run_pipeline("echo hello", false).expect("run echo"), 0);
+    fn capture_cmd_not_found_returns_io_error() {
+        let result = capture_cmd(&["nonexistent_cmd_zxy123".into()]);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn run_pipeline_not_found_returns_nonzero() {
-        let result = run_pipeline("nonexistent_cmd_zxy123", false);
-        assert!(result.is_ok());
-        assert_ne!(result.expect("run nonexistent"), 0);
-    }
-
-    #[test]
-    fn run_pipeline_signal_returns_one() {
-        let result = run_pipeline("kill -9 $$", false);
-        assert!(result.is_ok());
-        assert_eq!(result.expect("run pipeline signal"), 1);
+    fn capture_cmd_nonzero_still_returns_stdout() {
+        let out =
+            capture_cmd(&["sh".into(), "-c".into(), "echo x; exit 3".into()]).expect("capture sh");
+        assert_eq!(out, "x\n");
     }
 
     #[test]
@@ -137,12 +118,17 @@ mod tests {
     #[test]
     fn process_runner_run_true_returns_zero() {
         let runner = ProcessRunner;
-        assert_eq!(runner.run(&["true".into()], false).expect("run true"), 0);
+        assert_eq!(runner.run(&["true".into()]).expect("run true"), 0);
     }
 
     #[test]
-    fn process_runner_run_pipeline_true_returns_zero() {
+    fn process_runner_capture_echo_returns_stdout() {
         let runner = ProcessRunner;
-        assert_eq!(runner.run_pipeline("true", false).expect("run true"), 0);
+        assert_eq!(
+            runner
+                .capture(&["echo".into(), "hi".into()])
+                .expect("capture"),
+            "hi\n"
+        );
     }
 }

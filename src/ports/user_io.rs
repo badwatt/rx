@@ -14,6 +14,8 @@ pub trait UserIo {
     fn error(&self, msg: &str) -> Result<(), Error>;
     /// Print a success message.
     fn success(&self, msg: &str) -> Result<(), Error>;
+    /// Print command output verbatim (no extra newline).
+    fn output(&self, text: &str) -> Result<(), Error>;
     /// Print the current configuration.
     fn config(&self, config: &Config) -> Result<(), Error>;
 }
