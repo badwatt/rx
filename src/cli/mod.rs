@@ -6,7 +6,6 @@
 pub(crate) mod defaults;
 pub(crate) mod help;
 pub(crate) mod hostname;
-pub(crate) mod nixos;
 pub(crate) mod parse;
 
 use std::io::Write;
@@ -62,6 +61,9 @@ mod tests {
         }
         fn capture(&self, _: &[String]) -> Result<(i32, String), Error> {
             Ok((0, String::new()))
+        }
+        fn probe(&self, _: &[String]) -> Result<i32, Error> {
+            Ok(0)
         }
     }
 
@@ -158,6 +160,7 @@ mod tests {
     fn ok_adapters_cover_all_methods() {
         assert!(OkCmd.run(&[]).is_ok());
         assert!(OkCmd.capture(&[]).is_ok());
+        assert!(OkCmd.probe(&[]).is_ok());
         assert!(OkUi.title("t").is_ok());
         assert!(OkUi.confirm(true, None).is_ok());
         assert!(OkUi.error("e").is_ok());

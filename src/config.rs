@@ -21,8 +21,6 @@ pub(crate) struct Config {
     pub(crate) yes: bool,
     /// Print commands instead of executing them.
     pub(crate) dry_run: bool,
-    /// Use `nixos-rebuild --elevate=sudo --no-reexec` (NixOS >= 25.11).
-    pub(crate) elevate: bool,
 }
 
 impl fmt::Display for Config {
@@ -48,7 +46,6 @@ mod tests {
             diff: false,
             yes: false,
             dry_run: false,
-            elevate: false,
         }
     }
 

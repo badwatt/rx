@@ -54,32 +54,54 @@ pub(crate) fn nix_update(repo: &str) -> Vec<String> {
     ]
 }
 
+/// Which `nixos-rebuild` implementation is installed.
+///
+/// The classic shell script elevates the whole command and skips the
+/// self-rebuild re-exec with `--fast`; the `-ng` rewrite elevates only the
+/// activation with `--elevate=sudo` and spells the skip `--no-reexec`.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub(crate) enum RebuildFlavor {
+    Classic,
+    Ng,
+}
+
+/// Capability probe for the installed `nixos-rebuild`.
+///
+/// `--elevate` only exists in the `-ng` rewrite, and `list-generations` is
+/// read-only, so exit code 0 means `-ng`.
+pub(crate) fn rebuild_probe() -> Vec<String> {
+    vec![
+        "nixos-rebuild".into(),
+        "--elevate=none".into(),
+        "list-generations".into(),
+    ]
+}
+
 /// Build a `nixos-rebuild switch` command argv for `repo` and `hostname`.
 ///
-/// When `elevate` is set (NixOS >= 25.11), run as the user and let
-/// `nixos-rebuild` elevate only the activation via `--elevate=sudo`, skipping
-/// the self-rebuild re-exec with `--no-reexec`. Otherwise prefix with `sudo`.
-pub(crate) fn nix_rebuild(repo: &str, hostname: &str, elevate: bool) -> Vec<String> {
+/// The self-rebuild re-exec is always skipped, with the flavor-appropriate
+/// flag, so the redundant pre-build evaluation is not paid.
+pub(crate) fn nix_rebuild(repo: &str, hostname: &str, flavor: RebuildFlavor) -> Vec<String> {
     let flake = format!("{repo}#{hostname}");
-    if elevate {
-        vec![
+    match flavor {
+        RebuildFlavor::Ng => vec![
             "nixos-rebuild".into(),
             "switch".into(),
+            "--elevate=sudo".into(),
+            "--no-reexec".into(),
             "--flake".into(),
             flake,
             "--show-trace".into(),
-            "--elevate=sudo".into(),
-            "--no-reexec".into(),
-        ]
-    } else {
-        vec![
+        ],
+        RebuildFlavor::Classic => vec![
             "sudo".into(),
             "nixos-rebuild".into(),
             "switch".into(),
+            "--fast".into(),
             "--flake".into(),
             flake,
             "--show-trace".into(),
-        ]
+        ],
     }
 }
 
@@ -166,13 +188,22 @@ mod tests {
     }
 
     #[test]
-    fn nix_rebuild_argv_legacy_uses_sudo() {
+    fn rebuild_probe_argv() {
         assert_eq!(
-            nix_rebuild("/repo", "host", false),
+            rebuild_probe(),
+            vec!["nixos-rebuild", "--elevate=none", "list-generations"]
+        );
+    }
+
+    #[test]
+    fn nix_rebuild_argv_classic_uses_sudo_and_fast() {
+        assert_eq!(
+            nix_rebuild("/repo", "host", RebuildFlavor::Classic),
             vec![
                 "sudo",
                 "nixos-rebuild",
                 "switch",
+                "--fast",
                 "--flake",
                 "/repo#host",
                 "--show-trace"
@@ -181,17 +212,17 @@ mod tests {
     }
 
     #[test]
-    fn nix_rebuild_argv_elevate_uses_ng_flags() {
+    fn nix_rebuild_argv_ng_uses_elevate_and_no_reexec() {
         assert_eq!(
-            nix_rebuild("/repo", "host", true),
+            nix_rebuild("/repo", "host", RebuildFlavor::Ng),
             vec![
                 "nixos-rebuild",
                 "switch",
+                "--elevate=sudo",
+                "--no-reexec",
                 "--flake",
                 "/repo#host",
-                "--show-trace",
-                "--elevate=sudo",
-                "--no-reexec"
+                "--show-trace"
             ]
         );
     }

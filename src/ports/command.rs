@@ -9,4 +9,7 @@ pub(crate) trait CommandRunner {
     fn run(&self, cmd: &[String]) -> Result<i32, Error>;
     /// Run a command via argv list and capture its exit code and stdout.
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error>;
+    /// Run a command with stdout/stderr discarded, returning its exit code.
+    /// Used for capability probes.
+    fn probe(&self, cmd: &[String]) -> Result<i32, Error>;
 }

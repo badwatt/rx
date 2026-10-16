@@ -22,6 +22,12 @@ impl CommandRunner for DryRunRunner {
         let _ = print_command(&mut out, cmd);
         Ok((0, String::new()))
     }
+
+    fn probe(&self, cmd: &[String]) -> Result<i32, Error> {
+        let mut out = std::io::stdout();
+        let _ = print_command(&mut out, cmd);
+        Ok(0)
+    }
 }
 
 /// Print a command as `$ prog arg1 arg2 …`.
@@ -57,5 +63,10 @@ mod tests {
         let (status, out) = DryRunRunner.capture(&["true".into()]).expect("capture");
         assert_eq!(status, 0);
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn dry_run_runner_probe_returns_zero() {
+        assert_eq!(DryRunRunner.probe(&["true".into()]).expect("probe"), 0);
     }
 }

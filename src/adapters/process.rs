@@ -14,6 +14,10 @@ impl CommandRunner for ProcessRunner {
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
         capture_cmd(cmd)
     }
+
+    fn probe(&self, cmd: &[String]) -> Result<i32, Error> {
+        probe_cmd(cmd)
+    }
 }
 
 /// Run a command via argv list (stdio inherited) and return its exit code.
@@ -44,6 +48,19 @@ pub(crate) fn capture_cmd(cmd: &[String]) -> Result<(i32, String), Error> {
         exit_code(output.status),
         String::from_utf8_lossy(&output.stdout).into_owned(),
     ))
+}
+
+/// Run a command via argv list with stdout/stderr discarded, returning its
+/// exit code. Used for capability probes that must stay silent.
+pub(crate) fn probe_cmd(cmd: &[String]) -> Result<i32, Error> {
+    let status = Command::new(program(cmd)?)
+        .args(&cmd[1..])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(Error::Io)?;
+    Ok(exit_code(status))
 }
 
 /// Return the program name, or an error when `cmd` is empty.
@@ -124,6 +141,26 @@ mod tests {
     }
 
     #[test]
+    fn probe_cmd_true_returns_zero() {
+        assert_eq!(probe_cmd(&["true".into()]).expect("probe true"), 0);
+    }
+
+    #[test]
+    fn probe_cmd_false_returns_one() {
+        assert_eq!(probe_cmd(&["false".into()]).expect("probe false"), 1);
+    }
+
+    #[test]
+    fn probe_cmd_not_found_returns_io_error() {
+        assert!(probe_cmd(&["nonexistent_cmd_zxy123".into()]).is_err());
+    }
+
+    #[test]
+    fn probe_cmd_empty_returns_error() {
+        assert!(probe_cmd(&[]).is_err());
+    }
+
+    #[test]
     fn exit_code_returns_one_for_signal() {
         let status = Command::new("sh")
             .arg("-c")
@@ -153,5 +190,10 @@ mod tests {
             .expect("capture");
         assert_eq!(status, 0);
         assert_eq!(out, "hi\n");
+    }
+
+    #[test]
+    fn process_runner_probe_true_returns_zero() {
+        assert_eq!(ProcessRunner.probe(&["true".into()]).expect("probe"), 0);
     }
 }

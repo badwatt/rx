@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 type RunFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 type CaptureFn = Box<dyn Fn(&[String]) -> Result<(i32, String), Error>>;
+type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 type TitleFn = Box<dyn Fn(&str) -> Result<(), Error>>;
 type ConfirmFn = Box<dyn Fn(bool, Option<&str>) -> Result<bool, Error>>;
 type MsgFn = Box<dyn Fn(&str) -> Result<(), Error>>;
@@ -12,6 +13,7 @@ type ConfigFn = Box<dyn Fn(&Config) -> Result<(), Error>>;
 struct MockCmd {
     run: RunFn,
     capture: CaptureFn,
+    probe: ProbeFn,
 }
 
 impl CommandRunner for MockCmd {
@@ -20,6 +22,19 @@ impl CommandRunner for MockCmd {
     }
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
         (self.capture)(cmd)
+    }
+    fn probe(&self, cmd: &[String]) -> Result<i32, Error> {
+        (self.probe)(cmd)
+    }
+}
+
+impl Default for MockCmd {
+    fn default() -> Self {
+        Self {
+            run: Box::new(no_run),
+            capture: Box::new(no_capture),
+            probe: Box::new(no_probe),
+        }
     }
 }
 
@@ -74,7 +89,6 @@ fn default_config() -> Config {
         diff: false,
         yes: false,
         dry_run: false,
-        elevate: false,
     }
 }
 
@@ -94,11 +108,16 @@ fn no_capture(_: &[String]) -> Result<(i32, String), Error> {
     Ok((0, String::new()))
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "mock must match the CommandRunner trait signature"
+)]
+fn no_probe(_: &[String]) -> Result<i32, Error> {
+    Ok(0)
+}
+
 fn ok_cmd() -> MockCmd {
-    MockCmd {
-        run: Box::new(no_run),
-        capture: Box::new(no_capture),
-    }
+    MockCmd::default()
 }
 
 /// Command mock reporting uncommitted changes (non-empty `git status`).
@@ -106,6 +125,7 @@ fn changes_cmd() -> MockCmd {
     MockCmd {
         run: Box::new(|_| Ok(0)),
         capture: Box::new(|_| Ok((0, String::from(" M file\n")))),
+        ..MockCmd::default()
     }
 }
 
@@ -121,6 +141,7 @@ fn changes_run_fails_on(sub: &str) -> MockCmd {
             }
         }),
         capture: Box::new(|_| Ok((0, String::from(" M file\n")))),
+        ..MockCmd::default()
     }
 }
 
@@ -135,7 +156,7 @@ fn run_nonzero_on(sub: &str) -> MockCmd {
                 Ok(0)
             }
         }),
-        capture: Box::new(no_capture),
+        ..MockCmd::default()
     }
 }
 
@@ -151,6 +172,7 @@ fn changes_run_nonzero_on(sub: &str) -> MockCmd {
             }
         }),
         capture: Box::new(|_| Ok((0, String::from(" M file\n")))),
+        ..MockCmd::default()
     }
 }
 
@@ -165,7 +187,7 @@ fn run_fails_on(sub: &str) -> MockCmd {
                 Ok(0)
             }
         }),
-        capture: Box::new(no_capture),
+        ..MockCmd::default()
     }
 }
 
@@ -173,7 +195,6 @@ fn run_fails_on(sub: &str) -> MockCmd {
 fn capture_fails_on(sub: &str) -> MockCmd {
     let sub = sub.to_owned();
     MockCmd {
-        run: Box::new(no_run),
         capture: Box::new(move |cmd| {
             if cmd.iter().any(|a| a.contains(&sub)) {
                 Err(Error::GitPullFailed)
@@ -181,6 +202,7 @@ fn capture_fails_on(sub: &str) -> MockCmd {
                 Ok((0, String::new()))
             }
         }),
+        ..MockCmd::default()
     }
 }
 
@@ -188,7 +210,6 @@ fn capture_fails_on(sub: &str) -> MockCmd {
 fn capture_nonzero_on(sub: &str) -> MockCmd {
     let sub = sub.to_owned();
     MockCmd {
-        run: Box::new(no_run),
         capture: Box::new(move |cmd| {
             if cmd.iter().any(|a| a.contains(&sub)) {
                 Ok((1, String::new()))
@@ -196,6 +217,23 @@ fn capture_nonzero_on(sub: &str) -> MockCmd {
                 Ok((0, String::new()))
             }
         }),
+        ..MockCmd::default()
+    }
+}
+
+/// Command mock whose `probe` returns `code`.
+fn probe_returns(code: i32) -> MockCmd {
+    MockCmd {
+        probe: Box::new(move |_| Ok(code)),
+        ..MockCmd::default()
+    }
+}
+
+/// Command mock whose `probe` fails (conservative classic fallback).
+fn probe_fails() -> MockCmd {
+    MockCmd {
+        probe: Box::new(|_| Err(Error::GitPullFailed)),
+        ..MockCmd::default()
     }
 }
 
@@ -350,7 +388,7 @@ fn run_stage_add_nonzero_output_error_propagates() {
 fn run_git_pull_non_zero_returns_error() {
     let cmd = MockCmd {
         run: Box::new(|_| Ok(1)),
-        capture: Box::new(no_capture),
+        ..MockCmd::default()
     };
     assert!(run(&default_config(), &cmd, &ok_ui(&Log::default())).is_err());
 }
@@ -436,7 +474,7 @@ fn run_pull_cmd_error_propagates() {
 fn run_pull_error_output_error_propagates() {
     let cmd = MockCmd {
         run: Box::new(|_| Ok(1)),
-        capture: Box::new(no_capture),
+        ..MockCmd::default()
     };
     let ui = MockUi {
         error: Box::new(|_| Err(Error::GitPullFailed)),
@@ -679,4 +717,22 @@ fn run_diff_output_error_propagates() {
         ..ok_ui(&Log::default())
     };
     assert!(run(&config, &ok_cmd(), &ui).is_err());
+}
+
+#[test]
+fn run_rebuild_classic_flavor_when_probe_nonzero() {
+    let cmd = probe_returns(1);
+    assert!(run(&default_config(), &cmd, &ok_ui(&Log::default())).is_ok());
+}
+
+#[test]
+fn run_rebuild_classic_flavor_when_probe_errors() {
+    let cmd = probe_fails();
+    assert!(run(&default_config(), &cmd, &ok_ui(&Log::default())).is_ok());
+}
+
+#[test]
+fn run_rebuild_ng_flavor_when_probe_zero() {
+    let cmd = probe_returns(0);
+    assert!(run(&default_config(), &cmd, &ok_ui(&Log::default())).is_ok());
 }
