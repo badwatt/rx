@@ -98,33 +98,37 @@ Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` �
 ## 🏗 Architecture
 
 Hexagonal (ports & adapters) core organized into vertical slices. Top-level
-directories scream the use cases (`update`, `cli`); the hexagonal layers
-(`ports`, `adapters`) hold the shared boundaries.
+directories scream the capabilities (`system_update`, `cli`); `domain` is the
+shared pure kernel and `ports`/`adapters` hold the hexagonal boundaries.
 
 ```
 src/
-├── main.rs              # Composition root: wires adapters, maps exit codes
-├── error.rs             # Error type (Io, GitPullFailed, InvalidArgs)
-├── config.rs            # Config entity (pure domain)
-├── commands.rs          # Command argv specs (git, nix)
-├── ansi.rs              # ANSI color helpers + write_flush
-├── test_helpers.rs      # FailingWriter / FailingFlushWriter etc.
-├── ports/               # Interfaces the core depends on
-│   ├── command.rs       # CommandRunner port (run + capture)
-│   └── user_io.rs       # UserIo port (title, confirm, output, config)
-├── adapters/            # Driven adapter implementations
+├── main.rs              # Composition root: parse → wire adapters → run
+├── domain/              # Shared kernel (pure)
+│   ├── config.rs        # Config entity + validation
+│   └── error.rs         # Error type
+├── ports/               # Semantic interfaces the core depends on
+│   ├── repo.rs          # Repo: is_repo / pull / changes / add_all
+│   ├── nix.rs           # Nix: update / rebuild / prune / collect_garbage / diff_closures
+│   └── user_io.rs       # UserIo: title / confirm / error / success / output / config
+├── adapters/            # Driven adapters
+│   ├── command.rs       # CommandRunner (adapter-internal argv seam)
 │   ├── process.rs       # ProcessRunner (std::process)
 │   ├── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
+│   ├── git.rs           # GitRepo: Repo via the git CLI
+│   ├── nix.rs           # NixCli: Nix via nix / nixos-rebuild
 │   └── terminal.rs      # TerminalIo (stdin/stdout) + config rendering
-├── update/              # Use-case slice: NixOS update workflow
+├── system_update/       # Use-case slice
 │   ├── mod.rs           # Pipeline orchestration
 │   └── steps/           # pull, flake, stage, rebuild, cleanup, diff
-├── cli/                 # Driving adapter: command-line interface
-│   ├── mod.rs           # Intent + dispatch
+├── cli/                 # Driving adapter
+│   ├── mod.rs           # Intent
 │   ├── parse.rs         # Argument parser
 │   ├── defaults.rs      # Default config + tilde expansion
 │   ├── hostname.rs      # Hostname resolution
 │   └── help.rs          # Help/version banners
+├── ansi.rs              # ANSI color helpers + write_flush
+└── test_helpers.rs      # FailingWriter / StubRunner etc.
 tests/
 └── integration.rs        # End-to-end binary tests
 ```
@@ -132,13 +136,13 @@ tests/
 ### Design decisions
 
 - **Zero dependencies** — no crates, pure `std`. Compile fast, audit easy.
-- **Ports & adapters** — the workflow depends only on the `CommandRunner` and `UserIo`
-  traits. Tests inject mocks; production wires `ProcessRunner` / `TerminalIo` in `main`.
+- **Semantic ports** — the use case depends on `Repo`, `Nix` and `UserIo`, never on
+  `git`/`nix` specifics. `adapters::git` / `adapters::nix` own the argv; the
+  workflow tests mock the semantic ports. `--dry-run` decorates a single
+  adapter-internal `CommandRunner` seam, so no per-port dry adapters.
+- **Composition in `main`** — the driving adapter (`cli`) only parses; `main`
+  selects adapters and wires them, so `cli` never depends on `adapters`.
 - **Single output channel** — all user-facing output flows through the `UserIo` port.
-- **Command builders return `Vec<String>`** — argv lists, not shell strings. No injection risk.
-- **Command vocabulary at the root** — `commands.rs` holds the pure argv specs the
-  use-case names; moving them under `adapters/` would invert the hexagonal
-  dependency direction (domain → adapter).
 - **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Capability-probed rebuild** — `rx` probes the installed `nixos-rebuild`
   (`--elevate=none list-generations`, read-only) instead of trusting the OS
@@ -157,7 +161,7 @@ tests/
 ### 100% coverage — every branch, every error path
 
 ```
-222 tests: 210 unit + 12 integration — all passing ✅
+240 tests: 228 unit + 12 integration — all passing ✅
 ```
 
 Coverage counts tests too: `--no-default-ignore-filename-regex` disables

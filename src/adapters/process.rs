@@ -1,7 +1,7 @@
 use std::process::{Command, Stdio};
 
-use crate::error::Error;
-use crate::ports::command::CommandRunner;
+use crate::adapters::command::CommandRunner;
+use crate::domain::error::Error;
 
 /// Production [`CommandRunner`] backed by `std::process`.
 pub(crate) struct ProcessRunner;

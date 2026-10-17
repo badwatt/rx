@@ -1,5 +1,5 @@
 use crate::cli::hostname;
-use crate::config::{Config, DEFAULT_KEEP, DEFAULT_REPO};
+use crate::domain::config::{Config, DEFAULT_KEEP, DEFAULT_REPO};
 
 /// Build a fresh [`Config`] from defaults: repo `~/.dotfiles`, hostname resolved
 /// from the OS, keep `10`, update/diff/yes/dry-run `false`.

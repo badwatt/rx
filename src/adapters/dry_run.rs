@@ -2,9 +2,9 @@
 
 use std::io::Write;
 
+use crate::adapters::command::CommandRunner;
 use crate::ansi;
-use crate::error::Error;
-use crate::ports::command::CommandRunner;
+use crate::domain::error::Error;
 
 /// Adapter that echoes each command instead of running it.
 pub(crate) struct DryRunRunner;

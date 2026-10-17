@@ -1,5 +1,5 @@
-use crate::config::Config;
-use crate::error::Error;
+use crate::domain::config::Config;
+use crate::domain::error::Error;
 
 /// Driven port: user-facing presentation and interaction.
 ///

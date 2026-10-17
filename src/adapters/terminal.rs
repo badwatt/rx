@@ -1,8 +1,8 @@
 use std::io::{self, BufRead, Write};
 
 use crate::ansi;
-use crate::config::Config;
-use crate::error::Error;
+use crate::domain::config::Config;
+use crate::domain::error::Error;
 use crate::ports::user_io::UserIo;
 
 /// Production [`UserIo`] backed by stdin/stdout.

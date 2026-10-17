@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::ansi;
-use crate::error::Error;
+use crate::domain::error::Error;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

@@ -65,37 +65,44 @@
 
 ## Architecture
 
-Hexagonal (ports & adapters) core organized into vertical slices.
+Hexagonal (ports & adapters) core organized into vertical slices. Top-level
+directories scream the capabilities (`system_update`, `cli`); `domain` is the
+shared pure kernel, `ports`/`adapters` the hexagonal boundaries.
 
 ```
 src/
-├── main.rs              # composition root: wires adapters, maps exit codes
-├── config.rs            # Config entity (pure domain)
-├── commands.rs          # argv specs for git/nix (shared vocabulary)
-├── error.rs             # Error enum
-├── ansi.rs              # ANSI color helpers + write_flush
-├── ports/               # interfaces the core depends on
-│   ├── command.rs       # CommandRunner: run(argv), capture(argv), probe(argv)
+├── main.rs              # composition root: parse → wire adapters → run
+├── domain/              # shared kernel (pure)
+│   ├── config.rs        # Config entity + validate()
+│   └── error.rs         # Error enum
+├── ports/               # semantic interfaces the core depends on
+│   ├── repo.rs          # Repo: is_repo / pull / changes / add_all
+│   ├── nix.rs           # Nix: update / rebuild / prune / collect_garbage / diff_closures
 │   └── user_io.rs       # UserIo: title/confirm/error/success/output/config
 ├── adapters/            # driven adapters
+│   ├── command.rs       # CommandRunner (adapter-internal argv seam)
 │   ├── process.rs       # ProcessRunner (std::process)
 │   ├── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
+│   ├── git.rs           # GitRepo: Repo via the git CLI
+│   ├── nix.rs           # NixCli: Nix via nix / nixos-rebuild
 │   └── terminal.rs      # TerminalIo (stdin/stdout) + config rendering
-├── update/              # use-case slice: NixOS update workflow
+├── system_update/       # use-case slice
 │   ├── mod.rs           # pipeline orchestration
 │   └── steps/           # pull, flake, stage, rebuild, cleanup, diff
-└── cli/                 # driving adapter
-    ├── mod.rs           # Intent + dispatch (selects DryRunRunner)
-    ├── parse.rs         # argument parser
-    ├── defaults.rs      # default config + tilde expansion
-    ├── hostname.rs      # hostname resolution
-    ├── nixos.rs         # NixOS release detection
-    └── help.rs          # help/version banners
+├── cli/                 # driving adapter (parsing only)
+│   ├── mod.rs           # Intent
+│   ├── parse.rs         # argument parser
+│   ├── defaults.rs      # default config + tilde expansion
+│   ├── hostname.rs      # hostname resolution
+│   └── help.rs          # help/version banners
+├── ansi.rs              # ANSI color helpers + write_flush
+└── test_helpers.rs      # FailingWriter / StubRunner etc.
 ```
 
-- **Ports**: `CommandRunner` (run/capture/probe), `UserIo`. Core depends only on these.
+- **Semantic ports**: the use case depends on `Repo`, `Nix`, `UserIo` — never on `git`/`nix` specifics. `adapters::git` / `adapters::nix` own the argv; workflow tests mock the semantic ports.
+- **`CommandRunner` is not a port**: it is an adapter-internal seam so `--dry-run` decorates a single implementation instead of every port.
+- **Composition in `main`**: `cli` only parses (`Intent`), `main` selects adapters (dry-run vs process) and wires them. `cli` must not depend on `adapters`.
 - **Single output channel**: all user-facing output flows through `UserIo`.
-- **`commands.rs` at the crate root on purpose**: the use-case names the commands it runs; moving these specs into `adapters/` would invert the hexagonal dependency direction. They are pure data (no I/O).
 - **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `InvalidArgs`, `InvalidConfig`.
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
