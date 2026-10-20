@@ -33,6 +33,8 @@ pub(crate) fn run(
     ui.config(config)?;
 
     if !config.yes && !ui.confirm(true, None)? {
+        // Best-effort: the workflow is ending anyway.
+        let _ = ui.output("Aborted.\n");
         return Ok(());
     }
 
@@ -42,7 +44,9 @@ pub(crate) fn run(
         steps::flake::run(config, nix, ui)?;
     }
 
-    steps::stage::run(&config.repo, config.yes, repo, ui)?;
+    if !steps::stage::run(&config.repo, config.yes, repo, ui)? {
+        return Ok(());
+    }
     steps::rebuild::run(config, nix, ui)?;
     steps::cleanup::run(config, nix, ui)?;
 

@@ -269,11 +269,13 @@ fn run_ok(config: &Config, ui: &dyn UserIo) -> Result<(), Error> {
 
 #[test]
 fn run_confirm_false_returns_early_ok() {
+    let log = Log::default();
     let ui = MockUi {
         confirm: Box::new(|_, _| Ok(false)),
-        ..ok_ui(&Log::default())
+        ..ok_ui(&log)
     };
     assert!(run_ok(&default_config(), &ui).is_ok());
+    assert!(log.contains("Aborted."));
 }
 
 #[test]
@@ -326,14 +328,19 @@ fn run_stage_add_success_prints_success() {
 }
 
 #[test]
-fn run_stage_decline_prints_not_added() {
+fn run_stage_decline_aborts_before_rebuild() {
     let log = Log::default();
     let ui = MockUi {
         confirm: Box::new(|_, msg| if msg.is_some() { Ok(false) } else { Ok(true) }),
         ..ok_ui(&log)
     };
     let repo = repo_with_changes();
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_ok());
+    // If the rebuild ran, this mock would fail the whole workflow.
+    let nix = MockNix {
+        rebuild: Box::new(|_, _| Err(Error::RebuildFailed)),
+        ..MockNix::default()
+    };
+    assert!(run(&default_config(), &repo, &nix, &ui).is_ok());
     assert!(log.contains("Changes not added to stage"));
 }
 
@@ -552,14 +559,24 @@ fn run_stage_confirm_error_propagates() {
 }
 
 #[test]
-fn run_stage_decline_output_error_propagates() {
-    let repo = repo_with_changes();
+fn run_stage_decline_ignores_abort_message_write_error() {
+    let calls = Rc::new(std::cell::Cell::new(0usize));
+    let counter = Rc::clone(&calls);
     let ui = MockUi {
         confirm: Box::new(|_, msg| if msg.is_some() { Ok(false) } else { Ok(true) }),
-        error: Box::new(|_| Err(Error::GitPullFailed)),
+        output: Box::new(move |_| {
+            let n = counter.get() + 1;
+            counter.set(n);
+            if n == 1 {
+                Ok(())
+            } else {
+                Err(Error::GitPullFailed)
+            }
+        }),
         ..ok_ui(&Log::default())
     };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
+    let repo = repo_with_changes();
+    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_ok());
 }
 
 #[test]
