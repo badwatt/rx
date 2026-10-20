@@ -23,6 +23,12 @@ pub(crate) fn run(
         return Err(Error::InvalidConfig(msg));
     }
 
+    // Abort before any side effect (pull, flake update, staging) when the
+    // hostname could not be resolved or was forced to the sentinel.
+    if config.hostname == "unknown" {
+        return Err(Error::HostnameUnknown);
+    }
+
     ui.title("RX Configuration")?;
     ui.config(config)?;
 

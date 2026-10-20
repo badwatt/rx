@@ -623,12 +623,18 @@ fn run_rebuild_error_propagates() {
 }
 
 #[test]
-fn run_rebuild_hostname_unknown_returns_error() {
+fn run_unknown_hostname_aborts_before_pull() {
     let config = Config {
         hostname: String::from("unknown"),
         ..default_config()
     };
-    assert!(run_ok(&config, &ok_ui(&Log::default())).is_err());
+    let repo = MockRepo {
+        pull: Box::new(|_| Err(Error::GitPullFailed)),
+        ..MockRepo::default()
+    };
+    let err = run(&config, &repo, &MockNix::default(), &ok_ui(&Log::default()))
+        .expect_err("unknown hostname must abort");
+    assert!(matches!(err, Error::HostnameUnknown));
 }
 
 #[test]
