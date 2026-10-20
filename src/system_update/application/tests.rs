@@ -62,6 +62,14 @@ fn no_diff() -> Result<String, Error> {
     Ok(String::new())
 }
 
+fn pull_errs(_: &str) -> Result<(), Error> {
+    Err(Error::GitPullFailed)
+}
+
+fn rebuild_errs(_: &str, _: &str) -> Result<(), Error> {
+    Err(Error::RebuildFailed)
+}
+
 // ------------------------------------------------------------------
 // Mock ports
 // ------------------------------------------------------------------
@@ -337,7 +345,7 @@ fn run_stage_decline_aborts_before_rebuild() {
     let repo = repo_with_changes();
     // If the rebuild ran, this mock would fail the whole workflow.
     let nix = MockNix {
-        rebuild: Box::new(|_, _| Err(Error::RebuildFailed)),
+        rebuild: Box::new(rebuild_errs),
         ..MockNix::default()
     };
     assert!(run(&default_config(), &repo, &nix, &ui).is_ok());
@@ -376,7 +384,7 @@ fn run_stage_add_spawn_failure_prints_detail() {
 fn run_git_pull_non_zero_returns_error() {
     let log = Log::default();
     let repo = MockRepo {
-        pull: Box::new(|_| Err(Error::GitPullFailed)),
+        pull: Box::new(pull_errs),
         ..MockRepo::default()
     };
     assert!(run(&default_config(), &repo, &MockNix::default(), &ok_ui(&log)).is_err());
@@ -420,7 +428,7 @@ fn run_is_repo_error_propagates() {
 #[test]
 fn run_pull_error_output_error_propagates() {
     let repo = MockRepo {
-        pull: Box::new(|_| Err(Error::GitPullFailed)),
+        pull: Box::new(pull_errs),
         ..MockRepo::default()
     };
     let ui = MockUi {
@@ -625,7 +633,7 @@ fn run_rebuild_title_error_propagates() {
 #[test]
 fn run_rebuild_error_propagates() {
     let nix = MockNix {
-        rebuild: Box::new(|_, _| Err(Error::RebuildFailed)),
+        rebuild: Box::new(rebuild_errs),
         ..MockNix::default()
     };
     assert!(
@@ -646,12 +654,15 @@ fn run_unknown_hostname_aborts_before_pull() {
         ..default_config()
     };
     let repo = MockRepo {
-        pull: Box::new(|_| Err(Error::GitPullFailed)),
+        pull: Box::new(pull_errs),
         ..MockRepo::default()
     };
     let err = run(&config, &repo, &MockNix::default(), &ok_ui(&Log::default()))
         .expect_err("unknown hostname must abort");
-    assert!(matches!(err, Error::HostnameUnknown));
+    assert_eq!(
+        std::mem::discriminant(&err),
+        std::mem::discriminant(&Error::HostnameUnknown)
+    );
 }
 
 #[test]
