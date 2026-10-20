@@ -193,6 +193,45 @@ fn parse_unknown_flag_returns_error() {
 }
 
 #[test]
+fn parse_short_value_flag_must_be_last_in_cluster() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "-rk", "/r"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("must be last"));
+}
+
+#[test]
+fn parse_short_boolean_then_value_in_cluster_ok() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.yes = true;
+    expected.repo = String::from("/r");
+    assert_eq!(
+        parse(&args(&["rx", "-yr", "/r"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_short_value_rejects_flag_like_value() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "-r", "-d"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
+fn parse_long_value_rejects_flag_like_value() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--repo", "--diff"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
 fn parse_extra_non_flag_arg_ignored() {
     let mut buf = Vec::new();
     let mut expected = default_config();

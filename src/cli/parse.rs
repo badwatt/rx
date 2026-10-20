@@ -138,7 +138,8 @@ fn parse_short(
     writer: &mut dyn Write,
 ) -> Result<usize, Intent> {
     let flags = arg.strip_prefix('-').unwrap_or(arg);
-    for flag in flags.chars() {
+    let mut rest = flags.chars().peekable();
+    while let Some(flag) = rest.next() {
         match flag {
             'h' => return Err(Intent::Help),
             'v' => return Err(Intent::Version),
@@ -147,6 +148,15 @@ fn parse_short(
             'y' => config.yes = true,
             'r' | 'n' | 'k' => {
                 let label = format!("-{flag}");
+                // A value flag consumes the next argv, so anything after it in
+                // the same cluster would be silently dropped. Reject instead.
+                if rest.peek().is_some() {
+                    write_parse_error(
+                        writer,
+                        &format!("\"{label}\" flag must be last in a cluster"),
+                    );
+                    return Err(Intent::Invalid);
+                }
                 let value = take_value(args, i, &label, writer)?;
                 set_value(value_key(flag), value, &label, config, writer)?;
                 return Ok(1);
@@ -176,12 +186,16 @@ fn take_value(
     label: &str,
     writer: &mut dyn Write,
 ) -> Result<String, Intent> {
-    if i + 1 >= args.len() {
+    let Some(next) = args.get(i + 1) else {
         write_parse_error(writer, &format!("\"{label}\" flag requires an argument"));
-        Err(Intent::Invalid)
-    } else {
-        Ok(args[i + 1].clone())
+        return Err(Intent::Invalid);
+    };
+    // Another flag is not accepted as a value.
+    if next.len() > 1 && next.starts_with('-') {
+        write_parse_error(writer, &format!("\"{label}\" flag requires an argument"));
+        return Err(Intent::Invalid);
     }
+    Ok(next.clone())
 }
 
 /// Assign `value` to the field selected by `key`.
