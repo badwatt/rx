@@ -73,7 +73,20 @@ fn program(cmd: &[String]) -> Result<&str, Error> {
     })
 }
 
-/// Extract exit code from process status; signal-killed processes return 1.
+/// Extract the exit code from a process status.
+///
+/// Signal- and stop-terminated children report the shell convention `128 + N`;
+/// when no signal is available, report `1`.
+#[cfg(unix)]
+fn exit_code(status: std::process::ExitStatus) -> i32 {
+    use std::os::unix::process::ExitStatusExt;
+    match status.code() {
+        Some(code) => code,
+        None => status.signal().map_or(1, |signal| 128 + signal),
+    }
+}
+
+#[cfg(not(unix))]
 fn exit_code(status: std::process::ExitStatus) -> i32 {
     status.code().unwrap_or(1)
 }
@@ -104,10 +117,10 @@ mod tests {
     }
 
     #[test]
-    fn run_cmd_signal_returns_one() {
+    fn run_cmd_signal_returns_signal_code() {
         let result = run_cmd(&["sh".into(), "-c".into(), "kill -9 $$".into()]);
         assert!(result.is_ok());
-        assert_eq!(result.expect("run cmd signal"), 1);
+        assert_eq!(result.expect("run cmd signal"), 137);
     }
 
     #[test]
@@ -161,13 +174,22 @@ mod tests {
     }
 
     #[test]
-    fn exit_code_returns_one_for_signal() {
+    fn exit_code_maps_signal_to_128_plus_n() {
         let status = Command::new("sh")
             .arg("-c")
             .arg("kill -9 $$")
             .status()
             .expect("spawn kill");
-        assert_eq!(exit_code(status), 1);
+        assert_eq!(exit_code(status), 137);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exit_code_unknown_termination_is_one() {
+        use std::os::unix::process::ExitStatusExt;
+        // A stopped child has neither an exit code nor a terminating signal.
+        let stopped = std::process::ExitStatus::from_raw(0x7f | (20 << 8));
+        assert_eq!(exit_code(stopped), 1);
     }
 
     #[test]
