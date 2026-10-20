@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# The workflow only reads the repository; keep the token read-only.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -49,3 +53,12 @@ jobs:
           --fail-under-lines 100
           --fail-under-functions 100
           --fail-under-regions 100
+
+  # Catch packaging breakage the cargo jobs cannot see (flake src filtering,
+  # buildRustPackage, etc.).
+  flake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - run: nix build .#default --no-link

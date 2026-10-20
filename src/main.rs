@@ -10,6 +10,7 @@ use domain::error::Error;
 use infra::command::CommandRunner;
 use infra::dry_run::DryRunRunner;
 use infra::process::ProcessRunner;
+use shared::ansi::Palette;
 use std::io::Write;
 use std::{env, io::stdout};
 use system_update::adapters::git::GitRepo;
@@ -43,25 +44,26 @@ fn report_error(writer: &mut dyn Write, error: &Error) -> bool {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut out = stdout();
-    if let Err(e) = run(&args, &mut out) {
+    let palette = Palette::detect();
+    if let Err(e) = run(&args, &mut out, palette) {
         report_error(&mut std::io::stderr(), &e);
         std::process::exit(exit_code_for(&e));
     }
 }
 
 /// Parse the arguments and dispatch to help/version or the update workflow.
-fn run(args: &[String], out: &mut dyn Write) -> Result<(), Error> {
+fn run(args: &[String], out: &mut dyn Write, palette: Palette) -> Result<(), Error> {
     match cli::parse::parse(args, out) {
         Intent::Help => cli::help::print_help(out),
-        Intent::Version => cli::help::print_version(out),
+        Intent::Version => cli::help::print_version(out, palette),
         Intent::Invalid => Err(Error::InvalidArgs),
-        Intent::Run(config) => run_workflow(&config),
+        Intent::Run(config) => run_workflow(&config, palette),
     }
 }
 
 /// Composition root for the workflow: wire the adapters and run the use case.
-fn run_workflow(config: &Config) -> Result<(), Error> {
-    let ui = TerminalIo;
+fn run_workflow(config: &Config, palette: Palette) -> Result<(), Error> {
+    let ui = TerminalIo::new(palette);
     let runner: &dyn CommandRunner = if config.dry_run {
         &DryRunRunner
     } else {
@@ -78,6 +80,11 @@ mod tests {
 
     fn args(from: &[&str]) -> Vec<String> {
         from.iter().copied().map(str::to_string).collect()
+    }
+
+    /// Run with the colored palette so existing assertions keep working.
+    fn run(args: &[String], out: &mut dyn Write) -> Result<(), Error> {
+        super::run(args, out, Palette::COLOR)
     }
 
     #[test]

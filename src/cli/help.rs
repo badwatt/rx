@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::domain::error::Error;
-use crate::shared::ansi;
+use crate::shared::ansi::{self, Palette};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -15,10 +15,13 @@ pub(crate) fn print_help(writer: &mut dyn Write) -> Result<(), Error> {
 }
 
 /// Print the version line.
-pub(crate) fn print_version(writer: &mut dyn Write) -> Result<(), Error> {
+pub(crate) fn print_version(writer: &mut dyn Write, palette: Palette) -> Result<(), Error> {
     ansi::write_flush(
         writer,
-        &format!("{}RX version: {}{}\n", ansi::YELLOW, VERSION, ansi::RESET),
+        &format!(
+            "{}RX version: {}{}\n",
+            palette.yellow, VERSION, palette.reset
+        ),
     )?;
     Ok(())
 }
@@ -37,7 +40,7 @@ mod tests {
     #[test]
     fn print_version_contains_semver() {
         let mut buf = Vec::new();
-        assert!(print_version(&mut buf).is_ok());
+        assert!(print_version(&mut buf, Palette::COLOR).is_ok());
         assert!(String::from_utf8_lossy(&buf).contains(VERSION));
     }
 
@@ -50,6 +53,6 @@ mod tests {
     #[test]
     fn print_version_error_propagation() {
         let mut writer = crate::shared::test_helpers::FailingWriter;
-        assert!(print_version(&mut writer).is_err());
+        assert!(print_version(&mut writer, Palette::COLOR).is_err());
     }
 }

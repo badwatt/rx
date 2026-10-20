@@ -17,11 +17,9 @@ enum ValueKey {
 
 /// Write a parse error to `writer`. Error is intentionally discarded —
 /// we're already in an error path and there's no useful recovery.
+/// Parse errors are deliberately uncolored so they are safe when piped.
 fn write_parse_error(writer: &mut dyn Write, msg: &str) {
-    let _ = ansi::write_flush(
-        writer,
-        &format!("{}Error: {}{}\n", ansi::RED, msg, ansi::RESET),
-    );
+    let _ = ansi::write_flush(writer, &format!("Error: {msg}\n"));
 }
 
 /// Parse `args` (including the program name at index 0).

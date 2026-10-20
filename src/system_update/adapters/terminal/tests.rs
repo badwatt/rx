@@ -1,6 +1,33 @@
 use super::*;
 use std::io::{self, Read};
 
+// Test-facing wrappers that pin the colored palette, so assertions stay
+// readable and the real functions keep a single palette parameter.
+fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
+    super::print_title(writer, text, Palette::COLOR)
+}
+
+fn confirm(
+    reader: &mut dyn BufRead,
+    writer: &mut dyn Write,
+    default: bool,
+    msg: Option<&str>,
+) -> Result<bool, Error> {
+    super::confirm(reader, writer, default, msg, Palette::COLOR)
+}
+
+fn print_config(writer: &mut dyn Write, config: &Config) -> Result<(), Error> {
+    super::print_config(writer, config, Palette::COLOR)
+}
+
+fn print_config_line(writer: &mut dyn Write, label: &str, value: &str) -> Result<(), Error> {
+    super::print_config_line(writer, label, value, Palette::COLOR)
+}
+
+fn terminal() -> TerminalIo {
+    TerminalIo::new(Palette::COLOR)
+}
+
 fn test_config() -> Config {
     Config {
         repo: String::from("r"),
@@ -219,6 +246,19 @@ fn print_config_omits_dry_run_when_disabled() {
 }
 
 #[test]
+fn print_config_dry_run_line_error_propagation() {
+    let mut writer = CountingWriter {
+        fail_after: 6,
+        count: 0,
+    };
+    let config = Config {
+        dry_run: true,
+        ..test_config()
+    };
+    assert!(print_config(&mut writer, &config).is_err());
+}
+
+#[test]
 fn print_config_block_is_separated_from_following_title_by_blank_line() {
     let mut buf = Vec::new();
     let config = test_config();
@@ -305,27 +345,27 @@ fn print_config_line_error_propagation() {
 
 #[test]
 fn terminal_io_title_does_not_panic() {
-    TerminalIo.title("Test").expect("title");
+    terminal().title("Test").expect("title");
 }
 
 #[test]
 fn terminal_io_error_does_not_panic() {
-    TerminalIo.error("err").expect("error");
+    terminal().error("err").expect("error");
 }
 
 #[test]
 fn terminal_io_success_does_not_panic() {
-    TerminalIo.success("ok").expect("success");
+    terminal().success("ok").expect("success");
 }
 
 #[test]
 fn terminal_io_config_does_not_panic() {
-    TerminalIo.config(&test_config()).expect("config");
+    terminal().config(&test_config()).expect("config");
 }
 
 #[test]
 fn terminal_io_output_does_not_panic() {
-    TerminalIo.output("raw\n").expect("output");
+    terminal().output("raw\n").expect("output");
 }
 
 #[test]

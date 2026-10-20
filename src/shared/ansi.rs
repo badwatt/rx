@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 // ANSI escape codes used in rx output styling.
 pub(crate) const RED: &str = "\x1b[31m";
@@ -22,6 +22,55 @@ pub(crate) const BOLD: &str = "\x1b[1m";
 // Used only in tests; kept for future styling needs.
 #[allow(dead_code)]
 pub(crate) const UNDERLINE: &str = "\x1b[4m";
+
+/// The colors used for a given run. [`Palette::PLAIN`] renders without ANSI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Palette {
+    pub(crate) red: &'static str,
+    pub(crate) green: &'static str,
+    pub(crate) yellow: &'static str,
+    pub(crate) blue: &'static str,
+    pub(crate) cyan: &'static str,
+    pub(crate) reset: &'static str,
+}
+
+impl Palette {
+    pub(crate) const COLOR: Self = Self {
+        red: RED,
+        green: GREEN,
+        yellow: YELLOW,
+        blue: BLUE,
+        cyan: CYAN,
+        reset: RESET,
+    };
+
+    pub(crate) const PLAIN: Self = Self {
+        red: "",
+        green: "",
+        yellow: "",
+        blue: "",
+        cyan: "",
+        reset: "",
+    };
+
+    /// Pick a palette for this process: `NO_COLOR` or a non-TTY stdout disables
+    /// color.
+    pub(crate) fn detect() -> Self {
+        Self::from(
+            std::env::var_os("NO_COLOR").is_some(),
+            std::io::stdout().is_terminal(),
+        )
+    }
+
+    /// Pure decision over the environment.
+    pub(crate) fn from(no_color: bool, is_tty: bool) -> Self {
+        if no_color || !is_tty {
+            Self::PLAIN
+        } else {
+            Self::COLOR
+        }
+    }
+}
 
 /// Write `msg` to `writer` and flush immediately.
 pub(crate) fn write_flush(writer: &mut dyn Write, msg: &str) -> Result<(), std::io::Error> {
@@ -78,5 +127,25 @@ mod tests {
         // Write succeeds but flush fails
         let mut writer = crate::shared::test_helpers::FlushFailingWriter;
         assert!(write_flush(&mut writer, "x").is_err());
+    }
+
+    #[test]
+    fn palette_from_disables_color_for_no_color() {
+        assert_eq!(Palette::from(true, true), Palette::PLAIN);
+    }
+
+    #[test]
+    fn palette_from_disables_color_for_non_tty() {
+        assert_eq!(Palette::from(false, false), Palette::PLAIN);
+    }
+
+    #[test]
+    fn palette_from_keeps_color_for_tty() {
+        assert_eq!(Palette::from(false, true), Palette::COLOR);
+    }
+
+    #[test]
+    fn palette_detect_runs_without_panic() {
+        let _ = Palette::detect();
     }
 }
