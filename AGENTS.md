@@ -65,49 +65,52 @@
 
 ## Architecture
 
-Hexagonal (ports & adapters) core organized into vertical slices. Top-level
-directories scream the capabilities (`system_update`, `cli`); `domain` is the
-shared pure kernel, `ports`/`adapters` the hexagonal boundaries.
+Feature-first hexagonal: every feature screams its capability (`system_update`,
+`cli`) and owns its layers (`application` / `ports` / `adapters`). Only the
+domain kernel, non-business helpers and generic infrastructure are shared.
 
 ```
 src/
 ├── main.rs              # composition root: parse → wire adapters → run
-├── domain/              # shared kernel (pure)
-│   ├── config.rs        # Config entity + validate()
-│   └── error.rs         # Error enum
-├── ports/               # semantic interfaces the core depends on
-│   ├── repo.rs          # Repo: is_repo / pull / changes / add_all
-│   ├── nix.rs           # Nix: update / rebuild / prune / collect_garbage / diff_closures
-│   └── user_io.rs       # UserIo: title/confirm/error/success/output/config
-├── adapters/            # driven adapters
+├── domain/              # shared kernel (pure): config.rs, error.rs
+├── shared/              # non-business cross-cutting: ansi.rs, test_helpers.rs
+├── infra/               # generic process mechanism (not business, not a port)
 │   ├── command.rs       # CommandRunner (adapter-internal argv seam)
 │   ├── process.rs       # ProcessRunner (std::process)
-│   ├── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
-│   ├── git.rs           # GitRepo: Repo via the git CLI
-│   ├── nix.rs           # NixCli: Nix via nix / nixos-rebuild
-│   └── terminal.rs      # TerminalIo (stdin/stdout) + config rendering
-├── system_update/       # use-case slice
-│   ├── mod.rs           # pipeline orchestration
-│   └── steps/           # pull, flake, stage, rebuild, cleanup, diff
+│   └── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
+├── system_update/       # feature: the NixOS update workflow
+│   ├── application/     # use cases
+│   │   ├── mod.rs       # pipeline orchestration
+│   │   └── steps/       # pull, flake, stage, rebuild, cleanup, diff
+│   ├── ports/           # the interfaces the feature needs
+│   │   ├── repo.rs      # Repo: is_repo / pull / changes / add_all
+│   │   ├── nix.rs       # Nix: update / rebuild / prune / collect_garbage / diff_closures
+│   │   └── user_io.rs   # UserIo: title/confirm/error/success/output/config
+│   └── adapters/        # driven implementations for the feature
+│       ├── git.rs       # GitRepo: Repo via the git CLI
+│       ├── nix.rs       # NixCli: Nix via nix / nixos-rebuild
+│       └── terminal.rs  # TerminalIo (stdout/stderr) + config rendering
 ├── cli/                 # driving adapter (parsing only)
 │   ├── mod.rs           # Intent
 │   ├── parse.rs         # argument parser
 │   ├── defaults.rs      # default config + tilde expansion
 │   ├── hostname.rs      # hostname resolution
 │   └── help.rs          # help/version banners
-├── ansi.rs              # ANSI color helpers + write_flush
-└── test_helpers.rs      # FailingWriter / StubRunner etc.
 ```
 
-- **Semantic ports**: the use case depends on `Repo`, `Nix`, `UserIo` — never on `git`/`nix` specifics. `adapters::git` / `adapters::nix` own the argv; workflow tests mock the semantic ports.
-- **`CommandRunner` is not a port**: it is an adapter-internal seam so `--dry-run` decorates a single implementation instead of every port.
-- **Composition in `main`**: `cli` only parses (`Intent`), `main` selects adapters (dry-run vs process) and wires them. `cli` must not depend on `adapters`.
-- **Single output channel**: all user-facing output flows through `UserIo`.
-- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `InvalidArgs`, `InvalidConfig`.
+- **Feature-first layout**: the business capability owns `application` / `ports` / `adapters`, so a new feature touches one folder. `domain`, `shared` and `infra` stay top-level because they are cross-feature by nature.
+- **Semantic ports**: the use case depends on `Repo`, `Nix`, `UserIo` — never on `git`/`nix` specifics. `system_update::adapters::git` / `::nix` own the argv; workflow tests mock the semantic ports.
+- **`CommandRunner` is not a port**: it is an adapter-internal seam (in `infra`) so `--dry-run` decorates a single implementation instead of every port.
+- **Composition in `main`**: `cli` only parses (`Intent`), `main` selects adapters (dry-run vs process) and wires them. `cli` must not depend on feature adapters.
+- **Single output channel**: user-facing output flows through `UserIo`; `error` and top-level errors go to **stderr**, the rest to stdout.
+- **NO_COLOR / non-TTY**: `ansi::Palette` is picked from `NO_COLOR` + `stdout.is_terminal()`; piped output is plain.
+- **Exit codes**: `2` invalid args/config, `141` (128 + SIGPIPE) on early stdout close, `128 + N` for signal-terminated children, else `1`.
+- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
 - **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
-- **Validated config**: `Config::validate()` rejects empty repo/hostname or `keep == 0` with `Error::InvalidConfig` (exit code 2).
+- **Validated config**: `Config::validate()` rejects empty repo/hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2).
+- **Prompt decline**: declining the initial prompt prints `Aborted.` and exits 0; declining staging aborts before the rebuild (no stale flake).
 - **Cleanup**: `nix-env --delete-generations +N` then `nix-collect-garbage` (no `-d`, so `--keep N` is respected).
 
 ## Build / packaging

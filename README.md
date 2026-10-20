@@ -81,6 +81,8 @@ Proceed? (Y/n)
 | `--repo`       | `-r`  | Path to dotfiles repo                    | `~/.dotfiles` |
 | `--hostname`   | `-n`  | Hostname for `nixos-rebuild --flake`     | auto-detected |
 | `--keep`       | `-k`  | Generations to keep during cleanup       | `10`          |
+| `--jobs`       | `-j`  | Cap Nix `--max-jobs` for the rebuild     | unset         |
+| `--cores`      | `-c`  | Cap Nix `--cores` for the rebuild        | unset         |
 | `--update`    | `-u`  | Run `nix flake update` before rebuild    | `false`       |
 | `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
 | `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
@@ -97,38 +99,41 @@ Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` �
 
 ## 🏗 Architecture
 
-Hexagonal (ports & adapters) core organized into vertical slices. Top-level
-directories scream the capabilities (`system_update`, `cli`); `domain` is the
-shared pure kernel and `ports`/`adapters` hold the hexagonal boundaries.
+Feature-first hexagonal: every feature screams its capability (`system_update`,
+`cli`) and owns its layers (`application` / `ports` / `adapters`). Only the
+domain kernel, non-business helpers and generic infrastructure are shared.
 
 ```
 src/
 ├── main.rs              # Composition root: parse → wire adapters → run
 ├── domain/              # Shared kernel (pure)
-│   ├── config.rs        # Config entity + validation
+│   ├── config.rs        # Config + validate() + BuildOptions
 │   └── error.rs         # Error type
-├── ports/               # Semantic interfaces the core depends on
-│   ├── repo.rs          # Repo: is_repo / pull / changes / add_all
-│   ├── nix.rs           # Nix: update / rebuild / prune / collect_garbage / diff_closures
-│   └── user_io.rs       # UserIo: title / confirm / error / success / output / config
-├── adapters/            # Driven adapters
+├── shared/              # Non-business cross-cutting
+│   ├── ansi.rs          # ANSI codes, Palette (NO_COLOR/TTY), write_flush
+│   └── test_helpers.rs  # FailingWriter / StubRunner etc.
+├── infra/               # Generic process mechanism (not business, not a port)
 │   ├── command.rs       # CommandRunner (adapter-internal argv seam)
 │   ├── process.rs       # ProcessRunner (std::process)
-│   ├── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
-│   ├── git.rs           # GitRepo: Repo via the git CLI
-│   ├── nix.rs           # NixCli: Nix via nix / nixos-rebuild
-│   └── terminal.rs      # TerminalIo (stdin/stdout) + config rendering
-├── system_update/       # Use-case slice
-│   ├── mod.rs           # Pipeline orchestration
-│   └── steps/           # pull, flake, stage, rebuild, cleanup, diff
+│   └── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
+├── system_update/       # Feature: the NixOS update workflow
+│   ├── application/     # Use cases
+│   │   ├── mod.rs       # Pipeline orchestration
+│   │   └── steps/       # pull, flake, stage, rebuild, cleanup, diff
+│   ├── ports/           # Interfaces the feature needs
+│   │   ├── repo.rs      # Repo: is_repo / pull / changes / add_all
+│   │   ├── nix.rs       # Nix: update / rebuild / prune / collect_garbage / diff_closures
+│   │   └── user_io.rs   # UserIo: title / confirm / error / success / output / config
+│   └── adapters/        # Driven implementations for the feature
+│       ├── git.rs       # GitRepo: Repo via the git CLI
+│       ├── nix.rs       # NixCli: Nix via nix / nixos-rebuild
+│       └── terminal.rs  # TerminalIo (stdout/stderr) + config rendering
 ├── cli/                 # Driving adapter
 │   ├── mod.rs           # Intent
 │   ├── parse.rs         # Argument parser
 │   ├── defaults.rs      # Default config + tilde expansion
 │   ├── hostname.rs      # Hostname resolution
 │   └── help.rs          # Help/version banners
-├── ansi.rs              # ANSI color helpers + write_flush
-└── test_helpers.rs      # FailingWriter / StubRunner etc.
 tests/
 └── integration.rs        # End-to-end binary tests
 ```
@@ -137,11 +142,19 @@ tests/
 
 - **Zero dependencies** — no crates, pure `std`. Compile fast, audit easy.
 - **Semantic ports** — the use case depends on `Repo`, `Nix` and `UserIo`, never on
-  `git`/`nix` specifics. `adapters::git` / `adapters::nix` own the argv; the
+  `git`/`nix` specifics. `system_update::adapters::git` / `::nix` own the argv; the
   workflow tests mock the semantic ports. `--dry-run` decorates a single
   adapter-internal `CommandRunner` seam, so no per-port dry adapters.
 - **Composition in `main`** — the driving adapter (`cli`) only parses; `main`
-  selects adapters and wires them, so `cli` never depends on `adapters`.
+  selects adapters and wires them, so `cli` never depends on feature adapters.
+- **Diagnostics on stderr** — `UserIo::error` and the top-level error go to stderr;
+  titles, prompts and status stay on stdout, so `rx | head` keeps errors visible.
+- **NO_COLOR / non-TTY** — a `Palette` picked from `NO_COLOR` and `stdout.is_terminal()`
+  disables ANSI; piped output is plain text.
+- **Exit codes** — `2` for invalid arguments/config, `141` (128 + SIGPIPE) when
+  stdout closes early, `128 + N` for signal-terminated child commands, else `1`.
+- **Parallelism caps** — `-j/--jobs` and `-c/--cores` map to `--max-jobs`/`--cores`,
+  so a heavy build cannot OOM the terminal's systemd scope.
 - **Single output channel** — all user-facing output flows through the `UserIo` port.
 - **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Capability-probed rebuild** — `rx` probes the installed `nixos-rebuild`
@@ -161,7 +174,7 @@ tests/
 ### 100% coverage — every branch, every error path
 
 ```
-240 tests: 228 unit + 12 integration — all passing ✅
+272 tests: 260 unit + 12 integration — all passing ✅
 ```
 
 Coverage counts tests too: `--no-default-ignore-filename-regex` disables
