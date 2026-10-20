@@ -33,37 +33,49 @@ fn is_quiet(error: &Error) -> bool {
 
 /// Print a terminal error unless it is quiet. Returns whether anything was
 /// printed.
-fn report_error(writer: &mut dyn Write, error: &Error) -> bool {
-    if is_quiet(error) {
+fn report_error(writer: &mut dyn Write, palette: Palette, error: &Error) -> bool {
+    // Quiet on a closed stdout; the parser already printed the detail for
+    // invalid arguments.
+    if is_quiet(error) || matches!(error, Error::InvalidArgs) {
         return false;
     }
-    let _ = writeln!(writer, "Error: {error}");
+    let _ = writeln!(writer, "{}Error: {}{}", palette.red, error, palette.reset);
     true
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut out = stdout();
-    let palette = Palette::detect();
-    if let Err(e) = run(&args, &mut out, palette) {
-        report_error(&mut std::io::stderr(), &e);
+    let mut err = std::io::stderr();
+    let out_palette = Palette::for_stdout();
+    let err_palette = Palette::for_stderr();
+    if let Err(e) = run(&args, &mut out, &mut err, out_palette, err_palette) {
+        report_error(&mut std::io::stderr(), err_palette, &e);
         std::process::exit(exit_code_for(&e));
     }
 }
 
 /// Parse the arguments and dispatch to help/version or the update workflow.
-fn run(args: &[String], out: &mut dyn Write, palette: Palette) -> Result<(), Error> {
-    match cli::parse::parse(args, out) {
+///
+/// Parse diagnostics go to `err`; help, prompts and status go to `out`.
+fn run(
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    out_palette: Palette,
+    err_palette: Palette,
+) -> Result<(), Error> {
+    match cli::parse::parse(args, err) {
         Intent::Help => cli::help::print_help(out),
-        Intent::Version => cli::help::print_version(out, palette),
+        Intent::Version => cli::help::print_version(out, out_palette),
         Intent::Invalid => Err(Error::InvalidArgs),
-        Intent::Run(config) => run_workflow(&config, palette),
+        Intent::Run(config) => run_workflow(&config, out_palette, err_palette),
     }
 }
 
 /// Composition root for the workflow: wire the adapters and run the use case.
-fn run_workflow(config: &Config, palette: Palette) -> Result<(), Error> {
-    let ui = TerminalIo::new(palette);
+fn run_workflow(config: &Config, out_palette: Palette, err_palette: Palette) -> Result<(), Error> {
+    let ui = TerminalIo::new(out_palette, err_palette);
     let runner: &dyn CommandRunner = if config.dry_run {
         &DryRunRunner
     } else {
@@ -84,7 +96,7 @@ mod tests {
 
     /// Run with the colored palette so existing assertions keep working.
     fn run(args: &[String], out: &mut dyn Write) -> Result<(), Error> {
-        super::run(args, out, Palette::COLOR)
+        super::run(args, out, &mut Vec::new(), Palette::COLOR, Palette::COLOR)
     }
 
     #[test]
@@ -124,15 +136,42 @@ mod tests {
     fn report_error_skips_broken_pipe() {
         let pipe = Error::Io(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
         let mut buf = Vec::new();
-        assert!(!report_error(&mut buf, &pipe));
+        assert!(!report_error(&mut buf, Palette::PLAIN, &pipe));
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn report_error_skips_invalid_args() {
+        let mut buf = Vec::new();
+        assert!(!report_error(&mut buf, Palette::PLAIN, &Error::InvalidArgs));
         assert!(buf.is_empty());
     }
 
     #[test]
     fn report_error_writes_other_errors() {
         let mut buf = Vec::new();
-        assert!(report_error(&mut buf, &Error::GitPullFailed));
+        assert!(report_error(
+            &mut buf,
+            Palette::PLAIN,
+            &Error::GitPullFailed
+        ));
         assert!(String::from_utf8_lossy(&buf).contains("Failed to pull changes"));
+    }
+
+    #[test]
+    fn run_parse_error_goes_to_err_writer() {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let result = super::run(
+            &args(&["rx", "-x"]),
+            &mut out,
+            &mut err,
+            Palette::PLAIN,
+            Palette::PLAIN,
+        );
+        assert!(result.is_err());
+        assert!(out.is_empty());
+        assert!(String::from_utf8_lossy(&err).contains("Unknown flag"));
     }
 
     #[test]

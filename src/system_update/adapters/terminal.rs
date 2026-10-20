@@ -7,26 +7,27 @@ use crate::system_update::ports::user_io::UserIo;
 
 /// Production [`UserIo`]: prompts and status on stdout, diagnostics on stderr.
 pub(crate) struct TerminalIo {
-    palette: Palette,
+    out: Palette,
+    err: Palette,
 }
 
 impl TerminalIo {
-    pub(crate) fn new(palette: Palette) -> Self {
-        Self { palette }
+    pub(crate) fn new(out: Palette, err: Palette) -> Self {
+        Self { out, err }
     }
 }
 
 impl UserIo for TerminalIo {
     fn title(&self, text: &str) -> Result<(), Error> {
         let mut out = io::stdout();
-        print_title(&mut out, text, self.palette)
+        print_title(&mut out, text, self.out)
     }
 
     fn confirm(&self, default: bool, msg: Option<&str>) -> Result<bool, Error> {
         let stdin = io::stdin();
         let mut reader = stdin.lock();
         let mut out = io::stdout();
-        confirm(&mut reader, &mut out, default, msg, self.palette)
+        confirm(&mut reader, &mut out, default, msg, self.out)
     }
 
     fn error(&self, msg: &str) -> Result<(), Error> {
@@ -34,7 +35,7 @@ impl UserIo for TerminalIo {
         let mut err = io::stderr();
         write_line(
             &mut err,
-            &format!("{}{}{}", self.palette.red, msg, self.palette.reset),
+            &format!("{}{}{}", self.err.red, msg, self.err.reset),
         )
     }
 
@@ -42,7 +43,7 @@ impl UserIo for TerminalIo {
         let mut out = io::stdout();
         write_line(
             &mut out,
-            &format!("{}{}{}", self.palette.green, msg, self.palette.reset),
+            &format!("{}{}{}", self.out.green, msg, self.out.reset),
         )
     }
 
@@ -53,7 +54,7 @@ impl UserIo for TerminalIo {
 
     fn config(&self, config: &Config) -> Result<(), Error> {
         let mut out = io::stdout();
-        print_config(&mut out, config, self.palette)
+        print_config(&mut out, config, self.out)
     }
 }
 

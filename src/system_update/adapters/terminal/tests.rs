@@ -25,7 +25,7 @@ fn print_config_line(writer: &mut dyn Write, label: &str, value: &str) -> Result
 }
 
 fn terminal() -> TerminalIo {
-    TerminalIo::new(Palette::COLOR)
+    TerminalIo::new(Palette::COLOR, Palette::COLOR)
 }
 
 fn test_config() -> Config {

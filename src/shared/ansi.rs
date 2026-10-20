@@ -53,13 +53,18 @@ impl Palette {
         reset: "",
     };
 
-    /// Pick a palette for this process: `NO_COLOR` or a non-TTY stdout disables
-    /// color.
-    pub(crate) fn detect() -> Self {
-        Self::from(
-            std::env::var_os("NO_COLOR").is_some(),
-            std::io::stdout().is_terminal(),
-        )
+    /// Palette for stdout.
+    pub(crate) fn for_stdout() -> Self {
+        Self::detect(std::io::stdout().is_terminal())
+    }
+
+    /// Palette for stderr.
+    pub(crate) fn for_stderr() -> Self {
+        Self::detect(std::io::stderr().is_terminal())
+    }
+
+    fn detect(is_tty: bool) -> Self {
+        Self::from(no_color(std::env::var_os("NO_COLOR").as_deref()), is_tty)
     }
 
     /// Pure decision over the environment.
@@ -70,6 +75,11 @@ impl Palette {
             Self::COLOR
         }
     }
+}
+
+/// `NO_COLOR` disables color only when set to a non-empty value.
+fn no_color(value: Option<&std::ffi::OsStr>) -> bool {
+    value.is_some_and(|v| !v.is_empty())
 }
 
 /// Write `msg` to `writer` and flush immediately.
@@ -145,7 +155,16 @@ mod tests {
     }
 
     #[test]
-    fn palette_detect_runs_without_panic() {
-        let _ = Palette::detect();
+    fn palette_for_stdout_and_stderr_run() {
+        let _ = Palette::for_stdout();
+        let _ = Palette::for_stderr();
+    }
+
+    #[test]
+    fn no_color_requires_a_non_empty_value() {
+        use std::ffi::OsStr;
+        assert!(!no_color(None));
+        assert!(!no_color(Some(OsStr::new(""))));
+        assert!(no_color(Some(OsStr::new("1"))));
     }
 }
