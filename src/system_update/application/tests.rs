@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::config::BuildOptions;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -34,7 +35,7 @@ fn no_changes(_: &str) -> Result<String, Error> {
     clippy::unnecessary_wraps,
     reason = "mock must match the port trait signature"
 )]
-fn ok_rebuild(_: &str, _: &str) -> Result<(), Error> {
+fn ok_rebuild(_: &str, _: &str, _: BuildOptions) -> Result<(), Error> {
     Ok(())
 }
 
@@ -66,7 +67,7 @@ fn pull_errs(_: &str) -> Result<(), Error> {
     Err(Error::GitPullFailed)
 }
 
-fn rebuild_errs(_: &str, _: &str) -> Result<(), Error> {
+fn rebuild_errs(_: &str, _: &str, _: BuildOptions) -> Result<(), Error> {
     Err(Error::RebuildFailed)
 }
 
@@ -111,7 +112,7 @@ impl Default for MockRepo {
     }
 }
 
-type RebuildFn = Box<dyn Fn(&str, &str) -> Result<(), Error>>;
+type RebuildFn = Box<dyn Fn(&str, &str, BuildOptions) -> Result<(), Error>>;
 type PruneFn = Box<dyn Fn(u8) -> Result<(), Error>>;
 type GcFn = Box<dyn Fn() -> Result<(), Error>>;
 type DiffFn = Box<dyn Fn() -> Result<String, Error>>;
@@ -128,8 +129,8 @@ impl Nix for MockNix {
     fn update(&self, repo: &str) -> Result<(), Error> {
         (self.update)(repo)
     }
-    fn rebuild(&self, repo: &str, hostname: &str) -> Result<(), Error> {
-        (self.rebuild)(repo, hostname)
+    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
+        (self.rebuild)(repo, hostname, options)
     }
     fn prune(&self, keep: u8) -> Result<(), Error> {
         (self.prune)(keep)
@@ -214,6 +215,8 @@ fn default_config() -> Config {
         diff: false,
         yes: false,
         dry_run: false,
+        jobs: None,
+        cores: None,
     }
 }
 

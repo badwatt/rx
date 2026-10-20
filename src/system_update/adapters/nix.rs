@@ -1,3 +1,4 @@
+use crate::domain::config::BuildOptions;
 use crate::domain::error::Error;
 use crate::infra::command::CommandRunner;
 use crate::system_update::ports::nix::Nix;
@@ -45,9 +46,11 @@ impl Nix for NixCli<'_> {
         }
     }
 
-    fn rebuild(&self, repo: &str, hostname: &str) -> Result<(), Error> {
+    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
         let flavor = self.detect_flavor();
-        let status = self.runner.run(&cmd_rebuild(repo, hostname, flavor))?;
+        let status = self
+            .runner
+            .run(&cmd_rebuild(repo, hostname, flavor, options))?;
         if status == 0 {
             Ok(())
         } else {
@@ -107,9 +110,15 @@ fn cmd_update(repo: &str) -> Vec<String> {
 }
 
 /// `nixos-rebuild switch <flavor flags> --flake <repo>#<hostname> --show-trace`
-fn cmd_rebuild(repo: &str, hostname: &str, flavor: RebuildFlavor) -> Vec<String> {
+/// plus any parallelism caps.
+fn cmd_rebuild(
+    repo: &str,
+    hostname: &str,
+    flavor: RebuildFlavor,
+    options: BuildOptions,
+) -> Vec<String> {
     let flake = format!("{repo}#{hostname}");
-    match flavor {
+    let mut cmd = match flavor {
         RebuildFlavor::Ng => vec![
             "nixos-rebuild".into(),
             "switch".into(),
@@ -128,7 +137,16 @@ fn cmd_rebuild(repo: &str, hostname: &str, flavor: RebuildFlavor) -> Vec<String>
             flake,
             "--show-trace".into(),
         ],
+    };
+    if let Some(jobs) = options.jobs {
+        cmd.push("--max-jobs".into());
+        cmd.push(jobs.to_string());
     }
+    if let Some(cores) = options.cores {
+        cmd.push("--cores".into());
+        cmd.push(cores.to_string());
+    }
+    cmd
 }
 
 /// `nix-env --profile /nix/var/nix/profiles/system --delete-generations +<keep>`
@@ -185,7 +203,7 @@ mod tests {
     #[test]
     fn cmd_rebuild_ng_argv() {
         assert_eq!(
-            cmd_rebuild("/repo", "host", RebuildFlavor::Ng),
+            cmd_rebuild("/repo", "host", RebuildFlavor::Ng, BuildOptions::default()),
             vec![
                 "nixos-rebuild",
                 "switch",
@@ -201,7 +219,12 @@ mod tests {
     #[test]
     fn cmd_rebuild_classic_argv() {
         assert_eq!(
-            cmd_rebuild("/repo", "host", RebuildFlavor::Classic),
+            cmd_rebuild(
+                "/repo",
+                "host",
+                RebuildFlavor::Classic,
+                BuildOptions::default()
+            ),
             vec![
                 "sudo",
                 "nixos-rebuild",
@@ -210,6 +233,31 @@ mod tests {
                 "--flake",
                 "/repo#host",
                 "--show-trace"
+            ]
+        );
+    }
+
+    #[test]
+    fn cmd_rebuild_appends_parallelism_caps() {
+        let options = BuildOptions {
+            jobs: Some(2),
+            cores: Some(4),
+        };
+        let cmd = cmd_rebuild("/repo", "host", RebuildFlavor::Ng, options);
+        assert_eq!(
+            cmd,
+            vec![
+                "nixos-rebuild",
+                "switch",
+                "--elevate=sudo",
+                "--no-reexec",
+                "--flake",
+                "/repo#host",
+                "--show-trace",
+                "--max-jobs",
+                "2",
+                "--cores",
+                "4"
             ]
         );
     }
@@ -269,7 +317,11 @@ mod tests {
     #[test]
     fn rebuild_ok_and_probes_ng_by_default() {
         let runner = StubRunner::new();
-        assert!(NixCli::new(&runner).rebuild("/repo", "host").is_ok());
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default())
+                .is_ok()
+        );
     }
 
     #[test]
@@ -280,7 +332,11 @@ mod tests {
             recorder.borrow_mut().extend_from_slice(cmd);
             Ok(0)
         });
-        assert!(NixCli::new(&runner).rebuild("/repo", "host").is_ok());
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default())
+                .is_ok()
+        );
         let joined = seen.borrow().join(" ");
         assert!(joined.contains("--elevate=sudo"));
         assert!(joined.contains("--no-reexec"));
@@ -296,7 +352,11 @@ mod tests {
                 recorder.borrow_mut().extend_from_slice(cmd);
                 Ok(0)
             });
-        assert!(NixCli::new(&runner).rebuild("/repo", "host").is_ok());
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default())
+                .is_ok()
+        );
         let joined = seen.borrow().join(" ");
         assert!(joined.contains("sudo"));
         assert!(joined.contains("--fast"));
@@ -305,19 +365,31 @@ mod tests {
     #[test]
     fn rebuild_classic_when_probe_errors() {
         let runner = StubRunner::new().with_probe(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(NixCli::new(&runner).rebuild("/repo", "host").is_ok());
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default())
+                .is_ok()
+        );
     }
 
     #[test]
     fn rebuild_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
-        assert!(NixCli::new(&runner).rebuild("/repo", "host").is_err());
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default())
+                .is_err()
+        );
     }
 
     #[test]
     fn rebuild_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(NixCli::new(&runner).rebuild("/repo", "host").is_err());
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default())
+                .is_err()
+        );
     }
 
     #[test]

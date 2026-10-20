@@ -84,6 +84,77 @@ fn parse_k_zero_returns_error() {
 }
 
 #[test]
+fn parse_j_flag_sets_jobs() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.jobs = Some(2);
+    assert_eq!(
+        parse(&args(&["rx", "-j", "2"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_c_flag_sets_cores() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.cores = Some(4);
+    assert_eq!(
+        parse(&args(&["rx", "-c", "4"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_jobs_long_sets_jobs() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.jobs = Some(3);
+    assert_eq!(
+        parse(&args(&["rx", "--jobs", "3"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_cores_long_sets_cores() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.cores = Some(5);
+    assert_eq!(
+        parse(&args(&["rx", "--cores", "5"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_jobs_zero_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "-j", "0"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
+}
+
+#[test]
+fn parse_jobs_non_numeric_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--jobs", "abc"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("not numeric"));
+}
+
+#[test]
+fn parse_cores_zero_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--cores", "0"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
+}
+
+#[test]
 fn parse_r_with_value_sets_repo() {
     let mut buf = Vec::new();
     let mut expected = default_config();

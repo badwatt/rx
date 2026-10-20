@@ -11,6 +11,8 @@ enum ValueKey {
     Repo,
     Hostname,
     Keep,
+    Jobs,
+    Cores,
 }
 
 /// Write a parse error to `writer`. Error is intentionally discarded —
@@ -107,7 +109,7 @@ fn parse_long(
             config.dry_run = true;
             Ok(0)
         }
-        "--repo" | "--hostname" | "--keep" => {
+        "--repo" | "--hostname" | "--keep" | "--jobs" | "--cores" => {
             let value = take_value(args, i, arg, writer)?;
             set_value(long_value_key(arg), value, arg, config, writer)
         }
@@ -123,7 +125,9 @@ fn long_value_key(arg: &str) -> ValueKey {
     match arg {
         "--repo" => ValueKey::Repo,
         "--hostname" => ValueKey::Hostname,
-        _ => ValueKey::Keep,
+        "--keep" => ValueKey::Keep,
+        "--jobs" => ValueKey::Jobs,
+        _ => ValueKey::Cores,
     }
 }
 
@@ -146,7 +150,7 @@ fn parse_short(
             'd' => config.diff = true,
             'u' => config.update = true,
             'y' => config.yes = true,
-            'r' | 'n' | 'k' => {
+            'r' | 'n' | 'k' | 'j' | 'c' => {
                 let label = format!("-{flag}");
                 // A value flag consumes the next argv, so anything after it in
                 // the same cluster would be silently dropped. Reject instead.
@@ -175,7 +179,9 @@ fn value_key(flag: char) -> ValueKey {
     match flag {
         'r' => ValueKey::Repo,
         'n' => ValueKey::Hostname,
-        _ => ValueKey::Keep,
+        'k' => ValueKey::Keep,
+        'j' => ValueKey::Jobs,
+        _ => ValueKey::Cores,
     }
 }
 
@@ -210,6 +216,8 @@ fn set_value(
         ValueKey::Repo => config.repo = expand_tilde(&value),
         ValueKey::Hostname => config.hostname = value,
         ValueKey::Keep => config.keep = parse_keep(&value, label, writer)?,
+        ValueKey::Jobs => config.jobs = Some(parse_count(&value, label, writer)?),
+        ValueKey::Cores => config.cores = Some(parse_count(&value, label, writer)?),
     }
     Ok(1)
 }
@@ -217,6 +225,27 @@ fn set_value(
 /// Parse a numeric `--keep` / `-k` value (>= 1), or report an error.
 fn parse_keep(value: &str, label: &str, writer: &mut dyn Write) -> Result<u8, Intent> {
     match value.parse::<u8>() {
+        Ok(num) if num >= 1 => Ok(num),
+        Ok(_) => {
+            write_parse_error(
+                writer,
+                &format!("Value of \"{label}\" flag must be at least 1."),
+            );
+            Err(Intent::Invalid)
+        }
+        Err(_) => {
+            write_parse_error(
+                writer,
+                &format!("Value of \"{label}\" flag is not numeric."),
+            );
+            Err(Intent::Invalid)
+        }
+    }
+}
+
+/// Parse a numeric `--jobs` / `--cores` value (>= 1), or report an error.
+fn parse_count(value: &str, label: &str, writer: &mut dyn Write) -> Result<u16, Intent> {
+    match value.parse::<u16>() {
         Ok(num) if num >= 1 => Ok(num),
         Ok(_) => {
             write_parse_error(

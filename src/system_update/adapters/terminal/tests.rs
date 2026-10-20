@@ -10,6 +10,8 @@ fn test_config() -> Config {
         diff: false,
         yes: false,
         dry_run: false,
+        jobs: None,
+        cores: None,
     }
 }
 
@@ -177,6 +179,8 @@ fn print_config_renders_all_fields() {
         diff: true,
         yes: false,
         dry_run: false,
+        jobs: None,
+        cores: None,
     };
     assert!(print_config(&mut buf, &config).is_ok());
     let s = String::from_utf8_lossy(&buf);

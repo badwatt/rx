@@ -12,6 +12,8 @@ pub(crate) fn default_config() -> Config {
         diff: false,
         yes: false,
         dry_run: false,
+        jobs: None,
+        cores: None,
     }
 }
 
