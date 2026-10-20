@@ -87,6 +87,7 @@ Proceed? (Y/n)
 | `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
 | `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
 | `--dry-run`    |       | Print commands without executing them     | `false`       |
+| `--no-color`   |       | Disable colored output                    | auto          |
 | `--help`       | `-h`  | Print help                                | —             |
 | `--version`    | `-v`  | Print version                             | —             |
 
@@ -147,10 +148,12 @@ tests/
   adapter-internal `CommandRunner` seam, so no per-port dry adapters.
 - **Composition in `main`** — the driving adapter (`cli`) only parses; `main`
   selects adapters and wires them, so `cli` never depends on feature adapters.
-- **Diagnostics on stderr** — `UserIo::error` and the top-level error go to stderr;
-  titles, prompts and status stay on stdout, so `rx | head` keeps errors visible.
-- **NO_COLOR / non-TTY** — a `Palette` picked from `NO_COLOR` and `stdout.is_terminal()`
-  disables ANSI; piped output is plain text.
+- **Diagnostics on stderr** — parse errors, `UserIo::error` and the top-level
+  error go to stderr; titles, prompts and status stay on stdout, so `rx | head`
+  keeps errors visible.
+- **NO_COLOR / non-TTY / `--no-color`** — each stream picks its own `Palette`
+  from `NO_COLOR` (when non-empty) and `is_terminal()`; `--no-color` forces
+  plain output for both.
 - **Exit codes** — `2` for invalid arguments/config, `141` (128 + SIGPIPE) when
   stdout closes early, `128 + N` for signal-terminated child commands, else `1`.
 - **Parallelism caps** — `-j/--jobs` and `-c/--cores` map to `--max-jobs`/`--cores`,
@@ -174,7 +177,7 @@ tests/
 ### 100% coverage — every branch, every error path
 
 ```
-272 tests: 260 unit + 12 integration — all passing ✅
+288 tests: 270 unit + 18 integration — all passing ✅
 ```
 
 Coverage counts tests too: `--no-default-ignore-filename-regex` disables
@@ -217,6 +220,7 @@ cargo llvm-cov --all-targets --no-default-ignore-filename-regex   # 100% (incl. 
 
   outputs = { self, nixpkgs, ... }:
     # Build: nix build        (or nix build .#rx / .#default)
+    # Run:   nix run .#default -- --version
     # Cross: nix build .#cross.x86_64-linux-musl.default --impure
     # Dev:   nix develop       (includes cargo-llvm-cov + LLVM tools)
 }

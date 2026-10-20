@@ -102,8 +102,8 @@ src/
 - **Semantic ports**: the use case depends on `Repo`, `Nix`, `UserIo` — never on `git`/`nix` specifics. `system_update::adapters::git` / `::nix` own the argv; workflow tests mock the semantic ports.
 - **`CommandRunner` is not a port**: it is an adapter-internal seam (in `infra`) so `--dry-run` decorates a single implementation instead of every port.
 - **Composition in `main`**: `cli` only parses (`Intent`), `main` selects adapters (dry-run vs process) and wires them. `cli` must not depend on feature adapters.
-- **Single output channel**: user-facing output flows through `UserIo`; `error` and top-level errors go to **stderr**, the rest to stdout.
-- **NO_COLOR / non-TTY**: `ansi::Palette` is picked from `NO_COLOR` + `stdout.is_terminal()`; piped output is plain.
+- **Single output channel**: user-facing output flows through `UserIo`; parse errors, `error` and top-level errors go to **stderr**, the rest to stdout.
+- **NO_COLOR / non-TTY / `--no-color`**: each stream picks its own `ansi::Palette` from `NO_COLOR` (non-empty) + `is_terminal()`; `--no-color` forces plain.
 - **Exit codes**: `2` invalid args/config, `141` (128 + SIGPIPE) on early stdout close, `128 + N` for signal-terminated children, else `1`.
 - **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
@@ -115,6 +115,6 @@ src/
 
 ## Build / packaging
 
-- `flake.nix`: `packages.default` / `packages.rx`; cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).
+- `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).
 - `nix build` (default) and `nix develop` must keep working.
 - CI pins rust 1.98 via `dtolnay/rust-toolchain@1.98`; keep it in sync with `rust-toolchain.toml`.
