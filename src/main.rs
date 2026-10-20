@@ -18,16 +18,33 @@ use system_update::adapters::terminal::TerminalIo;
 
 fn exit_code_for(error: &Error) -> i32 {
     match error {
+        Error::Io(e) if e.kind() == std::io::ErrorKind::BrokenPipe => 141,
         Error::InvalidArgs | Error::InvalidConfig(_) => 2,
         _ => 1,
     }
+}
+
+/// A closed stdout (e.g. `rx | head`) is a normal way to stop, so it must not
+/// be reported as an error.
+fn is_quiet(error: &Error) -> bool {
+    matches!(error, Error::Io(e) if e.kind() == std::io::ErrorKind::BrokenPipe)
+}
+
+/// Print a terminal error unless it is quiet. Returns whether anything was
+/// printed.
+fn report_error(writer: &mut dyn Write, error: &Error) -> bool {
+    if is_quiet(error) {
+        return false;
+    }
+    let _ = writeln!(writer, "Error: {error}");
+    true
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut out = stdout();
     if let Err(e) = run(&args, &mut out) {
-        eprintln!("Error: {e}");
+        report_error(&mut std::io::stderr(), &e);
         std::process::exit(exit_code_for(&e));
     }
 }
@@ -81,6 +98,34 @@ mod tests {
     #[test]
     fn exit_code_io_error_is_1() {
         assert_eq!(exit_code_for(&Error::Io(std::io::Error::other("x"))), 1);
+    }
+
+    #[test]
+    fn exit_code_broken_pipe_is_141() {
+        let err = Error::Io(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
+        assert_eq!(exit_code_for(&err), 141);
+    }
+
+    #[test]
+    fn is_quiet_only_for_broken_pipe() {
+        let pipe = Error::Io(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
+        assert!(is_quiet(&pipe));
+        assert!(!is_quiet(&Error::GitPullFailed));
+    }
+
+    #[test]
+    fn report_error_skips_broken_pipe() {
+        let pipe = Error::Io(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
+        let mut buf = Vec::new();
+        assert!(!report_error(&mut buf, &pipe));
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn report_error_writes_other_errors() {
+        let mut buf = Vec::new();
+        assert!(report_error(&mut buf, &Error::GitPullFailed));
+        assert!(String::from_utf8_lossy(&buf).contains("Failed to pull changes"));
     }
 
     #[test]
