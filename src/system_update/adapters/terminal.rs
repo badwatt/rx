@@ -126,6 +126,10 @@ pub(crate) fn print_config(writer: &mut dyn Write, config: &Config) -> Result<()
     print_config_line(writer, "keep", &config.keep.to_string())?;
     print_config_line(writer, "update", &config.update.to_string())?;
     print_config_line(writer, "diff", &config.diff.to_string())?;
+    // Shown only when set, so a dry run is never mistaken for a real one.
+    if config.dry_run {
+        print_config_line(writer, "dry-run", &config.dry_run.to_string())?;
+    }
     Ok(())
 }
 

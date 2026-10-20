@@ -201,6 +201,24 @@ fn print_config_last_field_has_trailing_newline() {
 }
 
 #[test]
+fn print_config_shows_dry_run_when_enabled() {
+    let mut buf = Vec::new();
+    let config = Config {
+        dry_run: true,
+        ..test_config()
+    };
+    assert!(print_config(&mut buf, &config).is_ok());
+    assert!(String::from_utf8_lossy(&buf).contains("dry-run"));
+}
+
+#[test]
+fn print_config_omits_dry_run_when_disabled() {
+    let mut buf = Vec::new();
+    assert!(print_config(&mut buf, &test_config()).is_ok());
+    assert!(!String::from_utf8_lossy(&buf).contains("dry-run"));
+}
+
+#[test]
 fn print_config_block_is_separated_from_following_title_by_blank_line() {
     let mut buf = Vec::new();
     let config = test_config();
