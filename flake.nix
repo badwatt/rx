@@ -32,6 +32,12 @@
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          meta = {
+            description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "rx";
+            platforms = pkgs.lib.platforms.unix;
+          };
         };
     in
     {
