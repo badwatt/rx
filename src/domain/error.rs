@@ -28,7 +28,7 @@ impl fmt::Display for Error {
             Error::GitStatusFailed => write!(f, "Failed to read repository status"),
             Error::NotAGitRepo => write!(f, "Repository is not a git working tree"),
             Error::FlakeUpdateFailed => write!(f, "Failed to update flake inputs"),
-            Error::RebuildFailed => write!(f, "Nixos rebuild failed"),
+            Error::RebuildFailed => write!(f, "NixOS rebuild failed"),
             Error::HostnameUnknown => {
                 write!(f, "Could not determine hostname; pass --hostname")
             }
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn display_rebuild_failed_matches_literal() {
-        assert_eq!(Error::RebuildFailed.to_string(), "Nixos rebuild failed");
+        assert_eq!(Error::RebuildFailed.to_string(), "NixOS rebuild failed");
     }
 
     #[test]

@@ -259,6 +259,55 @@ fn print_config_dry_run_line_error_propagation() {
 }
 
 #[test]
+fn print_config_shows_parallelism_caps() {
+    let mut buf = Vec::new();
+    let config = Config {
+        jobs: Some(2),
+        cores: Some(4),
+        ..test_config()
+    };
+    assert!(print_config(&mut buf, &config).is_ok());
+    let s = String::from_utf8_lossy(&buf);
+    assert!(s.contains("jobs"));
+    assert!(s.contains("cores"));
+}
+
+#[test]
+fn print_config_omits_parallelism_caps_when_unset() {
+    let mut buf = Vec::new();
+    assert!(print_config(&mut buf, &test_config()).is_ok());
+    let s = String::from_utf8_lossy(&buf);
+    assert!(!s.contains("jobs"));
+    assert!(!s.contains("cores"));
+}
+
+#[test]
+fn print_config_jobs_line_error_propagation() {
+    let mut writer = CountingWriter {
+        fail_after: 6,
+        count: 0,
+    };
+    let config = Config {
+        jobs: Some(2),
+        ..test_config()
+    };
+    assert!(print_config(&mut writer, &config).is_err());
+}
+
+#[test]
+fn print_config_cores_line_error_propagation() {
+    let mut writer = CountingWriter {
+        fail_after: 6,
+        count: 0,
+    };
+    let config = Config {
+        cores: Some(4),
+        ..test_config()
+    };
+    assert!(print_config(&mut writer, &config).is_err());
+}
+
+#[test]
 fn print_config_block_is_separated_from_following_title_by_blank_line() {
     let mut buf = Vec::new();
     let config = test_config();

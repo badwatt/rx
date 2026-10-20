@@ -630,7 +630,7 @@ fn run_stage_add_spawn_failure_output_error_propagates() {
 
 #[test]
 fn run_rebuild_title_error_propagates() {
-    assert!(run_ok(&default_config(), &title_fails_on("Nixos Rebuild")).is_err());
+    assert!(run_ok(&default_config(), &title_fails_on("NixOS Rebuild")).is_err());
 }
 
 #[test]
