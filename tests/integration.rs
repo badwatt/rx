@@ -98,3 +98,59 @@ fn piped_stdin_decline_exits_zero() {
     let status = child.wait().expect("wait rx");
     assert!(status.success());
 }
+
+#[test]
+fn piped_output_has_no_ansi() {
+    let output = run(&[
+        "--dry-run",
+        "-y",
+        "--hostname",
+        "testhost",
+        "--repo",
+        "/tmp",
+    ]);
+    assert!(!stdout_of(&output).contains('\u{1b}'));
+}
+
+#[test]
+fn parse_error_goes_to_stderr_only() {
+    let output = run(&["-x"]);
+    assert!(!output.status.success());
+    assert_eq!(stdout_of(&output), "");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Unknown flag"));
+}
+
+#[test]
+fn invalid_jobs_exits_nonzero() {
+    let output = run(&["-j", "abc"]);
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn dry_run_summary_shows_dry_run() {
+    let output = run(&[
+        "--dry-run",
+        "-y",
+        "--hostname",
+        "testhost",
+        "--repo",
+        "/tmp",
+    ]);
+    assert!(output.status.success());
+    assert!(stdout_of(&output).contains("dry-run"));
+}
+
+#[test]
+fn no_color_version_has_no_ansi() {
+    let output = run(&["--no-color", "--version"]);
+    assert!(output.status.success());
+    assert!(!stdout_of(&output).contains('\u{1b}'));
+}
+
+#[test]
+fn help_mentions_no_color() {
+    let output = run(&["--help"]);
+    assert!(stdout_of(&output).contains("--no-color"));
+}
