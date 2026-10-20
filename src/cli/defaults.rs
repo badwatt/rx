@@ -15,16 +15,26 @@ pub(crate) fn default_config() -> Config {
     }
 }
 
-/// Expand `~` at the start of a path to the user's home directory.
-/// Returns the path unchanged if `~` is not the leading character
-/// or if `$HOME` is not set.
+/// Expand a leading `~` (alone or followed by `/`) to the user's home
+/// directory. `~user` forms are left untouched, as are paths not starting with
+/// `~` and expansions when `$HOME` is unset.
 pub(crate) fn expand_tilde(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix('~')
-        && let Ok(home) = std::env::var("HOME")
-    {
-        format!("{home}{rest}")
-    } else {
-        path.to_owned()
+    expand_tilde_with(path, std::env::var("HOME").ok().as_deref())
+}
+
+/// Pure form of [`expand_tilde`] with the home directory injected.
+fn expand_tilde_with(path: &str, home: Option<&str>) -> String {
+    let Some(rest) = path.strip_prefix('~') else {
+        return path.to_owned();
+    };
+    // Only `~` and `~/...` are home-relative; `~user` must not be spliced onto
+    // $HOME.
+    if !rest.is_empty() && !rest.starts_with('/') {
+        return path.to_owned();
+    }
+    match home {
+        Some(home) => format!("{home}{rest}"),
+        None => path.to_owned(),
     }
 }
 
@@ -52,6 +62,25 @@ mod tests {
     fn expand_tilde_tilde_only() {
         let home = std::env::var("HOME").expect("HOME set");
         assert_eq!(expand_tilde("~"), home);
+    }
+
+    #[test]
+    fn expand_tilde_leaves_user_path() {
+        // `~user` is not home-relative; must not be spliced onto $HOME.
+        assert_eq!(expand_tilde("~bob"), "~bob");
+        assert_eq!(expand_tilde("~bob/dots"), "~bob/dots");
+    }
+
+    #[test]
+    fn expand_tilde_with_missing_home_leaves_path() {
+        assert_eq!(expand_tilde_with("~/.dotfiles", None), "~/.dotfiles");
+    }
+
+    #[test]
+    fn expand_tilde_with_home_expands_tilde_forms() {
+        assert_eq!(expand_tilde_with("~/x", Some("/home/u")), "/home/u/x");
+        assert_eq!(expand_tilde_with("~", Some("/home/u")), "/home/u");
+        assert_eq!(expand_tilde_with("~bob", Some("/home/u")), "~bob");
     }
 
     #[test]
