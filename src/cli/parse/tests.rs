@@ -377,6 +377,15 @@ fn parse_dry_run_long_sets_dry_run() {
 }
 
 #[test]
+fn parse_no_color_flag_is_accepted() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--no-color"]), &mut buf),
+        Intent::Run(default_config())
+    );
+}
+
+#[test]
 fn parse_repo_long_sets_repo() {
     let mut buf = Vec::new();
     let mut expected = default_config();

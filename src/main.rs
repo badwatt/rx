@@ -43,12 +43,22 @@ fn report_error(writer: &mut dyn Write, palette: Palette, error: &Error) -> bool
     true
 }
 
+/// Palettes for this process. `--no-color` forces plain output for both
+/// streams; otherwise each stream decides from `NO_COLOR` and its own TTY.
+fn palettes(no_color: bool) -> (Palette, Palette) {
+    if no_color {
+        (Palette::PLAIN, Palette::PLAIN)
+    } else {
+        (Palette::for_stdout(), Palette::for_stderr())
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut out = stdout();
     let mut err = std::io::stderr();
-    let out_palette = Palette::for_stdout();
-    let err_palette = Palette::for_stderr();
+    let no_color = args.iter().any(|arg| arg == "--no-color");
+    let (out_palette, err_palette) = palettes(no_color);
     if let Err(e) = run(&args, &mut out, &mut err, out_palette, err_palette) {
         report_error(&mut std::io::stderr(), err_palette, &e);
         std::process::exit(exit_code_for(&e));
@@ -97,6 +107,18 @@ mod tests {
     /// Run with the colored palette so existing assertions keep working.
     fn run(args: &[String], out: &mut dyn Write) -> Result<(), Error> {
         super::run(args, out, &mut Vec::new(), Palette::COLOR, Palette::COLOR)
+    }
+
+    #[test]
+    fn palettes_honor_no_color_flag() {
+        assert_eq!(palettes(true), (Palette::PLAIN, Palette::PLAIN));
+    }
+
+    #[test]
+    fn palettes_use_detected_streams_by_default() {
+        let (out, err) = palettes(false);
+        assert_eq!(out, Palette::for_stdout());
+        assert_eq!(err, Palette::for_stderr());
     }
 
     #[test]

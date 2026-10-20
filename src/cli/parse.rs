@@ -107,6 +107,7 @@ fn parse_long(
             config.dry_run = true;
             Ok(0)
         }
+        "--no-color" => Ok(0),
         "--repo" | "--hostname" | "--keep" | "--jobs" | "--cores" => {
             let value = take_value(args, i, arg, writer)?;
             set_value(long_value_key(arg), value, arg, config, writer)
