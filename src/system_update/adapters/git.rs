@@ -1,6 +1,6 @@
-use crate::adapters::command::CommandRunner;
 use crate::domain::error::Error;
-use crate::ports::repo::Repo;
+use crate::infra::command::CommandRunner;
+use crate::system_update::ports::repo::Repo;
 
 /// [`Repo`] adapter backed by the `git` CLI.
 pub(crate) struct GitRepo<'a> {
@@ -88,7 +88,7 @@ fn add(repo: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::StubRunner;
+    use crate::shared::test_helpers::StubRunner;
 
     #[test]
     fn pull_argv() {

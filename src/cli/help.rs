@@ -1,7 +1,7 @@
 use std::io::Write;
 
-use crate::ansi;
 use crate::domain::error::Error;
+use crate::shared::ansi;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -43,13 +43,13 @@ mod tests {
 
     #[test]
     fn print_help_error_propagation() {
-        let mut writer = crate::test_helpers::FailingWriter;
+        let mut writer = crate::shared::test_helpers::FailingWriter;
         assert!(print_help(&mut writer).is_err());
     }
 
     #[test]
     fn print_version_error_propagation() {
-        let mut writer = crate::test_helpers::FailingWriter;
+        let mut writer = crate::shared::test_helpers::FailingWriter;
         assert!(print_version(&mut writer).is_err());
     }
 }

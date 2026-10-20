@@ -1,51 +1,9 @@
 //! Use-case slice: the NixOS update workflow.
 //!
-//! Orchestrates the update pipeline (pull → flake update → stage → rebuild →
-//! cleanup → diff) through the [`Repo`], [`Nix`] and [`UserIo`] ports. Contains
-//! no I/O and no knowledge of the underlying tools.
+//! The hexagonal layers live inside the feature: `application` (use cases),
+//! `ports` (the interfaces it needs) and `adapters` (driven implementations).
+//! It shares only the domain kernel and generic infrastructure.
 
-pub(crate) mod steps;
-
-use crate::domain::config::Config;
-use crate::domain::error::Error;
-use crate::ports::nix::Nix;
-use crate::ports::repo::Repo;
-use crate::ports::user_io::UserIo;
-
-/// Run the full NixOS update workflow.
-pub(crate) fn run(
-    config: &Config,
-    repo: &dyn Repo,
-    nix: &dyn Nix,
-    ui: &dyn UserIo,
-) -> Result<(), Error> {
-    if let Some(msg) = config.validate() {
-        return Err(Error::InvalidConfig(msg));
-    }
-
-    ui.title("RX Configuration")?;
-    ui.config(config)?;
-
-    if !config.yes && !ui.confirm(true, None)? {
-        return Ok(());
-    }
-
-    steps::pull::run(&config.repo, repo, ui)?;
-
-    if config.update {
-        steps::flake::run(config, nix, ui)?;
-    }
-
-    steps::stage::run(&config.repo, config.yes, repo, ui)?;
-    steps::rebuild::run(config, nix, ui)?;
-    steps::cleanup::run(config, nix, ui)?;
-
-    if config.diff {
-        steps::diff::run(nix, ui)?;
-    }
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests;
+pub(crate) mod adapters;
+pub(crate) mod application;
+pub(crate) mod ports;

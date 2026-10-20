@@ -1,11 +1,11 @@
 //! Shared test utilities across modules.
 //!
-//! Included via main.rs & available as `crate::test_helpers`.
+//! Included via main.rs & available as `crate::shared::test_helpers`.
 
 use std::io::{self, Write};
 
-use crate::adapters::command::CommandRunner;
 use crate::domain::error::Error;
+use crate::infra::command::CommandRunner;
 
 /// A `Write` implementation that always fails on `write` but succeeds on `flush`.
 pub(crate) struct FailingWriter;

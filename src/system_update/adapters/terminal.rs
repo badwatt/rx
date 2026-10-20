@@ -1,9 +1,9 @@
 use std::io::{self, BufRead, Write};
 
-use crate::ansi;
 use crate::domain::config::Config;
 use crate::domain::error::Error;
-use crate::ports::user_io::UserIo;
+use crate::shared::ansi;
+use crate::system_update::ports::user_io::UserIo;
 
 /// Production [`UserIo`] backed by stdin/stdout.
 pub(crate) struct TerminalIo;

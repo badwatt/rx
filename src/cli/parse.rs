@@ -1,9 +1,9 @@
 use std::io::Write;
 
-use crate::ansi;
 use crate::cli::Intent;
 use crate::cli::defaults::{default_config, expand_tilde};
 use crate::domain::config::Config;
+use crate::shared::ansi;
 
 /// Which [`Config`] field a value flag targets.
 #[derive(Clone, Copy)]

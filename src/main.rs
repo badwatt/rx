@@ -1,24 +1,20 @@
-mod adapters;
-mod ansi;
 mod cli;
 mod domain;
-mod ports;
+mod infra;
+mod shared;
 mod system_update;
 
-#[cfg(test)]
-mod test_helpers;
-
-use adapters::command::CommandRunner;
-use adapters::dry_run::DryRunRunner;
-use adapters::git::GitRepo;
-use adapters::nix::NixCli;
-use adapters::process::ProcessRunner;
-use adapters::terminal::TerminalIo;
 use cli::Intent;
 use domain::config::Config;
 use domain::error::Error;
+use infra::command::CommandRunner;
+use infra::dry_run::DryRunRunner;
+use infra::process::ProcessRunner;
 use std::io::Write;
 use std::{env, io::stdout};
+use system_update::adapters::git::GitRepo;
+use system_update::adapters::nix::NixCli;
+use system_update::adapters::terminal::TerminalIo;
 
 fn exit_code_for(error: &Error) -> i32 {
     match error {
@@ -56,7 +52,7 @@ fn run_workflow(config: &Config) -> Result<(), Error> {
     };
     let repo = GitRepo::new(runner);
     let nix = NixCli::new(runner);
-    system_update::run(config, &repo, &nix, &ui)
+    system_update::application::run(config, &repo, &nix, &ui)
 }
 
 #[cfg(test)]

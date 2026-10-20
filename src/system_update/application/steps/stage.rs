@@ -1,6 +1,6 @@
 use crate::domain::error::Error;
-use crate::ports::repo::Repo;
-use crate::ports::user_io::UserIo;
+use crate::system_update::ports::repo::Repo;
+use crate::system_update::ports::user_io::UserIo;
 
 /// Detect changes (including untracked files) and, if confirmed, stage them.
 pub(crate) fn run(repo: &str, yes: bool, vcs: &dyn Repo, ui: &dyn UserIo) -> Result<(), Error> {

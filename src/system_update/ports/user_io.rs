@@ -3,7 +3,7 @@ use crate::domain::error::Error;
 
 /// Driven port: user-facing presentation and interaction.
 ///
-/// Production wires [`crate::adapters::terminal::TerminalIo`]; tests inject
+/// Production wires [`crate::system_update::adapters::terminal::TerminalIo`]; tests inject
 /// mock implementations.
 pub(crate) trait UserIo {
     /// Print a banner title.

@@ -1,6 +1,6 @@
-use crate::adapters::command::CommandRunner;
 use crate::domain::error::Error;
-use crate::ports::nix::Nix;
+use crate::infra::command::CommandRunner;
+use crate::system_update::ports::nix::Nix;
 
 /// Which `nixos-rebuild` implementation is installed.
 ///
@@ -158,7 +158,7 @@ fn cmd_diff_closures() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::StubRunner;
+    use crate::shared::test_helpers::StubRunner;
     use std::cell::RefCell;
     use std::rc::Rc;
 

@@ -1,6 +1,6 @@
 use crate::domain::error::Error;
-use crate::ports::nix::Nix;
-use crate::ports::user_io::UserIo;
+use crate::system_update::ports::nix::Nix;
+use crate::system_update::ports::user_io::UserIo;
 
 /// Show the closure diff between the previous and current generation.
 pub(crate) fn run(nix: &dyn Nix, ui: &dyn UserIo) -> Result<(), Error> {

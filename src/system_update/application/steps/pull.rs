@@ -1,6 +1,6 @@
 use crate::domain::error::Error;
-use crate::ports::repo::Repo;
-use crate::ports::user_io::UserIo;
+use crate::system_update::ports::repo::Repo;
+use crate::system_update::ports::user_io::UserIo;
 
 /// Ensure `repo` is a git working tree, then pull the latest changes.
 pub(crate) fn run(repo: &str, vcs: &dyn Repo, ui: &dyn UserIo) -> Result<(), Error> {
