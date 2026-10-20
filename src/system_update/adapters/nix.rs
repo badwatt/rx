@@ -74,8 +74,12 @@ impl Nix for NixCli<'_> {
     }
 
     fn diff_closures(&self) -> Result<String, Error> {
-        let (_, output) = self.runner.capture(&cmd_diff_closures())?;
-        Ok(output)
+        let (status, output) = self.runner.capture(&cmd_diff_closures())?;
+        if status == 0 {
+            Ok(output)
+        } else {
+            Err(Error::DiffFailed)
+        }
     }
 }
 
@@ -359,6 +363,12 @@ mod tests {
             NixCli::new(&runner).diff_closures().expect("diff"),
             "Version 1 -> 2\n"
         );
+    }
+
+    #[test]
+    fn diff_closures_errs_on_nonzero() {
+        let runner = StubRunner::new().with_capture(|_| Ok((1, String::from("junk"))));
+        assert!(NixCli::new(&runner).diff_closures().is_err());
     }
 
     #[test]
