@@ -18,7 +18,7 @@
 
 - Tool: `cargo llvm-cov --all-targets --no-default-ignore-filename-regex` exclusively. Rejected alternatives (tarpaulin).
 - **Tests count too**: `--no-default-ignore-filename-regex` disables cargo-llvm-cov's built-in exclusion of `tests.rs` / `tests/`. Without it test code is silently ignored.
-- Toolchain pinned in `rust-toolchain.toml` (1.99). No nightly, no `#![feature(coverage_attribute)]` currently.
+- Toolchain pinned in `rust-toolchain.toml` (1.99). No nightly, no `#![feature(coverage_attribute)]` currently. No `rust-version` field: the pinned toolchain is the supported one, so there is no unverified MSRV claim.
 - **Prefer structural fixes** over `#[coverage(off)]`. Use it only as last resort for impossible-to-cover branches.
 - **`dyn Write` over generics**: prefer `&mut dyn Write` instead of `<W: Write>` for IO functions. Generic monomorphizations create uncovered per-type regions.
 - Every `?` creates a branch. Both paths (Ok, Err) must be exercised by tests.

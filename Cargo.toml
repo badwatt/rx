@@ -3,7 +3,6 @@ name = "rx"
 # Placeholder: the real version lives in the repository-root VERSION file.
 version = "0.0.0"
 edition = "2024"
-rust-version = "1.88"
 description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system"
 license = "MIT"
 repository = "https://github.com/badwatt/rx"

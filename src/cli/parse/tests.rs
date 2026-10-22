@@ -483,3 +483,46 @@ fn parse_cores_overflow_reports_the_valid_range() {
     );
     assert!(String::from_utf8_lossy(&buf).contains("between 1 and 65535"));
 }
+
+#[test]
+fn parse_repo_long_equals_sets_repo() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.repo = String::from("/x");
+    assert_eq!(
+        parse(&args(&["rx", "--repo=/x"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_value_keeps_embedded_equals_signs() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.repo = String::from("/x=a");
+    assert_eq!(
+        parse(&args(&["rx", "--repo=/x=a"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_value_long_equals_empty_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--repo="]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
+fn parse_boolean_long_with_value_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--yes=1"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("does not take a value"));
+}
+
+#[test]
+fn parse_help_long_with_value_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--help=1"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("does not take a value"));
+}

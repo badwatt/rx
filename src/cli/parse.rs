@@ -79,7 +79,7 @@ fn parse_flags(args: &[String], writer: &mut dyn Write) -> Intent {
     Intent::Run(config)
 }
 
-/// Parse a `--long` flag at `args[i]`.
+/// Parse a `--long` flag (or `--long=value`) at `args[i]`.
 ///
 /// Returns the number of extra arguments consumed, or the terminal intent.
 fn parse_long(
@@ -89,32 +89,52 @@ fn parse_long(
     config: &mut Config,
     writer: &mut dyn Write,
 ) -> Result<usize, Intent> {
-    match arg {
-        "--help" => Err(Intent::Help),
-        "--version" => Err(Intent::Version),
-        "--update" => {
-            config.update = true;
-            Ok(0)
-        }
-        "--diff" => {
-            config.diff = true;
-            Ok(0)
-        }
-        "--yes" => {
-            config.yes = true;
-            Ok(0)
-        }
-        "--dry-run" => {
-            config.dry_run = true;
-            Ok(0)
-        }
-        "--no-color" => Ok(0),
+    // GNU-style `--flag=value`: the value travels in the same argv entry.
+    let (name, inline) = match arg.split_once('=') {
+        Some((name, value)) => (name, Some(value)),
+        None => (arg, None),
+    };
+    match name {
         "--repo" | "--hostname" | "--keep" | "--jobs" | "--cores" => {
-            let value = take_value(args, i, arg, writer)?;
-            set_value(long_value_key(arg), value, arg, config, writer)
+            let value = match inline {
+                Some("") => {
+                    write_parse_error(writer, &format!("\"{name}\" flag requires an argument"));
+                    return Err(Intent::Invalid);
+                }
+                Some(value) => String::from(value),
+                None => take_value(args, i, name, writer)?,
+            };
+            set_value(long_value_key(name), value, name, config, writer)
+        }
+        "--help" | "--version" | "--update" | "--diff" | "--yes" | "--dry-run" | "--no-color" => {
+            if inline.is_some() {
+                write_parse_error(writer, &format!("\"{name}\" flag does not take a value"));
+                return Err(Intent::Invalid);
+            }
+            match name {
+                "--help" => Err(Intent::Help),
+                "--version" => Err(Intent::Version),
+                "--update" => {
+                    config.update = true;
+                    Ok(0)
+                }
+                "--diff" => {
+                    config.diff = true;
+                    Ok(0)
+                }
+                "--yes" => {
+                    config.yes = true;
+                    Ok(0)
+                }
+                "--dry-run" => {
+                    config.dry_run = true;
+                    Ok(0)
+                }
+                _ => Ok(0),
+            }
         }
         _ => {
-            write_parse_error(writer, &format!("Unknown flag \"{arg}\""));
+            write_parse_error(writer, &format!("Unknown flag \"{name}\""));
             Err(Intent::Invalid)
         }
     }
