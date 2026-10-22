@@ -85,11 +85,9 @@ fn run(
 /// Composition root for the workflow: wire the adapters and run the use case.
 fn run_workflow(config: &Config, out_palette: Palette) -> Result<(), Error> {
     let ui = TerminalIo::new(out_palette);
-    let runner: &dyn CommandRunner = if config.dry_run {
-        &DryRunRunner
-    } else {
-        &ProcessRunner
-    };
+    let real = ProcessRunner;
+    let dry = DryRunRunner::new(&real);
+    let runner: &dyn CommandRunner = if config.dry_run { &dry } else { &real };
     let repo = GitRepo::new(runner);
     let nix = NixCli::new(runner);
     system_update::application::run(config, &repo, &nix, &ui)

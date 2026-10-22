@@ -87,6 +87,20 @@ fn non_git_repo_exits_nonzero() {
 }
 
 #[test]
+fn dry_run_does_not_echo_the_capability_probe() {
+    let output = run(&[
+        "--dry-run",
+        "-y",
+        "--hostname",
+        "testhost",
+        "--repo",
+        "/tmp",
+    ]);
+    assert!(output.status.success());
+    assert!(!stdout_of(&output).contains("list-generations"));
+}
+
+#[test]
 fn dry_run_prints_commands_without_executing() {
     let output = run(&["--dry-run", "-y", "--hostname", "testhost"]);
     assert!(output.status.success());
