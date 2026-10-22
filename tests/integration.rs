@@ -189,6 +189,12 @@ fn no_color_version_has_no_ansi() {
 }
 
 #[test]
+fn help_mentions_only() {
+    let output = run(&["--help"]);
+    assert!(stdout_of(&output).contains("--only"));
+}
+
+#[test]
 fn help_mentions_no_color() {
     let output = run(&["--help"]);
     assert!(stdout_of(&output).contains("--no-color"));
