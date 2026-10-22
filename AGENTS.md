@@ -102,14 +102,14 @@ src/
 - **Semantic ports**: the use case depends on `Repo`, `Nix`, `UserIo` — never on `git`/`nix` specifics. `system_update::adapters::git` / `::nix` own the argv; workflow tests mock the semantic ports.
 - **`CommandRunner` is not a port**: it is an adapter-internal seam (in `infra`) so `--dry-run` decorates a single implementation instead of every port.
 - **Composition in `main`**: `cli` only parses (`Intent`), `main` selects adapters (dry-run vs process) and wires them. `cli` must not depend on feature adapters.
-- **Single output channel**: user-facing output flows through `UserIo`; parse errors, `error` and top-level errors go to **stderr**, the rest to stdout.
+- **Single output channel**: user-facing output flows through `UserIo`; parse errors and the single top-level error go to **stderr**, the rest to stdout.
 - **NO_COLOR / non-TTY / `--no-color`**: each stream picks its own `ansi::Palette` from `NO_COLOR` (non-empty) + `is_terminal()`; `--no-color` forces plain.
 - **Exit codes**: `2` invalid args/config, `141` (128 + SIGPIPE) on early stdout close, `128 + N` for signal-terminated children, else `1`.
 - **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
 - **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
-- **Validated config**: `Config::validate()` rejects empty repo/hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2).
+- **Validated config**: `Config::validate()` rejects an empty repo, an explicitly empty hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2). An undetected hostname (`None`) is valid here; the workflow turns it into `Error::HostnameUnknown` before any side effect.
 - **Prompt decline**: declining the initial prompt prints `Aborted.` and exits 0; declining staging aborts before the rebuild (no stale flake). A closed stdin (EOF) is never a "yes": it aborts, so an empty pipe cannot rebuild the system.
 - **Step selection**: `--only pull,flake,stage,rebuild,cleanup,diff` runs an explicit subset; `Config::runs(Step)` owns the decision and a list wins over `--update`/`--diff`. Long flags also accept `--flag=value`.
 - **Single error voice**: steps return `Error`; only `main` reports it (on stderr). The `UserIo` port has no `error()` so a failure can never print twice.

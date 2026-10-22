@@ -116,7 +116,7 @@ Proceed? (Y/n)
 | `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
 | `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
 | `--only`       |       | Run only these steps (comma separated)   | all           |
-| `--dry-run`    |       | Print commands without executing them     | `false`       |
+| `--dry-run`    |       | Print commands; only the read-only probe runs | `false`   |
 | `--no-color`   |       | Disable colored output                    | auto          |
 | `--help`       | `-h`  | Print help                                | —             |
 | `--version`    | `-v`  | Print version                             | —             |
@@ -158,11 +158,11 @@ domain kernel, non-business helpers and generic infrastructure are shared.
 src/
 ├── main.rs              # Composition root: parse → wire adapters → run
 ├── domain/              # Shared kernel (pure)
-│   ├── config.rs        # Config + validate() + BuildOptions
+│   ├── config.rs        # Config + Step + validate() + BuildOptions
 │   └── error.rs         # Error type
 ├── shared/              # Non-business cross-cutting
 │   ├── ansi.rs          # ANSI codes, Palette (NO_COLOR/TTY), write_flush
-│   └── test_helpers.rs  # FailingWriter / StubRunner etc.
+│   └── test_helpers.rs  # FailingWriter / FailAfterWriter / StubRunner
 ├── infra/               # Generic process mechanism (not business, not a port)
 │   ├── command.rs       # CommandRunner (adapter-internal argv seam)
 │   ├── process.rs       # ProcessRunner (std::process)
