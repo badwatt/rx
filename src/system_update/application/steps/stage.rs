@@ -18,16 +18,7 @@ pub(crate) fn run(repo: &str, yes: bool, vcs: &dyn Repo, ui: &dyn UserIo) -> Res
         let _ = ui.output("Changes not added to stage; aborting\n");
         return Ok(false);
     }
-    match vcs.add_all(repo) {
-        Ok(()) => ui.success("Changes added to git stage successfully")?,
-        Err(Error::Io(e)) => {
-            ui.error(&format!("Failed to add changes to the stage: {e}"))?;
-            return Err(Error::GitAddFailed);
-        }
-        Err(_) => {
-            ui.error("Failed to add changes to the stage")?;
-            return Err(Error::GitAddFailed);
-        }
-    }
+    vcs.add_all(repo)?;
+    ui.success("Changes added to git stage successfully")?;
     Ok(true)
 }

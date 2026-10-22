@@ -8,9 +8,5 @@ pub(crate) fn run(repo: &str, vcs: &dyn Repo, ui: &dyn UserIo) -> Result<(), Err
     if !vcs.is_repo(repo)? {
         return Err(Error::NotAGitRepo);
     }
-    let result = vcs.pull(repo);
-    if let Err(Error::GitPullFailed) = &result {
-        ui.error("Failed to pull changes")?;
-    }
-    result
+    vcs.pull(repo)
 }

@@ -5,15 +5,17 @@ use crate::domain::error::Error;
 use crate::shared::ansi::{self, Palette};
 use crate::system_update::ports::user_io::UserIo;
 
-/// Production [`UserIo`]: prompts and status on stdout, diagnostics on stderr.
+/// Production [`UserIo`]: prompts and status on stdout.
+///
+/// Diagnostics do not flow through this port; top-level errors are reported by
+/// `main` on stderr, so a failing step never prints twice.
 pub(crate) struct TerminalIo {
     out: Palette,
-    err: Palette,
 }
 
 impl TerminalIo {
-    pub(crate) fn new(out: Palette, err: Palette) -> Self {
-        Self { out, err }
+    pub(crate) fn new(out: Palette) -> Self {
+        Self { out }
     }
 }
 
@@ -28,15 +30,6 @@ impl UserIo for TerminalIo {
         let mut reader = stdin.lock();
         let mut out = io::stdout();
         confirm(&mut reader, &mut out, default, msg, self.out)
-    }
-
-    fn error(&self, msg: &str) -> Result<(), Error> {
-        // Diagnostics go to stderr so they survive stdout being piped.
-        let mut err = io::stderr();
-        write_line(
-            &mut err,
-            &format!("{}{}{}", self.err.red, msg, self.err.reset),
-        )
     }
 
     fn success(&self, msg: &str) -> Result<(), Error> {

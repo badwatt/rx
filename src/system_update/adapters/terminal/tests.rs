@@ -25,7 +25,7 @@ fn print_config_line(writer: &mut dyn Write, label: &str, value: &str) -> Result
 }
 
 fn terminal() -> TerminalIo {
-    TerminalIo::new(Palette::COLOR, Palette::COLOR)
+    TerminalIo::new(Palette::COLOR)
 }
 
 fn test_config() -> Config {
@@ -403,11 +403,6 @@ fn print_config_line_error_propagation() {
 #[test]
 fn terminal_io_title_does_not_panic() {
     terminal().title("Test").expect("title");
-}
-
-#[test]
-fn terminal_io_error_does_not_panic() {
-    terminal().error("err").expect("error");
 }
 
 #[test]

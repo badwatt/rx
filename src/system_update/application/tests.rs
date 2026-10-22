@@ -167,7 +167,6 @@ type ConfigFn = Box<dyn Fn(&Config) -> Result<(), Error>>;
 struct MockUi {
     title: TitleFn,
     confirm: ConfirmFn,
-    error: MsgFn,
     success: MsgFn,
     output: MsgFn,
     config: ConfigFn,
@@ -179,9 +178,6 @@ impl UserIo for MockUi {
     }
     fn confirm(&self, default: bool, msg: Option<&str>) -> Result<bool, Error> {
         (self.confirm)(default, msg)
-    }
-    fn error(&self, msg: &str) -> Result<(), Error> {
-        (self.error)(msg)
     }
     fn success(&self, msg: &str) -> Result<(), Error> {
         (self.success)(msg)
@@ -223,7 +219,6 @@ fn default_config() -> Config {
 /// UI where every method succeeds; confirm/error/success/output are logged.
 fn ok_ui(log: &Log) -> MockUi {
     let confirm_log = log.clone();
-    let error_log = log.clone();
     let success_log = log.clone();
     let output_log = log.clone();
     MockUi {
@@ -231,10 +226,6 @@ fn ok_ui(log: &Log) -> MockUi {
         confirm: Box::new(move |_, _| {
             confirm_log.record("confirm");
             Ok(true)
-        }),
-        error: Box::new(move |m| {
-            error_log.record(m);
-            Ok(())
         }),
         success: Box::new(move |m| {
             success_log.record(m);
@@ -356,27 +347,37 @@ fn run_stage_decline_aborts_before_rebuild() {
 }
 
 #[test]
-fn run_stage_add_failure_prints_failure_message() {
-    let log = Log::default();
+fn run_stage_add_failure_returns_git_add_failed() {
     let repo = MockRepo {
         changes: Box::new(|_| Ok(String::from(" M file\n"))),
         add_all: Box::new(|_| Err(Error::GitAddFailed)),
         ..MockRepo::default()
     };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ok_ui(&log)).is_err());
-    assert!(log.contains("Failed to add changes to the stage"));
+    let err = run(
+        &default_config(),
+        &repo,
+        &MockNix::default(),
+        &ok_ui(&Log::default()),
+    )
+    .expect_err("add failure");
+    assert_eq!(err.to_string(), "Failed to add changes to the stage");
 }
 
 #[test]
-fn run_stage_add_spawn_failure_prints_detail() {
-    let log = Log::default();
+fn run_stage_add_spawn_failure_propagates_the_io_error() {
     let repo = MockRepo {
         changes: Box::new(|_| Ok(String::from(" M file\n"))),
         add_all: Box::new(|_| Err(Error::Io(std::io::Error::other("boom")))),
         ..MockRepo::default()
     };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ok_ui(&log)).is_err());
-    assert!(log.contains("Failed to add changes to the stage: "));
+    let err = run(
+        &default_config(),
+        &repo,
+        &MockNix::default(),
+        &ok_ui(&Log::default()),
+    )
+    .expect_err("add spawn failure");
+    assert!(err.to_string().contains("IO error"));
 }
 
 // ------------------------------------------------------------------
@@ -384,14 +385,19 @@ fn run_stage_add_spawn_failure_prints_detail() {
 // ------------------------------------------------------------------
 
 #[test]
-fn run_git_pull_non_zero_returns_error() {
-    let log = Log::default();
+fn run_git_pull_non_zero_returns_git_pull_failed() {
     let repo = MockRepo {
         pull: Box::new(pull_errs),
         ..MockRepo::default()
     };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ok_ui(&log)).is_err());
-    assert!(log.contains("Failed to pull changes"));
+    let err = run(
+        &default_config(),
+        &repo,
+        &MockNix::default(),
+        &ok_ui(&Log::default()),
+    )
+    .expect_err("pull failure");
+    assert_eq!(err.to_string(), "Failed to pull changes");
 }
 
 #[test]
@@ -426,19 +432,6 @@ fn run_is_repo_error_propagates() {
         )
         .is_err()
     );
-}
-
-#[test]
-fn run_pull_error_output_error_propagates() {
-    let repo = MockRepo {
-        pull: Box::new(pull_errs),
-        ..MockRepo::default()
-    };
-    let ui = MockUi {
-        error: Box::new(|_| Err(Error::GitPullFailed)),
-        ..ok_ui(&Log::default())
-    };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
 }
 
 // ------------------------------------------------------------------
@@ -595,34 +588,6 @@ fn run_stage_add_success_output_error_propagates() {
     let repo = repo_with_changes();
     let ui = MockUi {
         success: Box::new(|_| Err(Error::GitPullFailed)),
-        ..ok_ui(&Log::default())
-    };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
-}
-
-#[test]
-fn run_stage_add_failure_output_error_propagates() {
-    let repo = MockRepo {
-        changes: Box::new(|_| Ok(String::from(" M file\n"))),
-        add_all: Box::new(|_| Err(Error::GitAddFailed)),
-        ..MockRepo::default()
-    };
-    let ui = MockUi {
-        error: Box::new(|_| Err(Error::GitPullFailed)),
-        ..ok_ui(&Log::default())
-    };
-    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
-}
-
-#[test]
-fn run_stage_add_spawn_failure_output_error_propagates() {
-    let repo = MockRepo {
-        changes: Box::new(|_| Ok(String::from(" M file\n"))),
-        add_all: Box::new(|_| Err(Error::Io(std::io::Error::other("boom")))),
-        ..MockRepo::default()
-    };
-    let ui = MockUi {
-        error: Box::new(|_| Err(Error::GitPullFailed)),
         ..ok_ui(&Log::default())
     };
     assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());

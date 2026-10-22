@@ -59,7 +59,7 @@ fn main() {
     let mut err = std::io::stderr();
     let no_color = args.iter().any(|arg| arg == "--no-color");
     let (out_palette, err_palette) = palettes(no_color);
-    if let Err(e) = run(&args, &mut out, &mut err, out_palette, err_palette) {
+    if let Err(e) = run(&args, &mut out, &mut err, out_palette) {
         report_error(&mut std::io::stderr(), err_palette, &e);
         std::process::exit(exit_code_for(&e));
     }
@@ -73,19 +73,18 @@ fn run(
     out: &mut dyn Write,
     err: &mut dyn Write,
     out_palette: Palette,
-    err_palette: Palette,
 ) -> Result<(), Error> {
     match cli::parse::parse(args, err) {
         Intent::Help => cli::help::print_help(out),
         Intent::Version => cli::help::print_version(out, out_palette),
         Intent::Invalid => Err(Error::InvalidArgs),
-        Intent::Run(config) => run_workflow(&config, out_palette, err_palette),
+        Intent::Run(config) => run_workflow(&config, out_palette),
     }
 }
 
 /// Composition root for the workflow: wire the adapters and run the use case.
-fn run_workflow(config: &Config, out_palette: Palette, err_palette: Palette) -> Result<(), Error> {
-    let ui = TerminalIo::new(out_palette, err_palette);
+fn run_workflow(config: &Config, out_palette: Palette) -> Result<(), Error> {
+    let ui = TerminalIo::new(out_palette);
     let runner: &dyn CommandRunner = if config.dry_run {
         &DryRunRunner
     } else {
@@ -106,7 +105,7 @@ mod tests {
 
     /// Run with the colored palette so existing assertions keep working.
     fn run(args: &[String], out: &mut dyn Write) -> Result<(), Error> {
-        super::run(args, out, &mut Vec::new(), Palette::COLOR, Palette::COLOR)
+        super::run(args, out, &mut Vec::new(), Palette::COLOR)
     }
 
     #[test]
@@ -184,13 +183,7 @@ mod tests {
     fn run_parse_error_goes_to_err_writer() {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let result = super::run(
-            &args(&["rx", "-x"]),
-            &mut out,
-            &mut err,
-            Palette::PLAIN,
-            Palette::PLAIN,
-        );
+        let result = super::run(&args(&["rx", "-x"]), &mut out, &mut err, Palette::PLAIN);
         assert!(result.is_err());
         assert_eq!(String::from_utf8_lossy(&out), "");
         assert!(String::from_utf8_lossy(&err).contains("Unknown flag"));
