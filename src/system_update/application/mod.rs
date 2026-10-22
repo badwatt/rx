@@ -23,11 +23,10 @@ pub(crate) fn run(
         return Err(Error::InvalidConfig(msg));
     }
 
-    // Abort before any side effect (pull, flake update, staging) when the
-    // hostname is unknown: the rebuild needs it for the flake attribute.
-    let Some(hostname) = config.hostname.as_deref() else {
-        return Err(Error::HostnameUnknown);
-    };
+    // Resolve the hostname before any side effect (pull, flake update,
+    // staging): an undetected hostname must abort, not fail halfway through.
+    // Only the rebuild needs it, so a run without that step does not care.
+    let hostname = required_hostname(config)?;
 
     ui.title("RX Configuration")?;
     ui.config(config)?;
@@ -50,7 +49,7 @@ pub(crate) fn run(
         return Ok(());
     }
 
-    if config.runs(Step::Rebuild) {
+    if let Some(hostname) = hostname {
         steps::rebuild::run(config, hostname, nix, ui)?;
     }
 
@@ -63,6 +62,17 @@ pub(crate) fn run(
     }
 
     Ok(())
+}
+
+/// Hostname for the rebuild, or `None` when the rebuild is not selected.
+fn required_hostname(config: &Config) -> Result<Option<&str>, Error> {
+    if !config.runs(Step::Rebuild) {
+        return Ok(None);
+    }
+    match config.hostname.as_deref() {
+        Some(hostname) => Ok(Some(hostname)),
+        None => Err(Error::HostnameUnknown),
+    }
 }
 
 #[cfg(test)]

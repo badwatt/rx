@@ -621,6 +621,42 @@ fn run_rebuild_error_propagates() {
 }
 
 #[test]
+fn run_only_diff_without_a_hostname_succeeds() {
+    let config = Config {
+        hostname: None,
+        only: Some(vec![Step::Diff]),
+        ..default_config()
+    };
+    assert!(
+        run(
+            &config,
+            &MockRepo::default(),
+            &MockNix::default(),
+            &ok_ui(&Log::default())
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn run_only_cleanup_without_a_hostname_succeeds() {
+    let config = Config {
+        hostname: None,
+        only: Some(vec![Step::Pull, Step::Cleanup]),
+        ..default_config()
+    };
+    assert!(
+        run(
+            &config,
+            &MockRepo::default(),
+            &MockNix::default(),
+            &ok_ui(&Log::default())
+        )
+        .is_ok()
+    );
+}
+
+#[test]
 fn run_undetected_hostname_aborts_before_pull() {
     let config = Config {
         hostname: None,
