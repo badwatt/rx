@@ -67,8 +67,12 @@ tar -xzf rx-v0.2.0-x86_64-unknown-linux-musl.tar.gz
 
 `VERSION` (repository root) is the single source of truth. `Cargo.toml` carries
 a `0.0.0` placeholder and `flake.nix` reads the file. To release, bump
-`VERSION`; CI builds, tags `v<VERSION>` and attaches the binary. A push that
+`VERSION`; CI builds, tags `v<VERSION>` and attaches the binaries. A push that
 does not change `VERSION` publishes nothing.
+
+Tradeoff: because `cargo` cannot read a version file, `Cargo.toml` keeps a
+`0.0.0` placeholder. `cargo install --path .` therefore records `0.0.0` in the
+cargo metadata, while `rx --version` always prints the real `VERSION`.
 
 ### Nix
 
