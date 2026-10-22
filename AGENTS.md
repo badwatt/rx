@@ -95,6 +95,7 @@ src/
 │   ├── parse.rs         # argument parser
 │   ├── defaults.rs      # default config + tilde expansion
 │   ├── hostname.rs      # hostname resolution
+│   ├── completions.rs   # bash/zsh/fish scripts (static, no generator)
 │   └── help.rs          # help/version banners
 ```
 
@@ -109,12 +110,13 @@ src/
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
 - **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
-- **Validated config**: `Config::validate()` rejects an empty repo, an explicitly empty hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2). An undetected hostname (`None`) is valid here; the workflow turns it into `Error::HostnameUnknown` before any side effect.
+- **Validated config**: `Config::validate() -> Result<(), Error>` rejects an empty repo, an explicitly empty hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2). An undetected hostname (`None`) is valid here; the workflow turns it into `Error::HostnameUnknown` before any side effect.
 - **Prompt decline**: declining the initial prompt prints `Aborted.` and exits 0; declining staging aborts before the rebuild (no stale flake). A closed stdin (EOF) is never a "yes": it aborts, so an empty pipe cannot rebuild the system.
 - **Step selection**: `--only pull,flake,stage,rebuild,cleanup,diff` runs an explicit subset; `Config::runs(Step)` owns the decision and a list wins over `--update`/`--diff`. Long flags also accept `--flag=value`.
 - **Single error voice**: steps return `Error`; only `main` reports it (on stderr). The `UserIo` port has no `error()` so a failure can never print twice.
 - **Non-interactive git**: `git pull --ff-only` with `GIT_TERMINAL_PROMPT=0` via `CommandRunner::run_with_env`, so a diverged branch or missing credentials fails instead of hanging.
 - **Repository root required**: `Repo::is_repo` checks that `git rev-parse --show-prefix` is empty, so a subdirectory of another repository is rejected instead of pulling/staging the enclosing repo.
+- **Completions**: `rx --completions <bash|zsh|fish>` prints static scripts; a test asserts every script mentions the binary and the shared flags, so a new flag cannot silently miss them. `rx.1` is the man page and is installed by the flake.
 - **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
 - **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
 
@@ -123,6 +125,8 @@ src/
 - `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).
 - `nix build` (default) and `nix develop` must keep working.
 - Release matrix (`.github/workflows/release.yml`): `x86_64-unknown-linux-musl` (tested + built natively), `aarch64-unknown-linux-musl` (via `cross`), `aarch64-apple-darwin` and `x86_64-apple-darwin` (macOS runners, unsigned). Artifacts are uploaded per target, checksummed (`SHA256SUMS`) and published by a separate job.
+- `checks.<system>.default` mirrors the package, so `nix flake check` works; CI evaluates all outputs (`nix flake check --no-build`) and runs `nix build .#default`. The package installs `rx.1` under `share/man/man1`.
+- No CI build cache on purpose: the crate has zero dependencies and every job finishes well under a minute, so a cache adds a third-party action for no measurable win.
 - A `workflow_dispatch` run always builds the matrix but only publishes with the `publish` input enabled and no tag for `VERSION`; use it to validate action bumps without a release.
 - CI pins rust 1.99 via `dtolnay/rust-toolchain@1.99`; keep it in sync with `rust-toolchain.toml`.
 

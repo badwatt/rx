@@ -7,7 +7,7 @@
 ### A minimal CLI to pull, stage, rebuild, and clean up your NixOS system — in one shot.
 
 [![Rust](https://img.shields.io/badge/rust-2024-edition-000?style=flat-square&logo=rust&logoColor=DEA584)](https://doc.rust-lang.org/edition-guide/rust-2024/)
-[![Tests](https://img.shields.io/badge/tests-331_passing-3FB950?style=flat-square)](./tests)
+[![CI](https://github.com/badwatt/rx/actions/workflows/ci.yml/badge.svg)](https://github.com/badwatt/rx/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-3FB950?style=flat-square)](./src)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-58A6FF?style=flat-square)](./Cargo.toml)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
@@ -44,6 +44,16 @@ cd rx
 cargo build --release
 ./target/release/rx
 ```
+
+### Shell completions and man page
+
+```bash
+rx --completions bash | sudo tee /etc/bash_completion.d/rx   # zsh, fish too
+man rx                                                        # installed by nix/cargo packaging
+```
+
+The completion scripts are static (no generator crate) and the man page is
+shipped as `rx.1`; the flake installs it under `share/man/man1`.
 
 ### Release binary
 
@@ -89,6 +99,7 @@ nix build                          # default package
 nix build .#default                # explicit attribute
 nix build .#cross.x86_64-linux-musl.default --impure  # cross-compile
 nix develop                        # dev shell
+nix flake check                    # evaluate outputs + build the package
 ```
 
 ---
@@ -126,6 +137,7 @@ Proceed? (Y/n)
 | `--only`       |       | Run only these steps (comma separated)   | all           |
 | `--dry-run`    |       | Print commands; only the read-only probe runs | `false`   |
 | `--no-color`   |       | Disable colored output                    | auto          |
+| `--completions`|       | Print shell completions (bash, zsh, fish) | —             |
 | `--help`       | `-h`  | Print help                                | —             |
 | `--version`    | `-v`  | Print version                             | —             |
 
