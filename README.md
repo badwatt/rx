@@ -7,7 +7,7 @@
 ### A minimal CLI to pull, stage, rebuild, and clean up your NixOS system — in one shot.
 
 [![Rust](https://img.shields.io/badge/rust-2024-edition-000?style=flat-square&logo=rust&logoColor=DEA584)](https://doc.rust-lang.org/edition-guide/rust-2024/)
-[![Tests](https://img.shields.io/badge/tests-161_passing-3FB950?style=flat-square)](./tests)
+[![Tests](https://img.shields.io/badge/tests-326_passing-3FB950?style=flat-square)](./tests)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-3FB950?style=flat-square)](./src)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-58A6FF?style=flat-square)](./Cargo.toml)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
@@ -27,7 +27,7 @@
    `nixos-rebuild` is probed (`--elevate=none list-generations`): the `-ng`
    rewrite runs as your user with `--elevate=sudo --no-reexec`, the classic
    script uses `sudo ... --fast`. Either way the self-rebuild re-exec is skipped.
-5. **Cleanup** — `nix-env --delete-generations +N` then `nix-collect-garbage`
+5. **Cleanup** — `nix-env --delete-generations +N` then `nix store gc`
 6. **Diff** — shows closure diff between old/new generations *(optional)*
 
 Every step — interactive confirmation, colored ANSI output, clean error handling.
@@ -39,7 +39,7 @@ Every step — interactive confirmation, colored ANSI output, clean error handli
 ### Build
 
 ```bash
-git clone https://github.com/user/rx.git
+git clone https://github.com/badwatt/rx.git
 cd rx
 cargo build --release
 ./target/release/rx
@@ -47,13 +47,20 @@ cargo build --release
 
 ### Release binary
 
-Every `VERSION` bump on `main` gets published as a GitHub release with a
-static `x86_64-unknown-linux-musl` binary (no glibc needed):
+Every `VERSION` bump on `main` gets published as a GitHub release with static
+binaries for:
+
+| Target                        | Runner        | Notes                     |
+|-------------------------------|---------------|---------------------------|
+| `x86_64-unknown-linux-musl`    | ubuntu-latest | static, no glibc          |
+| `aarch64-unknown-linux-musl`   | ubuntu-latest | cross-built               |
+| `aarch64-apple-darwin`         | macos-latest  | native                    |
+| `x86_64-apple-darwin`          | macos-latest  | cross-built on arm64 host |
 
 ```bash
-gh release download v0.1.0 --pattern '*.tar.gz'
-tar -xzf rx-v0.1.0-x86_64-unknown-linux-musl.tar.gz
-./rx-v0.1.0-x86_64-unknown-linux-musl/rx --version
+gh release download v0.2.0 --pattern '*x86_64-unknown-linux-musl*'
+tar -xzf rx-v0.2.0-x86_64-unknown-linux-musl.tar.gz
+./rx-v0.2.0-x86_64-unknown-linux-musl/rx --version
 ```
 
 ### Versioning
@@ -104,15 +111,36 @@ Proceed? (Y/n)
 | `--update`    | `-u`  | Run `nix flake update` before rebuild    | `false`       |
 | `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
 | `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
+| `--only`       |       | Run only these steps (comma separated)   | all           |
 | `--dry-run`    |       | Print commands without executing them     | `false`       |
 | `--no-color`   |       | Disable colored output                    | auto          |
 | `--help`       | `-h`  | Print help                                | —             |
 | `--version`    | `-v`  | Print version                             | —             |
 
-`--keep` must be at least `1`. If the hostname cannot be detected, `rx` stops
-before rebuilding; pass `--hostname` explicitly.
+`--keep` must be at least `1` (up to `255`); `--jobs`/`--cores` go up to `65535`.
+Out-of-range values name the accepted range. If the hostname cannot be
+detected, `rx` stops before touching the repository; pass `--hostname`
+explicitly.
 
-Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` → `$HOSTNAME` env → `hostname` command → `"unknown"`.
+Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` →
+`$HOSTNAME` env → `hostname` command. When every source fails the summary shows
+`<not detected>` and the run aborts with a hint.
+
+Long flags also accept `--flag=value` (`--repo=/path`, `--only=diff`).
+
+### Step selection
+
+`--only` takes a comma-separated list of `pull`, `flake`, `stage`, `rebuild`,
+`cleanup`, `diff`:
+
+```bash
+rx --only diff                 # only show the closure diff
+rx -u --only flake            # just update flake inputs
+rx --only stage,rebuild       # no pull, no cleanup
+```
+
+An explicit list wins over `--update`/`--diff`, so the printed summary always
+matches what runs. Declining the staging prompt still aborts the run.
 
 ---
 
@@ -142,7 +170,7 @@ src/
 │   ├── ports/           # Interfaces the feature needs
 │   │   ├── repo.rs      # Repo: is_repo / pull / changes / add_all
 │   │   ├── nix.rs       # Nix: update / rebuild / prune / collect_garbage / diff_closures
-│   │   └── user_io.rs   # UserIo: title / confirm / error / success / output / config
+│   │   └── user_io.rs   # UserIo: title / confirm / success / output / config
 │   └── adapters/        # Driven implementations for the feature
 │       ├── git.rs       # GitRepo: Repo via the git CLI
 │       ├── nix.rs       # NixCli: Nix via nix / nixos-rebuild
@@ -166,12 +194,12 @@ tests/
   adapter-internal `CommandRunner` seam, so no per-port dry adapters.
 - **Composition in `main`** — the driving adapter (`cli`) only parses; `main`
   selects adapters and wires them, so `cli` never depends on feature adapters.
-- **Diagnostics on stderr** — parse errors, `UserIo::error` and the top-level
-  error go to stderr; titles, prompts and status stay on stdout, so `rx | head`
-  keeps errors visible.
+- **Diagnostics on stderr, once** — parse errors and the single top-level error
+  go to stderr; titles, prompts and status stay on stdout, so `rx | head` keeps
+  errors visible and no failure is printed twice.
 - **NO_COLOR / non-TTY / `--no-color`** — each stream picks its own `Palette`
   from `NO_COLOR` (when non-empty) and `is_terminal()`; `--no-color` forces
-  plain output for both.
+  plain output. A closed stdin aborts prompts instead of answering "yes".
 - **Exit codes** — `2` for invalid arguments/config, `141` (128 + SIGPIPE) when
   stdout closes early, `128 + N` for signal-terminated child commands, else `1`.
 - **Parallelism caps** — `-j/--jobs` and `-c/--cores` map to `--max-jobs`/`--cores`,

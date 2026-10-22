@@ -85,7 +85,7 @@ src/
 │   ├── ports/           # the interfaces the feature needs
 │   │   ├── repo.rs      # Repo: is_repo / pull / changes / add_all
 │   │   ├── nix.rs       # Nix: update / rebuild / prune / collect_garbage / diff_closures
-│   │   └── user_io.rs   # UserIo: title/confirm/error/success/output/config
+│   │   └── user_io.rs   # UserIo: title/confirm/success/output/config
 │   └── adapters/        # driven implementations for the feature
 │       ├── git.rs       # GitRepo: Repo via the git CLI
 │       ├── nix.rs       # NixCli: Nix via nix / nixos-rebuild
@@ -110,13 +110,18 @@ src/
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
 - **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
 - **Validated config**: `Config::validate()` rejects empty repo/hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2).
-- **Prompt decline**: declining the initial prompt prints `Aborted.` and exits 0; declining staging aborts before the rebuild (no stale flake).
-- **Cleanup**: `nix-env --delete-generations +N` then `nix-collect-garbage` (no `-d`, so `--keep N` is respected).
+- **Prompt decline**: declining the initial prompt prints `Aborted.` and exits 0; declining staging aborts before the rebuild (no stale flake). A closed stdin (EOF) is never a "yes": it aborts, so an empty pipe cannot rebuild the system.
+- **Step selection**: `--only pull,flake,stage,rebuild,cleanup,diff` runs an explicit subset; `Config::runs(Step)` owns the decision and a list wins over `--update`/`--diff`. Long flags also accept `--flag=value`.
+- **Single error voice**: steps return `Error`; only `main` reports it (on stderr). The `UserIo` port has no `error()` so a failure can never print twice.
+- **Non-interactive git**: `git pull --ff-only` with `GIT_TERMINAL_PROMPT=0` via `CommandRunner::run_with_env`, so a diverged branch or missing credentials fails instead of hanging.
+- **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
+- **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
 
 ## Build / packaging
 
 - `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).
 - `nix build` (default) and `nix develop` must keep working.
+- Release matrix (`.github/workflows/release.yml`): `x86_64-unknown-linux-musl` (tested + built natively), `aarch64-unknown-linux-musl` (via `cross`), `aarch64-apple-darwin` and `x86_64-apple-darwin` (macOS runners). Artifacts are uploaded per target and published by a separate job.
 - CI pins rust 1.99 via `dtolnay/rust-toolchain@1.99`; keep it in sync with `rust-toolchain.toml`.
 
 ## Versioning & releases

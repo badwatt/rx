@@ -161,9 +161,9 @@ fn cmd_prune(keep: u8) -> Vec<String> {
     ]
 }
 
-/// `nix-collect-garbage`
+/// `nix store gc` (modern replacement for `nix-collect-garbage`).
 fn cmd_collect_garbage() -> Vec<String> {
-    vec!["sudo".into(), "nix-collect-garbage".into()]
+    vec!["sudo".into(), "nix".into(), "store".into(), "gc".into()]
 }
 
 /// `nix profile diff-closures --profile /nix/var/nix/profiles/system`
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn cmd_collect_garbage_argv() {
-        assert_eq!(cmd_collect_garbage(), vec!["sudo", "nix-collect-garbage"]);
+        assert_eq!(cmd_collect_garbage(), vec!["sudo", "nix", "store", "gc"]);
     }
 
     #[test]

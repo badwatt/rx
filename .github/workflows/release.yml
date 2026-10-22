@@ -1,7 +1,7 @@
 name: Release
 
 # Publishes one release per VERSION bump: when the tag `v<VERSION>` does not
-# exist yet, the binary is built, packaged and attached to a new release.
+# exist yet, the binaries are built, packaged and attached to a new release.
 on:
   push:
     branches: [main]
@@ -13,12 +13,13 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Static binary: runs on any linux, no glibc/interpreter to match.
-  TARGET: x86_64-unknown-linux-musl
 
 jobs:
-  release:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      released: ${{ steps.tag.outputs.released }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -41,49 +42,92 @@ jobs:
             echo "released=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Skip
+        if: steps.tag.outputs.released == 'true'
+        run: echo "v$(cat VERSION) already released; bump VERSION to publish."
+
+  build:
+    needs: check
+    if: needs.check.outputs.released == 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Static binaries: no glibc / interpreter to match on the target.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            tool: cargo
+            test: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            tool: cross
+            test: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            tool: cargo
+            test: false
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            tool: cargo
+            test: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
       - uses: dtolnay/rust-toolchain@1.99
-        if: steps.tag.outputs.released == 'false'
 
       # `rust-toolchain.toml` overrides the default toolchain, so add the
       # target to *that* one: the action's `targets:` input installs it on
       # the action's own toolchain name, which cargo never uses.
-      - name: Add static target
-        if: steps.tag.outputs.released == 'false'
-        run: rustup target add "$TARGET"
+      - name: Add target
+        if: matrix.tool == 'cargo'
+        run: rustup target add "${{ matrix.target }}"
 
-      # Gate the released binary on a green test suite: never ship what CI
-      # would reject.
+      - uses: taiki-e/install-action@cross
+        if: matrix.tool == 'cross'
+
+      # Gate the released binaries on a green test suite: never ship what CI
+      # would reject. One job is enough, the sources are the same.
       - name: Test
-        if: steps.tag.outputs.released == 'false'
+        if: matrix.test
         run: cargo test --all-targets --locked
 
       - name: Build
-        if: steps.tag.outputs.released == 'false'
-        run: cargo build --release --locked --target "$TARGET"
+        run: >-
+          ${{ matrix.tool }} build --release --locked
+          --target "${{ matrix.target }}"
 
       - name: Package
-        if: steps.tag.outputs.released == 'false'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check.outputs.version }}
+          TARGET: ${{ matrix.target }}
         run: |
           name="rx-v$VERSION-$TARGET"
           mkdir -p "dist/$name"
           cp "target/$TARGET/release/rx" README.md LICENSE "dist/$name/"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rx-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Publish
-        if: steps.tag.outputs.released == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: >-
-          gh release create "v$VERSION" dist/*.tar.gz
-          --title "v$VERSION"
-          --generate-notes
-          --target "$GITHUB_SHA"
-
-      - name: Skip
-        if: steps.tag.outputs.released == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: echo "v$VERSION already released; bump VERSION to publish."
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          gh release create "v$VERSION" dist/*.tar.gz \
+            --title "v$VERSION" \
+            --generate-notes \
+            --target "$GITHUB_SHA"
