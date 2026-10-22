@@ -76,9 +76,9 @@ action versions and cross targets) and only publishes when the `publish` input
 is enabled.
 
 ```bash
-gh release download v0.3.0 --pattern '*x86_64-unknown-linux-musl*'
-tar -xzf rx-v0.3.0-x86_64-unknown-linux-musl.tar.gz
-./rx-v0.3.0-x86_64-unknown-linux-musl/rx --version
+gh release download v0.4.0 --pattern '*x86_64-unknown-linux-musl*'
+tar -xzf rx-v0.4.0-x86_64-unknown-linux-musl.tar.gz
+./rx-v0.4.0-x86_64-unknown-linux-musl/rx --version
 ```
 
 ### Versioning
