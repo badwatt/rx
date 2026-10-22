@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::domain::error::Error;
+
 /// Default dotfiles repository path (before `~` expansion).
 pub(crate) const DEFAULT_REPO: &str = "~/.dotfiles";
 /// Default number of generations to keep during cleanup.
@@ -111,24 +113,23 @@ impl fmt::Display for Config {
 
 impl Config {
     /// Check invariants before running the workflow.
-    /// Returns a user-facing message when the config is invalid.
-    pub(crate) fn validate(&self) -> Option<&'static str> {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
         if self.repo.is_empty() {
-            return Some("repo path cannot be empty");
+            return Err(Error::InvalidConfig("repo path cannot be empty"));
         }
         if matches!(self.hostname.as_deref(), Some("")) {
-            return Some("hostname cannot be empty");
+            return Err(Error::InvalidConfig("hostname cannot be empty"));
         }
         if self.keep == 0 {
-            return Some("generations to keep must be > 0");
+            return Err(Error::InvalidConfig("generations to keep must be > 0"));
         }
         if self.jobs == Some(0) {
-            return Some("jobs must be > 0");
+            return Err(Error::InvalidConfig("jobs must be > 0"));
         }
         if self.cores == Some(0) {
-            return Some("cores must be > 0");
+            return Err(Error::InvalidConfig("cores must be > 0"));
         }
-        None
+        Ok(())
     }
 
     /// Whether `step` belongs to this run.
@@ -189,7 +190,7 @@ mod tests {
 
     #[test]
     fn validate_accepts_valid_config() {
-        assert!(sample().validate().is_none());
+        assert!(sample().validate().is_ok());
     }
 
     #[test]
@@ -198,7 +199,10 @@ mod tests {
             repo: String::new(),
             ..sample()
         };
-        assert_eq!(config.validate(), Some("repo path cannot be empty"));
+        assert_eq!(
+            config.validate().expect_err("empty repo").to_string(),
+            "repo path cannot be empty"
+        );
     }
 
     #[test]
@@ -207,7 +211,10 @@ mod tests {
             keep: 0,
             ..sample()
         };
-        assert_eq!(config.validate(), Some("generations to keep must be > 0"));
+        assert_eq!(
+            config.validate().expect_err("zero keep").to_string(),
+            "generations to keep must be > 0"
+        );
     }
 
     #[test]
@@ -216,7 +223,10 @@ mod tests {
             hostname: Some(String::new()),
             ..sample()
         };
-        assert_eq!(config.validate(), Some("hostname cannot be empty"));
+        assert_eq!(
+            config.validate().expect_err("empty hostname").to_string(),
+            "hostname cannot be empty"
+        );
     }
 
     #[test]
@@ -227,7 +237,7 @@ mod tests {
                 ..sample()
             }
             .validate()
-            .is_none()
+            .is_ok()
         );
     }
 
@@ -246,7 +256,10 @@ mod tests {
             jobs: Some(0),
             ..sample()
         };
-        assert_eq!(config.validate(), Some("jobs must be > 0"));
+        assert_eq!(
+            config.validate().expect_err("zero jobs").to_string(),
+            "jobs must be > 0"
+        );
     }
 
     #[test]
@@ -255,7 +268,10 @@ mod tests {
             cores: Some(0),
             ..sample()
         };
-        assert_eq!(config.validate(), Some("cores must be > 0"));
+        assert_eq!(
+            config.validate().expect_err("zero cores").to_string(),
+            "cores must be > 0"
+        );
     }
 
     #[test]

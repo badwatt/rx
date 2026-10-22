@@ -19,9 +19,7 @@ pub(crate) fn run(
     nix: &dyn Nix,
     ui: &dyn UserIo,
 ) -> Result<(), Error> {
-    if let Some(msg) = config.validate() {
-        return Err(Error::InvalidConfig(msg));
-    }
+    config.validate()?;
 
     // Resolve the hostname before any side effect (pull, flake update,
     // staging): an undetected hostname must abort, not fail halfway through.
