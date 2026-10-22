@@ -15,8 +15,11 @@ impl<'a> GitRepo<'a> {
 
 impl Repo for GitRepo<'_> {
     fn is_repo(&self, repo: &str) -> Result<bool, Error> {
-        let (status, _) = self.runner.capture(&rev_parse(repo))?;
-        Ok(status == 0)
+        let (status, prefix) = self.runner.capture(&work_tree_prefix(repo))?;
+        // An empty prefix means `repo` *is* the work-tree root. A subdirectory
+        // would pass a plain "is inside a work tree" check while `pull`/`add`
+        // then act on the enclosing repository.
+        Ok(status == 0 && prefix.trim().is_empty())
     }
 
     fn pull(&self, repo: &str) -> Result<(), Error> {
@@ -73,14 +76,14 @@ fn status(repo: &str) -> Vec<String> {
     ]
 }
 
-/// `git -C <repo> rev-parse --is-inside-work-tree`
-fn rev_parse(repo: &str) -> Vec<String> {
+/// `git -C <repo> rev-parse --show-prefix` (empty at the work-tree root)
+fn work_tree_prefix(repo: &str) -> Vec<String> {
     vec![
         "git".into(),
         "-C".into(),
         repo.into(),
         "rev-parse".into(),
-        "--is-inside-work-tree".into(),
+        "--show-prefix".into(),
     ]
 }
 
@@ -131,10 +134,10 @@ mod tests {
     }
 
     #[test]
-    fn rev_parse_argv() {
+    fn work_tree_prefix_argv() {
         assert_eq!(
-            rev_parse("/repo"),
-            vec!["git", "-C", "/repo", "rev-parse", "--is-inside-work-tree"]
+            work_tree_prefix("/repo"),
+            vec!["git", "-C", "/repo", "rev-parse", "--show-prefix"]
         );
     }
 
@@ -147,6 +150,16 @@ mod tests {
     fn is_repo_true_when_status_zero() {
         let runner = StubRunner::new();
         assert!(GitRepo::new(&runner).is_repo("/repo").expect("is_repo"));
+    }
+
+    #[test]
+    fn is_repo_false_for_a_subdirectory_of_a_work_tree() {
+        let runner = StubRunner::new().with_capture(|_| Ok((0, String::from("nixos/\n"))));
+        assert!(
+            !GitRepo::new(&runner)
+                .is_repo("/repo/nixos")
+                .expect("is_repo")
+        );
     }
 
     #[test]
