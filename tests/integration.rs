@@ -76,7 +76,13 @@ fn zero_keep_flag_exits_nonzero() {
 
 #[test]
 fn non_git_repo_exits_nonzero() {
-    let output = run(&["--repo", "/nonexistent_rx_repo", "--hostname", "testhost"]);
+    let output = run(&[
+        "-y",
+        "--repo",
+        "/nonexistent_rx_repo",
+        "--hostname",
+        "testhost",
+    ]);
     assert!(!output.status.success());
 }
 
@@ -87,6 +93,20 @@ fn dry_run_prints_commands_without_executing() {
     let stdout = stdout_of(&output);
     assert!(stdout.contains("$ "));
     assert!(stdout.contains("nixos-rebuild"));
+}
+
+#[test]
+fn closed_stdin_aborts_without_rebuilding() {
+    let mut child = Command::new(RX)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn rx");
+    drop(child.stdin.take());
+    let output = child.wait_with_output().expect("wait rx");
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Aborted."));
 }
 
 #[test]

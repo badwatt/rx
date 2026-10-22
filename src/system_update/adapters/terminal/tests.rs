@@ -128,6 +128,14 @@ fn confirm_empty_line_uses_default_true() {
 }
 
 #[test]
+fn confirm_closed_stdin_never_takes_the_default_yes() {
+    // EOF is not a confirmation: piping an empty stdin must abort.
+    let mut reader = io::BufReader::new(b"".as_slice());
+    let mut writer = Vec::new();
+    assert!(!confirm(&mut reader, &mut writer, true, None).expect("confirm"));
+}
+
+#[test]
 fn failing_writer_flush_is_ok() {
     let mut writer = crate::shared::test_helpers::FailingWriter;
     assert!(io::Write::flush(&mut writer).is_ok());

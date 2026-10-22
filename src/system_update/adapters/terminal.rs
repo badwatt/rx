@@ -90,7 +90,8 @@ pub(crate) fn print_title(
 
 /// Prompt user for confirmation on `reader`/`writer`.
 ///
-/// `default` is returned when the user sends an empty line.
+/// `default` is returned when the user sends an empty line; a closed stdin
+/// (EOF) aborts instead, so an empty pipe never confirms.
 pub(crate) fn confirm(
     reader: &mut dyn BufRead,
     writer: &mut dyn Write,
@@ -100,7 +101,11 @@ pub(crate) fn confirm(
 ) -> Result<bool, Error> {
     write_confirm_prompt(writer, default, msg, palette)?;
     let mut line = String::new();
-    reader.read_line(&mut line)?;
+    // A closed stdin is not an answer: taking the default here would rebuild
+    // the system on an empty pipe (`rx </dev/null`).
+    if reader.read_line(&mut line)? == 0 {
+        return Ok(false);
+    }
     Ok(parse_confirm_response(line.trim(), default))
 }
 
