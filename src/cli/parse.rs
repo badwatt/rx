@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::cli::Intent;
 use crate::cli::defaults::{default_config, expand_tilde};
-use crate::domain::config::Config;
+use crate::domain::config::{Config, Step};
 use crate::shared::ansi;
 
 /// Which [`Config`] field a value flag targets.
@@ -95,16 +95,15 @@ fn parse_long(
         None => (arg, None),
     };
     match name {
+        "--only" => {
+            let (value, consumed) = long_value(name, inline, args, i, writer)?;
+            config.only = Some(parse_steps(&value, writer)?);
+            Ok(consumed)
+        }
         "--repo" | "--hostname" | "--keep" | "--jobs" | "--cores" => {
-            let value = match inline {
-                Some("") => {
-                    write_parse_error(writer, &format!("\"{name}\" flag requires an argument"));
-                    return Err(Intent::Invalid);
-                }
-                Some(value) => String::from(value),
-                None => take_value(args, i, name, writer)?,
-            };
-            set_value(long_value_key(name), value, name, config, writer)
+            let (value, consumed) = long_value(name, inline, args, i, writer)?;
+            set_value(long_value_key(name), value, name, config, writer)?;
+            Ok(consumed)
         }
         "--help" | "--version" | "--update" | "--diff" | "--yes" | "--dry-run" | "--no-color" => {
             if inline.is_some() {
@@ -148,6 +147,27 @@ fn long_value_key(arg: &str) -> ValueKey {
         "--keep" => ValueKey::Keep,
         "--jobs" => ValueKey::Jobs,
         _ => ValueKey::Cores,
+    }
+}
+
+/// Resolve a long flag's value and how many argv entries it consumed.
+///
+/// `--flag=value` carries its value inline; plain `--flag value` consumes the
+/// next argv entry.
+fn long_value(
+    name: &str,
+    inline: Option<&str>,
+    args: &[String],
+    i: usize,
+    writer: &mut dyn Write,
+) -> Result<(String, usize), Intent> {
+    match inline {
+        Some("") => {
+            write_parse_error(writer, &format!("\"{name}\" flag requires an argument"));
+            Err(Intent::Invalid)
+        }
+        Some(value) => Ok((String::from(value), 0)),
+        None => Ok((take_value(args, i, name, writer)?, 1)),
     }
 }
 
@@ -231,7 +251,7 @@ fn set_value(
     label: &str,
     config: &mut Config,
     writer: &mut dyn Write,
-) -> Result<usize, Intent> {
+) -> Result<(), Intent> {
     match key {
         ValueKey::Repo => config.repo = expand_tilde(&value),
         ValueKey::Hostname => config.hostname = Some(value),
@@ -243,7 +263,20 @@ fn set_value(
             config.cores = Some(parse_bounded(&value, label, 1u16, u16::MAX, writer)?);
         }
     }
-    Ok(1)
+    Ok(())
+}
+
+/// Parse a comma-separated `--only` step list, or report an unknown name.
+fn parse_steps(value: &str, writer: &mut dyn Write) -> Result<Vec<Step>, Intent> {
+    let mut steps = Vec::new();
+    for name in value.split(',') {
+        let Some(step) = Step::from_name(name.trim()) else {
+            write_parse_error(writer, &format!("Unknown step \"{name}\""));
+            return Err(Intent::Invalid);
+        };
+        steps.push(step);
+    }
+    Ok(steps)
 }
 
 /// Report the accepted range for a numeric flag.

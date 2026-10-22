@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::config::Step;
 use std::io::{self, Read};
 
 // Test-facing wrappers that pin the colored palette, so assertions stay
@@ -39,6 +40,7 @@ fn test_config() -> Config {
         dry_run: false,
         jobs: None,
         cores: None,
+        only: None,
     }
 }
 
@@ -204,6 +206,41 @@ fn confirm_error_from_reader_read_line() {
 // ------------------------------------------------------------------
 
 #[test]
+fn print_config_fails_when_only_the_step_line_cannot_be_written() {
+    let config = Config {
+        only: Some(vec![Step::Pull]),
+        ..test_config()
+    };
+    // repo, hostname, keep, update, diff succeed; the step list fails.
+    let mut writer = crate::shared::test_helpers::FailAfterWriter::new(5);
+    assert!(print_config(&mut writer, &config).is_err());
+}
+
+#[test]
+fn fail_after_writer_succeeds_until_the_budget_runs_out() {
+    use crate::shared::test_helpers::FailAfterWriter;
+    let mut writer = FailAfterWriter::new(1);
+    assert!(io::Write::write(&mut writer, b"a").is_ok());
+    assert!(io::Write::write(&mut writer, b"b").is_err());
+    assert!(io::Write::flush(&mut writer).is_ok());
+    let mut exhausted = FailAfterWriter::new(0);
+    assert!(io::Write::write(&mut exhausted, b"a").is_err());
+}
+
+#[test]
+fn print_config_lists_an_explicit_step_selection() {
+    let mut buf = Vec::new();
+    let config = Config {
+        only: Some(vec![Step::Pull, Step::Diff]),
+        ..test_config()
+    };
+    assert!(print_config(&mut buf, &config).is_ok());
+    let rendered = String::from_utf8_lossy(&buf).into_owned();
+    assert!(rendered.contains("only"));
+    assert!(rendered.contains("pull,diff"));
+}
+
+#[test]
 fn print_config_marks_an_undetected_hostname() {
     let mut buf = Vec::new();
     let config = Config {
@@ -227,6 +264,7 @@ fn print_config_renders_all_fields() {
         dry_run: false,
         jobs: None,
         cores: None,
+        only: None,
     };
     assert!(print_config(&mut buf, &config).is_ok());
     let s = String::from_utf8_lossy(&buf);

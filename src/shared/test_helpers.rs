@@ -31,6 +31,32 @@ impl Write for FailingFlushWriter {
     }
 }
 
+/// A `Write` implementation that succeeds for `writes` calls and then fails.
+///
+/// Lets a test reach a specific `?` deep inside a function.
+pub(crate) struct FailAfterWriter {
+    writes: usize,
+}
+
+impl FailAfterWriter {
+    pub(crate) fn new(writes: usize) -> Self {
+        Self { writes }
+    }
+}
+
+impl Write for FailAfterWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.writes == 0 {
+            return Err(io::Error::other("fail"));
+        }
+        self.writes -= 1;
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 /// A `Write` implementation where `write` succeeds but `flush` fails.
 pub(crate) struct FlushFailingWriter;
 

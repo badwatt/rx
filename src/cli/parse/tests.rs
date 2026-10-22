@@ -526,3 +526,83 @@ fn parse_help_long_with_value_returns_error() {
     assert_eq!(parse(&args(&["rx", "--help=1"]), &mut buf), Intent::Invalid);
     assert!(String::from_utf8_lossy(&buf).contains("does not take a value"));
 }
+
+#[test]
+fn parse_only_sets_the_step_selection() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.only = Some(vec![Step::Pull, Step::Diff]);
+    assert_eq!(
+        parse(&args(&["rx", "--only", "pull,diff"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_only_equals_accepts_a_single_step() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.only = Some(vec![Step::Rebuild]);
+    assert_eq!(
+        parse(&args(&["rx", "--only=rebuild"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_only_unknown_step_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--only", "pull,bogus"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("Unknown step"));
+}
+
+#[test]
+fn parse_only_missing_value_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--only"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
+fn parse_only_empty_equals_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--only="]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
+fn parse_only_rejects_an_empty_item() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--only", "pull,,diff"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("Unknown step"));
+}
+
+#[test]
+fn parse_equals_value_does_not_swallow_the_next_flag() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.repo = String::from("/x");
+    expected.yes = true;
+    assert_eq!(
+        parse(&args(&["rx", "--repo=/x", "-y"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_only_equals_does_not_swallow_the_next_flag() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.only = Some(vec![Step::Diff]);
+    expected.yes = true;
+    assert_eq!(
+        parse(&args(&["rx", "--only=diff", "-y"]), &mut buf),
+        Intent::Run(expected)
+    );
+}

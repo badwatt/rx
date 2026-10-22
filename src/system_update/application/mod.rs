@@ -6,7 +6,7 @@
 
 pub(crate) mod steps;
 
-use crate::domain::config::Config;
+use crate::domain::config::{Config, Step};
 use crate::domain::error::Error;
 use crate::system_update::ports::nix::Nix;
 use crate::system_update::ports::repo::Repo;
@@ -38,19 +38,27 @@ pub(crate) fn run(
         return Ok(());
     }
 
-    steps::pull::run(&config.repo, repo, ui)?;
+    if config.runs(Step::Pull) {
+        steps::pull::run(&config.repo, repo, ui)?;
+    }
 
-    if config.update {
+    if config.runs(Step::Flake) {
         steps::flake::run(config, nix, ui)?;
     }
 
-    if !steps::stage::run(&config.repo, config.yes, repo, ui)? {
+    if config.runs(Step::Stage) && !steps::stage::run(&config.repo, config.yes, repo, ui)? {
         return Ok(());
     }
-    steps::rebuild::run(config, hostname, nix, ui)?;
-    steps::cleanup::run(config, nix, ui)?;
 
-    if config.diff {
+    if config.runs(Step::Rebuild) {
+        steps::rebuild::run(config, hostname, nix, ui)?;
+    }
+
+    if config.runs(Step::Cleanup) {
+        steps::cleanup::run(config, nix, ui)?;
+    }
+
+    if config.runs(Step::Diff) {
         steps::diff::run(nix, ui)?;
     }
 

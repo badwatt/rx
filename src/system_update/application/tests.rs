@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::config::BuildOptions;
+use crate::domain::config::{BuildOptions, Step};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -213,16 +213,21 @@ fn default_config() -> Config {
         dry_run: false,
         jobs: None,
         cores: None,
+        only: None,
     }
 }
 
 /// UI where every method succeeds; confirm/error/success/output are logged.
 fn ok_ui(log: &Log) -> MockUi {
     let confirm_log = log.clone();
+    let title_log = log.clone();
     let success_log = log.clone();
     let output_log = log.clone();
     MockUi {
-        title: Box::new(|_| Ok(())),
+        title: Box::new(move |text| {
+            title_log.record(text);
+            Ok(())
+        }),
         confirm: Box::new(move |_, _| {
             confirm_log.record("confirm");
             Ok(true)
@@ -700,4 +705,61 @@ fn run_diff_output_error_propagates() {
         ..ok_ui(&Log::default())
     };
     assert!(run_ok(&config, &ui).is_err());
+}
+
+#[test]
+fn run_only_rebuild_skips_pull_and_stage() {
+    let log = Log::default();
+    let config = Config {
+        only: Some(vec![Step::Rebuild]),
+        ..default_config()
+    };
+    assert!(
+        run(
+            &config,
+            &MockRepo::default(),
+            &MockNix::default(),
+            &ok_ui(&log)
+        )
+        .is_ok()
+    );
+    assert!(log.contains("NixOS Rebuild"));
+    assert!(!log.contains("Git Pull"));
+    assert!(!log.contains("Git Changes"));
+}
+
+#[test]
+fn run_only_cleanup_skips_rebuild() {
+    let log = Log::default();
+    let config = Config {
+        only: Some(vec![Step::Cleanup]),
+        ..default_config()
+    };
+    assert!(
+        run(
+            &config,
+            &MockRepo::default(),
+            &MockNix::default(),
+            &ok_ui(&log)
+        )
+        .is_ok()
+    );
+    assert!(!log.contains("NixOS Rebuild"));
+}
+
+#[test]
+fn run_only_diff_runs_the_diff_alone() {
+    let log = Log::default();
+    let nix = MockNix {
+        diff: Box::new(|| Ok(String::from("Version 1 -> 2\n"))),
+        ..MockNix::default()
+    };
+    let config = Config {
+        only: Some(vec![Step::Diff]),
+        update: true,
+        diff: true,
+        ..default_config()
+    };
+    assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&log)).is_ok());
+    assert!(log.contains("Version 1 -> 2"));
 }

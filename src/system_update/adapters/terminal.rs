@@ -151,6 +151,11 @@ pub(crate) fn print_config(
     if let Some(cores) = config.cores {
         print_config_line(writer, "cores", &cores.to_string(), palette)?;
     }
+    // Shown only when set, so the summary never lies about the pipeline.
+    if let Some(steps) = &config.only {
+        let names: Vec<&str> = steps.iter().map(|step| step.name()).collect();
+        print_config_line(writer, "only", &names.join(","), palette)?;
+    }
     // Shown only when set, so a dry run is never mistaken for a real one.
     if config.dry_run {
         print_config_line(writer, "dry-run", &config.dry_run.to_string(), palette)?;

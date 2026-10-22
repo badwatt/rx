@@ -5,6 +5,48 @@ pub(crate) const DEFAULT_REPO: &str = "~/.dotfiles";
 /// Default number of generations to keep during cleanup.
 pub(crate) const DEFAULT_KEEP: u8 = 10;
 
+/// One step of the update pipeline, in execution order.
+///
+/// `--only` selects an explicit subset; `Config::runs` decides which steps run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Step {
+    Pull,
+    Flake,
+    Stage,
+    Rebuild,
+    Cleanup,
+    Diff,
+}
+
+impl Step {
+    /// Every step, in execution order.
+    pub(crate) const ALL: [Step; 6] = [
+        Step::Pull,
+        Step::Flake,
+        Step::Stage,
+        Step::Rebuild,
+        Step::Cleanup,
+        Step::Diff,
+    ];
+
+    /// CLI name of the step (`--only <name>`).
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Step::Pull => "pull",
+            Step::Flake => "flake",
+            Step::Stage => "stage",
+            Step::Rebuild => "rebuild",
+            Step::Cleanup => "cleanup",
+            Step::Diff => "diff",
+        }
+    }
+
+    /// Look a step up by its CLI name.
+    pub(crate) fn from_name(name: &str) -> Option<Step> {
+        Step::ALL.into_iter().find(|step| step.name() == name)
+    }
+}
+
 /// Parallelism caps passed to `nixos-rebuild`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct BuildOptions {
@@ -36,6 +78,8 @@ pub(crate) struct Config {
     pub(crate) jobs: Option<u16>,
     /// `--cores` cap for the rebuild.
     pub(crate) cores: Option<u16>,
+    /// Explicit step selection (`--only`), or `None` for the default pipeline.
+    pub(crate) only: Option<Vec<Step>>,
 }
 
 impl fmt::Display for Config {
@@ -74,6 +118,21 @@ impl Config {
         None
     }
 
+    /// Whether `step` belongs to this run.
+    ///
+    /// `--only` wins when given; otherwise pull/stage/rebuild/cleanup always run
+    /// and the flake update / closure diff follow their own flags.
+    pub(crate) fn runs(&self, step: Step) -> bool {
+        match &self.only {
+            Some(steps) => steps.contains(&step),
+            None => match step {
+                Step::Flake => self.update,
+                Step::Diff => self.diff,
+                Step::Pull | Step::Stage | Step::Rebuild | Step::Cleanup => true,
+            },
+        }
+    }
+
     /// Parallelism caps for the rebuild step.
     pub(crate) fn build_options(&self) -> BuildOptions {
         BuildOptions {
@@ -98,6 +157,7 @@ mod tests {
             dry_run: false,
             jobs: None,
             cores: None,
+            only: None,
         }
     }
 
@@ -183,6 +243,38 @@ mod tests {
             ..sample()
         };
         assert_eq!(config.validate(), Some("cores must be > 0"));
+    }
+
+    #[test]
+    fn runs_defaults_to_the_full_pipeline() {
+        let config = sample();
+        assert!(config.runs(Step::Pull));
+        assert!(config.runs(Step::Stage));
+        assert!(config.runs(Step::Rebuild));
+        assert!(config.runs(Step::Cleanup));
+        assert!(config.runs(Step::Flake));
+        assert!(!config.runs(Step::Diff));
+    }
+
+    #[test]
+    fn runs_prefers_an_explicit_selection() {
+        let config = Config {
+            only: Some(vec![Step::Diff]),
+            update: true,
+            diff: false,
+            ..sample()
+        };
+        assert!(config.runs(Step::Diff));
+        assert!(!config.runs(Step::Pull));
+        assert!(!config.runs(Step::Flake));
+    }
+
+    #[test]
+    fn step_names_round_trip() {
+        for step in Step::ALL {
+            assert_eq!(Step::from_name(step.name()), Some(step));
+        }
+        assert!(Step::from_name("bogus").is_none());
     }
 
     #[test]

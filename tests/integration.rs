@@ -193,3 +193,29 @@ fn help_mentions_no_color() {
     let output = run(&["--help"]);
     assert!(stdout_of(&output).contains("--no-color"));
 }
+
+#[test]
+fn only_diff_skips_pull_and_rebuild() {
+    let output = run(&[
+        "--only",
+        "diff",
+        "--dry-run",
+        "-y",
+        "--hostname",
+        "testhost",
+        "--repo",
+        "/tmp",
+    ]);
+    assert!(output.status.success());
+    let stdout = stdout_of(&output);
+    assert!(stdout.contains("Nix Diff"));
+    assert!(!stdout.contains("Git Pull"));
+    assert!(!stdout.contains("NixOS Rebuild"));
+}
+
+#[test]
+fn unknown_only_step_exits_two() {
+    let output = run(&["--only", "bogus"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Unknown step"));
+}
