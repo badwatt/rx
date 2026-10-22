@@ -32,6 +32,9 @@
           version = lib.removeSuffix "\n" (builtins.readFile ./VERSION);
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          postInstall = ''
+            install -Dm644 ${./rx.1} "$out/share/man/man1/rx.1"
+          '';
           meta = {
             description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system";
             license = pkgs.lib.licenses.mit;
@@ -51,6 +54,18 @@
           # e.g. nix build .#rx  (or plain: nix build)
           default = rx;
           rx = rx;
+        }
+      );
+
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          # `nix flake check` builds the package (and its man page) for the
+          # current system.
+          default = mkRx pkgs;
         }
       );
 

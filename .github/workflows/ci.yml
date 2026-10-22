@@ -61,4 +61,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
+      # Evaluate every flake output, then build the package and its man page.
+      - run: nix flake check --no-build
       - run: nix build .#default --no-link
