@@ -20,7 +20,11 @@ impl Repo for GitRepo<'_> {
     }
 
     fn pull(&self, repo: &str) -> Result<(), Error> {
-        let status = self.runner.run(&pull(repo))?;
+        // `--ff-only` keeps a diverged branch from opening a merge editor and
+        // `GIT_TERMINAL_PROMPT=0` keeps missing credentials from prompting.
+        let status = self
+            .runner
+            .run_with_env(&pull(repo), "GIT_TERMINAL_PROMPT", "0")?;
         if status == 0 {
             Ok(())
         } else {
@@ -47,9 +51,15 @@ impl Repo for GitRepo<'_> {
     }
 }
 
-/// `git -C <repo> pull`
+/// `git -C <repo> pull --ff-only`
 fn pull(repo: &str) -> Vec<String> {
-    vec!["git".into(), "-C".into(), repo.into(), "pull".into()]
+    vec![
+        "git".into(),
+        "-C".into(),
+        repo.into(),
+        "pull".into(),
+        "--ff-only".into(),
+    ]
 }
 
 /// `git -C <repo> status --porcelain`
@@ -89,10 +99,27 @@ fn add(repo: &str) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::shared::test_helpers::StubRunner;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn pull_argv() {
-        assert_eq!(pull("/repo"), vec!["git", "-C", "/repo", "pull"]);
+        assert_eq!(
+            pull("/repo"),
+            vec!["git", "-C", "/repo", "pull", "--ff-only"]
+        );
+    }
+
+    #[test]
+    fn pull_disables_terminal_prompts() {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let recorder = Rc::clone(&seen);
+        let runner = StubRunner::new().with_run_env(move |_, key, value| {
+            recorder.borrow_mut().push(format!("{key}={value}"));
+            Ok(0)
+        });
+        assert!(GitRepo::new(&runner).pull("/repo").is_ok());
+        assert_eq!(seen.borrow().join(" "), "GIT_TERMINAL_PROMPT=0");
     }
 
     #[test]
@@ -142,13 +169,13 @@ mod tests {
 
     #[test]
     fn pull_errs_on_nonzero() {
-        let runner = StubRunner::new().with_run(|_| Ok(1));
+        let runner = StubRunner::new().with_run_env(|_, _, _| Ok(1));
         assert!(GitRepo::new(&runner).pull("/repo").is_err());
     }
 
     #[test]
     fn pull_propagates_run_error() {
-        let runner = StubRunner::new().with_run(|_| Err(Error::GitPullFailed));
+        let runner = StubRunner::new().with_run_env(|_, _, _| Err(Error::GitPullFailed));
         assert!(GitRepo::new(&runner).pull("/repo").is_err());
     }
 

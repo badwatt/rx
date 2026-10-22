@@ -17,6 +17,13 @@ impl CommandRunner for DryRunRunner {
         Ok(0)
     }
 
+    fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
+        let mut out = std::io::stdout();
+        // Echo failure is non-critical; mirrors `write_parse_error`.
+        let _ = print_command_env(&mut out, cmd, var, value);
+        Ok(0)
+    }
+
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
         let mut out = std::io::stdout();
         let _ = print_command(&mut out, cmd);
@@ -36,6 +43,18 @@ fn print_command(writer: &mut dyn Write, cmd: &[String]) -> Result<(), Error> {
     Ok(())
 }
 
+/// Print a command with an environment assignment, as
+/// `$ VAR=value prog arg1 arg2 …`.
+fn print_command_env(
+    writer: &mut dyn Write,
+    cmd: &[String],
+    var: &str,
+    value: &str,
+) -> Result<(), Error> {
+    ansi::write_flush(writer, &format!("$ {var}={value} {}\n", cmd.join(" ")))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,9 +67,22 @@ mod tests {
     }
 
     #[test]
+    fn print_command_env_writes_assignment_and_argv() {
+        let mut buf = Vec::new();
+        assert!(print_command_env(&mut buf, &["git".into(), "pull".into()], "K", "v").is_ok());
+        assert_eq!(buf, b"$ K=v git pull\n");
+    }
+
+    #[test]
     fn print_command_error_propagation() {
         let mut writer = crate::shared::test_helpers::FailingWriter;
         assert!(print_command(&mut writer, &["git".into()]).is_err());
+    }
+
+    #[test]
+    fn print_command_env_error_propagation() {
+        let mut writer = crate::shared::test_helpers::FailingWriter;
+        assert!(print_command_env(&mut writer, &["git".into()], "K", "v").is_err());
     }
 
     #[test]
@@ -63,6 +95,16 @@ mod tests {
         let (status, out) = DryRunRunner.capture(&["true".into()]).expect("capture");
         assert_eq!(status, 0);
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn dry_run_runner_run_with_env_prints_env_assignment() {
+        assert_eq!(
+            DryRunRunner
+                .run_with_env(&["git".into(), "pull".into()], "K", "v")
+                .expect("run env"),
+            0
+        );
     }
 
     #[test]

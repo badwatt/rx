@@ -7,6 +7,8 @@ use crate::domain::error::Error;
 pub(crate) trait CommandRunner {
     /// Run a command inheriting stdio and return its exit code.
     fn run(&self, cmd: &[String]) -> Result<i32, Error>;
+    /// Run a command inheriting stdio with `var=value` in its environment.
+    fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error>;
     /// Run a command and capture its exit code and stdout.
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error>;
     /// Run a command with stdout/stderr discarded, returning its exit code.

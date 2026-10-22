@@ -44,6 +44,7 @@ impl Write for FlushFailingWriter {
 }
 
 type RunFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
+type RunEnvFn = Box<dyn Fn(&[String], &str, &str) -> Result<i32, Error>>;
 type CaptureFn = Box<dyn Fn(&[String]) -> Result<(i32, String), Error>>;
 type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 
@@ -51,6 +52,7 @@ type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 /// defaults succeed.
 pub(crate) struct StubRunner {
     run: RunFn,
+    run_env: RunEnvFn,
     capture: CaptureFn,
     probe: ProbeFn,
 }
@@ -59,6 +61,7 @@ impl StubRunner {
     pub(crate) fn new() -> Self {
         Self {
             run: Box::new(no_run),
+            run_env: Box::new(no_run_env),
             capture: Box::new(no_capture),
             probe: Box::new(no_probe),
         }
@@ -69,6 +72,14 @@ impl StubRunner {
         f: impl Fn(&[String]) -> Result<i32, Error> + 'static,
     ) -> Self {
         self.run = Box::new(f);
+        self
+    }
+
+    pub(crate) fn with_run_env(
+        mut self,
+        f: impl Fn(&[String], &str, &str) -> Result<i32, Error> + 'static,
+    ) -> Self {
+        self.run_env = Box::new(f);
         self
     }
 
@@ -93,6 +104,9 @@ impl CommandRunner for StubRunner {
     fn run(&self, cmd: &[String]) -> Result<i32, Error> {
         (self.run)(cmd)
     }
+    fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
+        (self.run_env)(cmd, var, value)
+    }
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
         (self.capture)(cmd)
     }
@@ -106,6 +120,14 @@ impl CommandRunner for StubRunner {
     reason = "stub must match the CommandRunner trait signature"
 )]
 fn no_run(_: &[String]) -> Result<i32, Error> {
+    Ok(0)
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "stub must match the CommandRunner trait signature"
+)]
+fn no_run_env(_: &[String], _: &str, _: &str) -> Result<i32, Error> {
     Ok(0)
 }
 

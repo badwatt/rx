@@ -11,6 +11,10 @@ impl CommandRunner for ProcessRunner {
         run_cmd(cmd)
     }
 
+    fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
+        run_cmd_env(cmd, var, value)
+    }
+
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
         capture_cmd(cmd)
     }
@@ -24,13 +28,26 @@ impl CommandRunner for ProcessRunner {
 ///
 /// A process killed by a signal returns `1`.
 pub(crate) fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
-    let status = Command::new(program(cmd)?)
+    run_cmd_env_impl(cmd, None)
+}
+
+/// Run a command via argv list with `var=value` in its environment.
+pub(crate) fn run_cmd_env(cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
+    run_cmd_env_impl(cmd, Some((var, value)))
+}
+
+/// Shared body of [`run_cmd`] and [`run_cmd_env`].
+fn run_cmd_env_impl(cmd: &[String], env: Option<(&str, &str)>) -> Result<i32, Error> {
+    let mut command = Command::new(program(cmd)?);
+    command
         .args(&cmd[1..])
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .map_err(Error::Io)?;
+        .stderr(Stdio::inherit());
+    if let Some((var, value)) = env {
+        command.env(var, value);
+    }
+    let status = command.status().map_err(Error::Io)?;
     Ok(exit_code(status))
 }
 
@@ -212,6 +229,45 @@ mod tests {
             .expect("capture");
         assert_eq!(status, 0);
         assert_eq!(out, "hi\n");
+    }
+
+    #[test]
+    fn run_cmd_env_exposes_the_variable() {
+        let cmd = vec![
+            "sh".into(),
+            "-c".into(),
+            "test \"$GIT_TERMINAL_PROMPT\" = 0".into(),
+        ];
+        assert_eq!(
+            run_cmd_env(&cmd, "GIT_TERMINAL_PROMPT", "0").expect("run env"),
+            0
+        );
+    }
+
+    #[test]
+    fn run_cmd_env_surfaces_failure_exit_code() {
+        let cmd = vec!["sh".into(), "-c".into(), "test -n \"$K\"".into()];
+        assert_eq!(run_cmd_env(&cmd, "K", "").expect("run env"), 1);
+    }
+
+    #[test]
+    fn run_cmd_env_not_found_returns_io_error() {
+        assert!(run_cmd_env(&["nonexistent_cmd_zxy123".into()], "K", "v").is_err());
+    }
+
+    #[test]
+    fn run_cmd_env_empty_returns_error() {
+        assert!(run_cmd_env(&[], "K", "v").is_err());
+    }
+
+    #[test]
+    fn process_runner_run_with_env_returns_zero() {
+        assert_eq!(
+            ProcessRunner
+                .run_with_env(&["true".into()], "K", "v")
+                .expect("run env"),
+            0
+        );
     }
 
     #[test]
