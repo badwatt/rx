@@ -556,7 +556,20 @@ fn parse_only_unknown_step_returns_error() {
         parse(&args(&["rx", "--only", "pull,bogus"]), &mut buf),
         Intent::Invalid
     );
-    assert!(String::from_utf8_lossy(&buf).contains("Unknown step"));
+    let message = String::from_utf8_lossy(&buf).into_owned();
+    assert!(message.contains("Unknown step"));
+    assert!(message.contains("valid: pull,flake"));
+}
+
+#[test]
+fn parse_only_accepts_update_as_an_alias_for_flake() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.only = Some(vec![Step::Flake]);
+    assert_eq!(
+        parse(&args(&["rx", "--only", "update"]), &mut buf),
+        Intent::Run(expected)
+    );
 }
 
 #[test]
@@ -580,7 +593,9 @@ fn parse_only_rejects_an_empty_item() {
         parse(&args(&["rx", "--only", "pull,,diff"]), &mut buf),
         Intent::Invalid
     );
-    assert!(String::from_utf8_lossy(&buf).contains("Unknown step"));
+    let message = String::from_utf8_lossy(&buf).into_owned();
+    assert!(message.contains("Unknown step"));
+    assert!(message.contains("valid: pull,flake"));
 }
 
 #[test]

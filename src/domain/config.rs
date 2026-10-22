@@ -41,9 +41,22 @@ impl Step {
         }
     }
 
-    /// Look a step up by its CLI name.
+    /// Look a step up by its CLI name. `update` is an alias for `flake`, to
+    /// match the `--update` flag people already know.
     pub(crate) fn from_name(name: &str) -> Option<Step> {
+        if name == "update" {
+            return Some(Step::Flake);
+        }
         Step::ALL.into_iter().find(|step| step.name() == name)
+    }
+
+    /// Comma-separated CLI names, for error messages.
+    pub(crate) fn names() -> String {
+        Step::ALL
+            .iter()
+            .map(|step| step.name())
+            .collect::<Vec<_>>()
+            .join(",")
     }
 }
 
@@ -275,6 +288,8 @@ mod tests {
             assert_eq!(Step::from_name(step.name()), Some(step));
         }
         assert!(Step::from_name("bogus").is_none());
+        assert_eq!(Step::from_name("update"), Some(Step::Flake));
+        assert_eq!(Step::names(), "pull,flake,stage,rebuild,cleanup,diff");
     }
 
     #[test]

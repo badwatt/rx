@@ -271,7 +271,10 @@ fn parse_steps(value: &str, writer: &mut dyn Write) -> Result<Vec<Step>, Intent>
     let mut steps = Vec::new();
     for name in value.split(',') {
         let Some(step) = Step::from_name(name.trim()) else {
-            write_parse_error(writer, &format!("Unknown step \"{name}\""));
+            write_parse_error(
+                writer,
+                &format!("Unknown step \"{name}\" (valid: {})", Step::names()),
+            );
             return Err(Intent::Invalid);
         };
         steps.push(step);
