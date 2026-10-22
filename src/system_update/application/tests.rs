@@ -205,7 +205,7 @@ impl Log {
 fn default_config() -> Config {
     Config {
         repo: String::from("r"),
-        hostname: String::from("h"),
+        hostname: Some(String::from("h")),
         keep: 1,
         update: false,
         diff: false,
@@ -616,9 +616,9 @@ fn run_rebuild_error_propagates() {
 }
 
 #[test]
-fn run_unknown_hostname_aborts_before_pull() {
+fn run_undetected_hostname_aborts_before_pull() {
     let config = Config {
-        hostname: String::from("unknown"),
+        hostname: None,
         ..default_config()
     };
     let repo = MockRepo {

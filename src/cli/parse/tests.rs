@@ -169,7 +169,7 @@ fn parse_r_with_value_sets_repo() {
 fn parse_n_with_value_sets_hostname() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.hostname = String::from("myhost");
+    expected.hostname = Some(String::from("myhost"));
     assert_eq!(
         parse(&args(&["rx", "-n", "myhost"]), &mut buf),
         Intent::Run(expected)
@@ -232,7 +232,7 @@ fn parse_combined_flags_and_values() {
     let mut buf = Vec::new();
     let mut expected = default_config();
     expected.repo = String::from("/my/repo");
-    expected.hostname = String::from("myhost");
+    expected.hostname = Some(String::from("myhost"));
     expected.keep = 3;
     expected.update = true;
     expected.diff = true;
@@ -389,7 +389,7 @@ fn parse_repo_long_sets_repo() {
 fn parse_hostname_long_sets_hostname() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.hostname = String::from("myhost");
+    expected.hostname = Some(String::from("myhost"));
     assert_eq!(
         parse(&args(&["rx", "--hostname", "myhost"]), &mut buf),
         Intent::Run(expected)

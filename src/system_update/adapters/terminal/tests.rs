@@ -31,7 +31,7 @@ fn terminal() -> TerminalIo {
 fn test_config() -> Config {
     Config {
         repo: String::from("r"),
-        hostname: String::from("h"),
+        hostname: Some(String::from("h")),
         keep: 1,
         update: false,
         diff: false,
@@ -204,11 +204,22 @@ fn confirm_error_from_reader_read_line() {
 // ------------------------------------------------------------------
 
 #[test]
+fn print_config_marks_an_undetected_hostname() {
+    let mut buf = Vec::new();
+    let config = Config {
+        hostname: None,
+        ..test_config()
+    };
+    assert!(print_config(&mut buf, &config).is_ok());
+    assert!(String::from_utf8_lossy(&buf).contains("<not detected>"));
+}
+
+#[test]
 fn print_config_renders_all_fields() {
     let mut buf = Vec::new();
     let config = Config {
         repo: String::from("~/.dotfiles"),
-        hostname: String::from("nixos"),
+        hostname: Some(String::from("nixos")),
         keep: 10,
         update: false,
         diff: true,

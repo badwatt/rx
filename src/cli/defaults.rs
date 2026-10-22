@@ -2,7 +2,8 @@ use crate::cli::hostname;
 use crate::domain::config::{Config, DEFAULT_KEEP, DEFAULT_REPO};
 
 /// Build a fresh [`Config`] from defaults: repo `~/.dotfiles`, hostname resolved
-/// from the OS, keep `10`, update/diff/yes/dry-run `false`.
+/// from the OS (`None` when undetectable), keep `10`, update/diff/yes/dry-run
+/// `false`.
 pub(crate) fn default_config() -> Config {
     Config {
         repo: expand_tilde(DEFAULT_REPO),
@@ -94,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn default_config_hostname_is_non_empty() {
-        assert_ne!(default_config().hostname, "");
+    fn default_config_hostname_is_never_the_empty_string() {
+        assert_ne!(default_config().hostname.as_deref(), Some(""));
     }
 }

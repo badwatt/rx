@@ -24,10 +24,10 @@ pub(crate) fn run(
     }
 
     // Abort before any side effect (pull, flake update, staging) when the
-    // hostname could not be resolved or was forced to the sentinel.
-    if config.hostname == "unknown" {
+    // hostname is unknown: the rebuild needs it for the flake attribute.
+    let Some(hostname) = config.hostname.as_deref() else {
         return Err(Error::HostnameUnknown);
-    }
+    };
 
     ui.title("RX Configuration")?;
     ui.config(config)?;
@@ -47,7 +47,7 @@ pub(crate) fn run(
     if !steps::stage::run(&config.repo, config.yes, repo, ui)? {
         return Ok(());
     }
-    steps::rebuild::run(config, nix, ui)?;
+    steps::rebuild::run(config, hostname, nix, ui)?;
     steps::cleanup::run(config, nix, ui)?;
 
     if config.diff {

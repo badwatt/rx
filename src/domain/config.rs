@@ -22,7 +22,9 @@ pub(crate) struct BuildOptions {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Config {
     pub(crate) repo: String,
-    pub(crate) hostname: String,
+    /// Hostname for the flake attribute, or `None` when it could not be
+    /// detected and no `--hostname` was given.
+    pub(crate) hostname: Option<String>,
     pub(crate) keep: u8,
     pub(crate) update: bool,
     pub(crate) diff: bool,
@@ -41,7 +43,11 @@ impl fmt::Display for Config {
         write!(
             f,
             "Config {{ repo: {}, hostname: {}, keep: {}, update: {}, diff: {} }}",
-            self.repo, self.hostname, self.keep, self.update, self.diff
+            self.repo,
+            self.hostname.as_deref().unwrap_or("<not detected>"),
+            self.keep,
+            self.update,
+            self.diff
         )
     }
 }
@@ -53,7 +59,7 @@ impl Config {
         if self.repo.is_empty() {
             return Some("repo path cannot be empty");
         }
-        if self.hostname.is_empty() {
+        if matches!(self.hostname.as_deref(), Some("")) {
             return Some("hostname cannot be empty");
         }
         if self.keep == 0 {
@@ -84,7 +90,7 @@ mod tests {
     fn sample() -> Config {
         Config {
             repo: String::from("repo"),
-            hostname: String::from("host"),
+            hostname: Some(String::from("host")),
             keep: 5,
             update: true,
             diff: false,
@@ -134,10 +140,31 @@ mod tests {
     #[test]
     fn validate_rejects_empty_hostname() {
         let config = Config {
-            hostname: String::new(),
+            hostname: Some(String::new()),
             ..sample()
         };
         assert_eq!(config.validate(), Some("hostname cannot be empty"));
+    }
+
+    #[test]
+    fn validate_accepts_undetected_hostname() {
+        assert!(
+            Config {
+                hostname: None,
+                ..sample()
+            }
+            .validate()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn config_display_marks_an_undetected_hostname() {
+        let config = Config {
+            hostname: None,
+            ..sample()
+        };
+        assert!(config.to_string().contains("<not detected>"));
     }
 
     #[test]

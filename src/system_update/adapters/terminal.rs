@@ -140,7 +140,8 @@ pub(crate) fn print_config(
     palette: Palette,
 ) -> Result<(), Error> {
     print_config_line(writer, "repo", &config.repo, palette)?;
-    print_config_line(writer, "hostname", &config.hostname, palette)?;
+    let hostname = config.hostname.as_deref().unwrap_or("<not detected>");
+    print_config_line(writer, "hostname", hostname, palette)?;
     print_config_line(writer, "keep", &config.keep.to_string(), palette)?;
     print_config_line(writer, "update", &config.update.to_string(), palette)?;
     print_config_line(writer, "diff", &config.diff.to_string(), palette)?;

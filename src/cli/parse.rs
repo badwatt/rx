@@ -214,7 +214,7 @@ fn set_value(
 ) -> Result<usize, Intent> {
     match key {
         ValueKey::Repo => config.repo = expand_tilde(&value),
-        ValueKey::Hostname => config.hostname = value,
+        ValueKey::Hostname => config.hostname = Some(value),
         ValueKey::Keep => config.keep = parse_bounded(&value, label, 1u8, u8::MAX, writer)?,
         ValueKey::Jobs => {
             config.jobs = Some(parse_bounded(&value, label, 1u16, u16::MAX, writer)?);
