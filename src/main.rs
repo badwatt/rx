@@ -77,6 +77,7 @@ fn run(
     match cli::parse::parse(args, err) {
         Intent::Help => cli::help::print_help(out),
         Intent::Version => cli::help::print_version(out, out_palette),
+        Intent::Completions(shell) => cli::completions::print(out, shell),
         Intent::Invalid => Err(Error::InvalidArgs),
         Intent::Run(config) => run_workflow(&config, out_palette),
     }

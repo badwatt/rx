@@ -225,3 +225,23 @@ fn unknown_only_step_exits_two() {
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("Unknown step"));
 }
+
+#[test]
+fn completions_bash_prints_a_completion_function() {
+    let output = run(&["--completions", "bash"]);
+    assert!(output.status.success());
+    assert!(stdout_of(&output).contains("complete -F _rx rx"));
+}
+
+#[test]
+fn completions_unknown_shell_exits_two() {
+    let output = run(&["--completions", "powershell"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Unknown shell"));
+}
+
+#[test]
+fn help_mentions_completions() {
+    let output = run(&["--help"]);
+    assert!(stdout_of(&output).contains("--completions"));
+}

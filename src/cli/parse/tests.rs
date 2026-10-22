@@ -621,3 +621,43 @@ fn parse_only_equals_does_not_swallow_the_next_flag() {
         Intent::Run(expected)
     );
 }
+
+#[test]
+fn parse_completions_returns_the_shell() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--completions", "bash"]), &mut buf),
+        Intent::Completions(Shell::Bash)
+    );
+}
+
+#[test]
+fn parse_completions_equals_returns_the_shell() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--completions=zsh"]), &mut buf),
+        Intent::Completions(Shell::Zsh)
+    );
+}
+
+#[test]
+fn parse_completions_unknown_shell_lists_the_valid_ones() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--completions", "powershell"]), &mut buf),
+        Intent::Invalid
+    );
+    let message = String::from_utf8_lossy(&buf).into_owned();
+    assert!(message.contains("Unknown shell"));
+    assert!(message.contains("valid: bash,zsh,fish"));
+}
+
+#[test]
+fn parse_completions_missing_shell_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--completions"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}

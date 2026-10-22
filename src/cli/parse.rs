@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use crate::cli::Intent;
+use crate::cli::completions::Shell;
 use crate::cli::defaults::{default_config, expand_tilde};
 use crate::domain::config::{Config, Step};
 use crate::shared::ansi;
@@ -95,6 +96,17 @@ fn parse_long(
         None => (arg, None),
     };
     match name {
+        "--completions" => {
+            let (value, _) = long_value(name, inline, args, i, writer)?;
+            let Some(shell) = Shell::from_name(&value) else {
+                write_parse_error(
+                    writer,
+                    &format!("Unknown shell \"{value}\" (valid: {})", Shell::names()),
+                );
+                return Err(Intent::Invalid);
+            };
+            Err(Intent::Completions(shell))
+        }
         "--only" => {
             let (value, consumed) = long_value(name, inline, args, i, writer)?;
             config.only = Some(parse_steps(&value, writer)?);
