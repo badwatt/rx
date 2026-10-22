@@ -43,8 +43,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@1.99
         if: steps.tag.outputs.released == 'false'
-        with:
-          targets: x86_64-unknown-linux-musl
+
+      # `rust-toolchain.toml` overrides the default toolchain, so add the
+      # target to *that* one: the action's `targets:` input installs it on
+      # the action's own toolchain name, which cargo never uses.
+      - name: Add static target
+        if: steps.tag.outputs.released == 'false'
+        run: rustup target add "$TARGET"
 
       # Gate the released binary on a green test suite: never ship what CI
       # would reject.
