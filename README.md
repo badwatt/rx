@@ -54,8 +54,16 @@ binaries for:
 |-------------------------------|---------------|---------------------------|
 | `x86_64-unknown-linux-musl`    | ubuntu-latest | static, no glibc          |
 | `aarch64-unknown-linux-musl`   | ubuntu-latest | cross-built               |
-| `aarch64-apple-darwin`         | macos-latest  | native                    |
+| `aarch64-apple-darwin`         | macos-latest  | native, unsigned          |
 | `x86_64-apple-darwin`          | macos-latest  | cross-built on arm64 host |
+
+Each release also ships `SHA256SUMS`. The macOS binaries are unsigned, so
+Gatekeeper quarantines them after download; clear it with
+`xattr -d com.apple.quarantine ./rx`.
+
+A manual `workflow_dispatch` run always builds the matrix (validating the
+action versions and cross targets) and only publishes when the `publish` input
+is enabled.
 
 ```bash
 gh release download v0.2.0 --pattern '*x86_64-unknown-linux-musl*'
@@ -135,7 +143,7 @@ Long flags also accept `--flag=value` (`--repo=/path`, `--only=diff`).
 ### Step selection
 
 `--only` takes a comma-separated list of `pull`, `flake`, `stage`, `rebuild`,
-`cleanup`, `diff`:
+`cleanup`, `diff` (`update` is accepted as an alias for `flake`):
 
 ```bash
 rx --only diff                 # only show the closure diff
