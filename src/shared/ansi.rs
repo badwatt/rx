@@ -5,23 +5,8 @@ pub(crate) const RED: &str = "\x1b[31m";
 pub(crate) const GREEN: &str = "\x1b[32m";
 pub(crate) const YELLOW: &str = "\x1b[33m";
 pub(crate) const BLUE: &str = "\x1b[34m";
-// Used only in tests; kept for future styling needs.
-#[allow(dead_code)]
-pub(crate) const MAGENTA: &str = "\x1b[35m";
 pub(crate) const CYAN: &str = "\x1b[36m";
-// Used only in tests; kept for future styling needs.
-#[allow(dead_code)]
-pub(crate) const GRAY: &str = "\x1b[37m";
-// Used only in tests; kept for future styling needs.
-#[allow(dead_code)]
-pub(crate) const BLACK: &str = "\x1b[30m";
 pub(crate) const RESET: &str = "\x1b[0m";
-// Used only in tests; kept for future styling needs.
-#[allow(dead_code)]
-pub(crate) const BOLD: &str = "\x1b[1m";
-// Used only in tests; kept for future styling needs.
-#[allow(dead_code)]
-pub(crate) const UNDERLINE: &str = "\x1b[4m";
 
 /// The colors used for a given run. [`Palette::PLAIN`] renders without ANSI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,13 +83,8 @@ mod tests {
         assert_ne!(GREEN, "");
         assert_ne!(YELLOW, "");
         assert_ne!(BLUE, "");
-        assert_ne!(MAGENTA, "");
         assert_ne!(CYAN, "");
-        assert_ne!(GRAY, "");
-        assert_ne!(BLACK, "");
         assert_ne!(RESET, "");
-        assert_ne!(BOLD, "");
-        assert_ne!(UNDERLINE, "");
     }
 
     #[test]

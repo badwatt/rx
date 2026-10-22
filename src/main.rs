@@ -60,7 +60,7 @@ fn main() {
     let no_color = args.iter().any(|arg| arg == "--no-color");
     let (out_palette, err_palette) = palettes(no_color);
     if let Err(e) = run(&args, &mut out, &mut err, out_palette) {
-        report_error(&mut std::io::stderr(), err_palette, &e);
+        report_error(&mut err, err_palette, &e);
         std::process::exit(exit_code_for(&e));
     }
 }
