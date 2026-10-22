@@ -71,7 +71,8 @@ fn parse_flags(args: &[String], writer: &mut dyn Write) -> Intent {
                 Err(intent) => return intent,
             }
         } else {
-            0
+            write_parse_error(writer, &format!("Unknown argument \"{arg}\""));
+            return Intent::Invalid;
         };
         i += 1 + consumed;
     }
@@ -214,43 +215,53 @@ fn set_value(
     match key {
         ValueKey::Repo => config.repo = expand_tilde(&value),
         ValueKey::Hostname => config.hostname = value,
-        ValueKey::Keep => config.keep = parse_keep(&value, label, writer)?,
-        ValueKey::Jobs => config.jobs = Some(parse_count(&value, label, writer)?),
-        ValueKey::Cores => config.cores = Some(parse_count(&value, label, writer)?),
+        ValueKey::Keep => config.keep = parse_bounded(&value, label, 1u8, u8::MAX, writer)?,
+        ValueKey::Jobs => {
+            config.jobs = Some(parse_bounded(&value, label, 1u16, u16::MAX, writer)?);
+        }
+        ValueKey::Cores => {
+            config.cores = Some(parse_bounded(&value, label, 1u16, u16::MAX, writer)?);
+        }
     }
     Ok(1)
 }
 
-/// Parse a numeric `--keep` / `-k` value (>= 1), or report an error.
-fn parse_keep(value: &str, label: &str, writer: &mut dyn Write) -> Result<u8, Intent> {
-    match value.parse::<u8>() {
-        Ok(num) if num >= 1 => Ok(num),
-        Ok(_) => {
-            write_parse_error(
-                writer,
-                &format!("Value of \"{label}\" flag must be at least 1."),
-            );
-            Err(Intent::Invalid)
-        }
-        Err(_) => {
-            write_parse_error(
-                writer,
-                &format!("Value of \"{label}\" flag is not numeric."),
-            );
-            Err(Intent::Invalid)
-        }
-    }
+/// Report the accepted range for a numeric flag.
+fn write_range_error<T: std::fmt::Display>(
+    writer: &mut dyn Write,
+    label: &str,
+    lowest: T,
+    highest: T,
+) {
+    write_parse_error(
+        writer,
+        &format!("Value of \"{label}\" flag must be between {lowest} and {highest}."),
+    );
 }
 
-/// Parse a numeric `--jobs` / `--cores` value (>= 1), or report an error.
-fn parse_count(value: &str, label: &str, writer: &mut dyn Write) -> Result<u16, Intent> {
-    match value.parse::<u16>() {
-        Ok(num) if num >= 1 => Ok(num),
+/// Parse a numeric flag value of at least `lowest`, or report an error.
+///
+/// `highest` only names the bound in the message: the target type already caps
+/// the value, so an overflow is the only way to exceed it. Telling "not
+/// numeric" apart from out of range keeps `--keep 300` honest.
+fn parse_bounded<T>(
+    value: &str,
+    label: &str,
+    lowest: T,
+    highest: T,
+    writer: &mut dyn Write,
+) -> Result<T, Intent>
+where
+    T: std::str::FromStr<Err = std::num::ParseIntError> + PartialOrd + std::fmt::Display,
+{
+    match value.parse::<T>() {
+        Ok(num) if num >= lowest => Ok(num),
         Ok(_) => {
-            write_parse_error(
-                writer,
-                &format!("Value of \"{label}\" flag must be at least 1."),
-            );
+            write_range_error(writer, label, lowest, highest);
+            Err(Intent::Invalid)
+        }
+        Err(e) if e.kind() == &std::num::IntErrorKind::PosOverflow => {
+            write_range_error(writer, label, lowest, highest);
             Err(Intent::Invalid)
         }
         Err(_) => {

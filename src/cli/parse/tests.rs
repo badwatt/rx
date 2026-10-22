@@ -80,7 +80,7 @@ fn parse_k_non_numeric_returns_error() {
 fn parse_k_zero_returns_error() {
     let mut buf = Vec::new();
     assert_eq!(parse(&args(&["rx", "-k", "0"]), &mut buf), Intent::Invalid);
-    assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 255"));
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn parse_cores_long_sets_cores() {
 fn parse_jobs_zero_returns_error() {
     let mut buf = Vec::new();
     assert_eq!(parse(&args(&["rx", "-j", "0"]), &mut buf), Intent::Invalid);
-    assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 65535"));
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn parse_cores_zero_returns_error() {
         parse(&args(&["rx", "--cores", "0"]), &mut buf),
         Intent::Invalid
     );
-    assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 65535"));
 }
 
 #[test]
@@ -302,17 +302,6 @@ fn parse_long_value_rejects_flag_like_value() {
     assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
 }
 
-#[test]
-fn parse_extra_non_flag_arg_ignored() {
-    let mut buf = Vec::new();
-    let mut expected = default_config();
-    expected.diff = true;
-    assert_eq!(
-        parse(&args(&["rx", "-d", "extra"]), &mut buf),
-        Intent::Run(expected)
-    );
-}
-
 // ------------------------------------------------------------------
 // long flags
 // ------------------------------------------------------------------
@@ -435,7 +424,7 @@ fn parse_keep_long_zero_returns_error() {
         parse(&args(&["rx", "--keep", "0"]), &mut buf),
         Intent::Invalid
     );
-    assert!(String::from_utf8_lossy(&buf).contains("at least 1"));
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 255"));
 }
 
 #[test]
@@ -453,4 +442,44 @@ fn parse_unknown_long_flag_returns_error() {
         Intent::Invalid
     );
     assert!(String::from_utf8_lossy(&buf).contains("Unknown flag"));
+}
+
+#[test]
+fn parse_stray_argument_after_flags_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--yes", "bogus"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("Unknown argument"));
+}
+
+#[test]
+fn parse_keep_overflow_reports_the_valid_range() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--keep", "300"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 255"));
+}
+
+#[test]
+fn parse_jobs_overflow_reports_the_valid_range() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--jobs", "70000"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 65535"));
+}
+
+#[test]
+fn parse_cores_overflow_reports_the_valid_range() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--cores", "70000"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("between 1 and 65535"));
 }
