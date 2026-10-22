@@ -157,8 +157,12 @@ mod tests {
 
     #[test]
     fn is_repo_propagates_capture_error() {
-        let runner = StubRunner::new().with_capture(|_| Err(Error::GitStatusFailed));
-        assert!(GitRepo::new(&runner).is_repo("/repo").is_err());
+        let runner =
+            StubRunner::new().with_capture(|_| Err(Error::Io(std::io::Error::other("boom"))));
+        let err = GitRepo::new(&runner)
+            .is_repo("/repo")
+            .expect_err("capture error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -170,13 +174,18 @@ mod tests {
     #[test]
     fn pull_errs_on_nonzero() {
         let runner = StubRunner::new().with_run_env(|_, _, _| Ok(1));
-        assert!(GitRepo::new(&runner).pull("/repo").is_err());
+        let err = GitRepo::new(&runner)
+            .pull("/repo")
+            .expect_err("pull failure");
+        assert_eq!(err.to_string(), "Failed to pull changes");
     }
 
     #[test]
     fn pull_propagates_run_error() {
-        let runner = StubRunner::new().with_run_env(|_, _, _| Err(Error::GitPullFailed));
-        assert!(GitRepo::new(&runner).pull("/repo").is_err());
+        let runner =
+            StubRunner::new().with_run_env(|_, _, _| Err(Error::Io(std::io::Error::other("boom"))));
+        let err = GitRepo::new(&runner).pull("/repo").expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -188,13 +197,20 @@ mod tests {
     #[test]
     fn changes_errs_on_nonzero() {
         let runner = StubRunner::new().with_capture(|_| Ok((1, String::new())));
-        assert!(GitRepo::new(&runner).changes("/repo").is_err());
+        let err = GitRepo::new(&runner)
+            .changes("/repo")
+            .expect_err("status failure");
+        assert_eq!(err.to_string(), "Failed to read repository status");
     }
 
     #[test]
     fn changes_propagates_capture_error() {
-        let runner = StubRunner::new().with_capture(|_| Err(Error::GitStatusFailed));
-        assert!(GitRepo::new(&runner).changes("/repo").is_err());
+        let runner =
+            StubRunner::new().with_capture(|_| Err(Error::Io(std::io::Error::other("boom"))));
+        let err = GitRepo::new(&runner)
+            .changes("/repo")
+            .expect_err("capture error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -206,12 +222,18 @@ mod tests {
     #[test]
     fn add_all_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
-        assert!(GitRepo::new(&runner).add_all("/repo").is_err());
+        let err = GitRepo::new(&runner)
+            .add_all("/repo")
+            .expect_err("add failure");
+        assert_eq!(err.to_string(), "Failed to add changes to the stage");
     }
 
     #[test]
     fn add_all_propagates_run_error() {
-        let runner = StubRunner::new().with_run(|_| Err(Error::GitAddFailed));
-        assert!(GitRepo::new(&runner).add_all("/repo").is_err());
+        let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("boom"))));
+        let err = GitRepo::new(&runner)
+            .add_all("/repo")
+            .expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 }

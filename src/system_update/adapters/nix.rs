@@ -305,13 +305,17 @@ mod tests {
     #[test]
     fn update_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
-        assert!(NixCli::new(&runner).update("/repo").is_err());
+        let err = NixCli::new(&runner)
+            .update("/repo")
+            .expect_err("update failure");
+        assert_eq!(err.to_string(), "Failed to update flake inputs");
     }
 
     #[test]
     fn update_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(NixCli::new(&runner).update("/repo").is_err());
+        let err = NixCli::new(&runner).update("/repo").expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -375,21 +379,19 @@ mod tests {
     #[test]
     fn rebuild_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
-        assert!(
-            NixCli::new(&runner)
-                .rebuild("/repo", "host", BuildOptions::default())
-                .is_err()
-        );
+        let err = NixCli::new(&runner)
+            .rebuild("/repo", "host", BuildOptions::default())
+            .expect_err("rebuild failure");
+        assert_eq!(err.to_string(), "NixOS rebuild failed");
     }
 
     #[test]
     fn rebuild_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(
-            NixCli::new(&runner)
-                .rebuild("/repo", "host", BuildOptions::default())
-                .is_err()
-        );
+        let err = NixCli::new(&runner)
+            .rebuild("/repo", "host", BuildOptions::default())
+            .expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -401,13 +403,15 @@ mod tests {
     #[test]
     fn prune_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
-        assert!(NixCli::new(&runner).prune(5).is_err());
+        let err = NixCli::new(&runner).prune(5).expect_err("prune failure");
+        assert_eq!(err.to_string(), "Cleanup failed");
     }
 
     #[test]
     fn prune_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(NixCli::new(&runner).prune(5).is_err());
+        let err = NixCli::new(&runner).prune(5).expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -419,13 +423,19 @@ mod tests {
     #[test]
     fn collect_garbage_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
-        assert!(NixCli::new(&runner).collect_garbage().is_err());
+        let err = NixCli::new(&runner)
+            .collect_garbage()
+            .expect_err("gc failure");
+        assert_eq!(err.to_string(), "Cleanup failed");
     }
 
     #[test]
     fn collect_garbage_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(NixCli::new(&runner).collect_garbage().is_err());
+        let err = NixCli::new(&runner)
+            .collect_garbage()
+            .expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
@@ -440,12 +450,18 @@ mod tests {
     #[test]
     fn diff_closures_errs_on_nonzero() {
         let runner = StubRunner::new().with_capture(|_| Ok((1, String::from("junk"))));
-        assert!(NixCli::new(&runner).diff_closures().is_err());
+        let err = NixCli::new(&runner)
+            .diff_closures()
+            .expect_err("diff failure");
+        assert_eq!(err.to_string(), "Failed to compute closure diff");
     }
 
     #[test]
     fn diff_closures_propagates_capture_error() {
         let runner = StubRunner::new().with_capture(|_| Err(Error::Io(std::io::Error::other("x"))));
-        assert!(NixCli::new(&runner).diff_closures().is_err());
+        let err = NixCli::new(&runner)
+            .diff_closures()
+            .expect_err("capture error");
+        assert!(err.to_string().contains("IO error"));
     }
 }
