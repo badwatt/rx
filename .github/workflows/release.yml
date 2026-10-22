@@ -127,7 +127,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.check.outputs.version }}
         run: |
+          # No checkout in this job: name the repository explicitly so `gh`
+          # does not look for a git remote.
           gh release create "v$VERSION" dist/*.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
             --title "v$VERSION" \
             --generate-notes \
             --target "$GITHUB_SHA"
