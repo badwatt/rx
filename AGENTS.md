@@ -18,7 +18,7 @@
 
 - Tool: `cargo llvm-cov --all-targets --no-default-ignore-filename-regex` exclusively. Rejected alternatives (tarpaulin).
 - **Tests count too**: `--no-default-ignore-filename-regex` disables cargo-llvm-cov's built-in exclusion of `tests.rs` / `tests/`. Without it test code is silently ignored.
-- Toolchain pinned in `rust-toolchain.toml` (1.98). No nightly, no `#![feature(coverage_attribute)]` currently.
+- Toolchain pinned in `rust-toolchain.toml` (1.99). No nightly, no `#![feature(coverage_attribute)]` currently.
 - **Prefer structural fixes** over `#[coverage(off)]`. Use it only as last resort for impossible-to-cover branches.
 - **`dyn Write` over generics**: prefer `&mut dyn Write` instead of `<W: Write>` for IO functions. Generic monomorphizations create uncovered per-type regions.
 - Every `?` creates a branch. Both paths (Ok, Err) must be exercised by tests.
@@ -117,4 +117,4 @@ src/
 
 - `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).
 - `nix build` (default) and `nix develop` must keep working.
-- CI pins rust 1.98 via `dtolnay/rust-toolchain@1.98`; keep it in sync with `rust-toolchain.toml`.
+- CI pins rust 1.99 via `dtolnay/rust-toolchain@1.99`; keep it in sync with `rust-toolchain.toml`.

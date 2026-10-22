@@ -159,14 +159,14 @@ mod tests {
         let pipe = Error::Io(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
         let mut buf = Vec::new();
         assert!(!report_error(&mut buf, Palette::PLAIN, &pipe));
-        assert!(buf.is_empty());
+        assert_eq!(String::from_utf8_lossy(&buf), "");
     }
 
     #[test]
     fn report_error_skips_invalid_args() {
         let mut buf = Vec::new();
         assert!(!report_error(&mut buf, Palette::PLAIN, &Error::InvalidArgs));
-        assert!(buf.is_empty());
+        assert_eq!(String::from_utf8_lossy(&buf), "");
     }
 
     #[test]
@@ -192,7 +192,7 @@ mod tests {
             Palette::PLAIN,
         );
         assert!(result.is_err());
-        assert!(out.is_empty());
+        assert_eq!(String::from_utf8_lossy(&out), "");
         assert!(String::from_utf8_lossy(&err).contains("Unknown flag"));
     }
 
