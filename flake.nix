@@ -29,7 +29,7 @@
         pkgs:
         pkgs.rustPlatform.buildRustPackage {
           pname = "rx";
-          version = "0.1.0";
+          version = lib.removeSuffix "\n" (builtins.readFile ./VERSION);
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           meta = {

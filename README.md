@@ -45,6 +45,24 @@ cargo build --release
 ./target/release/rx
 ```
 
+### Release binary
+
+Every `VERSION` bump on `main` gets published as a GitHub release with a
+static `x86_64-unknown-linux-musl` binary (no glibc needed):
+
+```bash
+gh release download v0.1.0 --pattern '*.tar.gz'
+tar -xzf rx-v0.1.0-x86_64-unknown-linux-musl.tar.gz
+./rx-v0.1.0-x86_64-unknown-linux-musl/rx --version
+```
+
+### Versioning
+
+`VERSION` (repository root) is the single source of truth. `Cargo.toml` carries
+a `0.0.0` placeholder and `flake.nix` reads the file. To release, bump
+`VERSION`; CI builds, tags `v<VERSION>` and attaches the binary. A push that
+does not change `VERSION` publishes nothing.
+
 ### Nix
 
 ```bash

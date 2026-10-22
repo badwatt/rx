@@ -4,6 +4,11 @@ use std::process::{Command, Output, Stdio};
 /// Path to the compiled `rx` binary, provided by Cargo for integration tests.
 const RX: &str = env!("CARGO_BIN_EXE_rx");
 
+/// Project version, sourced from the repository-root `VERSION` file.
+fn version() -> &'static str {
+    include_str!("../VERSION").trim()
+}
+
 /// Run `rx` with `args` (stdin closed), capturing stdout/stderr and status.
 fn run(args: &[&str]) -> Output {
     Command::new(RX).args(args).output().expect("run rx")
@@ -35,12 +40,12 @@ fn help_word_prints_help_and_exits_zero() {
 
 #[test]
 fn version_flag_prints_semver() {
-    assert!(stdout_of(&run(&["-v"])).contains("0.1.0"));
+    assert!(stdout_of(&run(&["-v"])).contains(version()));
 }
 
 #[test]
 fn version_long_flag_prints_semver() {
-    assert!(stdout_of(&run(&["--version"])).contains("0.1.0"));
+    assert!(stdout_of(&run(&["--version"])).contains(version()));
 }
 
 #[test]

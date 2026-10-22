@@ -1,0 +1,84 @@
+name: Release
+
+# Publishes one release per VERSION bump: when the tag `v<VERSION>` does not
+# exist yet, the binary is built, packaged and attached to a new release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Publishing a release needs to write tags and releases.
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  # Static binary: runs on any linux, no glibc/interpreter to match.
+  TARGET: x86_64-unknown-linux-musl
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Tags are needed to detect an already released version.
+          fetch-depth: 0
+
+      - name: Read VERSION
+        id: version
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing release tag
+        id: tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="refs/tags/v$VERSION"
+          if git rev-parse --quiet --verify "$tag" > /dev/null; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@1.99
+        if: steps.tag.outputs.released == 'false'
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      # Gate the released binary on a green test suite: never ship what CI
+      # would reject.
+      - name: Test
+        if: steps.tag.outputs.released == 'false'
+        run: cargo test --all-targets --locked
+
+      - name: Build
+        if: steps.tag.outputs.released == 'false'
+        run: cargo build --release --locked --target "$TARGET"
+
+      - name: Package
+        if: steps.tag.outputs.released == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          name="rx-v$VERSION-$TARGET"
+          mkdir -p "dist/$name"
+          cp "target/$TARGET/release/rx" README.md LICENSE "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+
+      - name: Publish
+        if: steps.tag.outputs.released == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: >-
+          gh release create "v$VERSION" dist/*.tar.gz
+          --title "v$VERSION"
+          --generate-notes
+          --target "$GITHUB_SHA"
+
+      - name: Skip
+        if: steps.tag.outputs.released == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: echo "v$VERSION already released; bump VERSION to publish."

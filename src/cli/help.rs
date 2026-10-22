@@ -3,7 +3,14 @@ use std::io::Write;
 use crate::domain::error::Error;
 use crate::shared::ansi::{self, Palette};
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Project version, read from the repository-root `VERSION` file (single source
+/// of truth). `Cargo.toml` only carries a placeholder version.
+const VERSION_FILE: &str = include_str!("../../VERSION");
+
+/// Version string without the file's trailing newline.
+fn version() -> &'static str {
+    VERSION_FILE.trim()
+}
 
 /// Print the help banner.
 pub(crate) fn print_help(writer: &mut dyn Write) -> Result<(), Error> {
@@ -20,7 +27,9 @@ pub(crate) fn print_version(writer: &mut dyn Write, palette: Palette) -> Result<
         writer,
         &format!(
             "{}RX version: {}{}\n",
-            palette.yellow, VERSION, palette.reset
+            palette.yellow,
+            version(),
+            palette.reset
         ),
     )?;
     Ok(())
@@ -38,10 +47,13 @@ mod tests {
     }
 
     #[test]
-    fn print_version_contains_semver() {
+    fn print_version_prints_file_version() {
         let mut buf = Vec::new();
-        assert!(print_version(&mut buf, Palette::COLOR).is_ok());
-        assert!(String::from_utf8_lossy(&buf).contains(VERSION));
+        assert!(print_version(&mut buf, Palette::PLAIN).is_ok());
+        assert_eq!(
+            String::from_utf8_lossy(&buf),
+            format!("RX version: {}\n", version())
+        );
     }
 
     #[test]
