@@ -2,10 +2,18 @@ name: Release
 
 # Publishes one release per VERSION bump: when the tag `v<VERSION>` does not
 # exist yet, the binaries are built, packaged and attached to a new release.
+#
+# A manual run always builds (so the matrix and the action versions can be
+# validated without bumping VERSION); it only publishes when asked to.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the release when VERSION has no tag yet"
+        type: boolean
+        default: false
 
 # Publishing a release needs to write tags and releases.
 permissions:
@@ -21,7 +29,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       released: ${{ steps.tag.outputs.released }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # Tags are needed to detect an already released version.
           fetch-depth: 0
@@ -43,12 +51,14 @@ jobs:
           fi
 
       - name: Skip
-        if: steps.tag.outputs.released == 'true'
+        if: github.event_name == 'push' && steps.tag.outputs.released == 'true'
         run: echo "v$(cat VERSION) already released; bump VERSION to publish."
 
   build:
     needs: check
-    if: needs.check.outputs.released == 'false'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.check.outputs.released == 'false'
     strategy:
       fail-fast: false
       matrix:
@@ -72,7 +82,7 @@ jobs:
             test: false
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@1.99
 
@@ -107,7 +117,7 @@ jobs:
           cp "target/$TARGET/release/rx" README.md LICENSE "dist/$name/"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rx-${{ matrix.target }}
           path: dist/*.tar.gz
@@ -115,12 +125,18 @@ jobs:
 
   publish:
     needs: [check, build]
+    if: >-
+      needs.check.outputs.released == 'false' &&
+      (github.event_name == 'push' || inputs.publish)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum ./*.tar.gz > SHA256SUMS
 
       - name: Publish
         env:
@@ -129,7 +145,7 @@ jobs:
         run: |
           # No checkout in this job: name the repository explicitly so `gh`
           # does not look for a git remote.
-          gh release create "v$VERSION" dist/*.tar.gz \
+          gh release create "v$VERSION" ./dist/*.tar.gz ./dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --title "v$VERSION" \
             --generate-notes \
