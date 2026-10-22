@@ -7,7 +7,7 @@
 ### A minimal CLI to pull, stage, rebuild, and clean up your NixOS system — in one shot.
 
 [![Rust](https://img.shields.io/badge/rust-2024-edition-000?style=flat-square&logo=rust&logoColor=DEA584)](https://doc.rust-lang.org/edition-guide/rust-2024/)
-[![Tests](https://img.shields.io/badge/tests-327_passing-3FB950?style=flat-square)](./tests)
+[![Tests](https://img.shields.io/badge/tests-331_passing-3FB950?style=flat-square)](./tests)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-3FB950?style=flat-square)](./src)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-58A6FF?style=flat-square)](./Cargo.toml)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
@@ -66,9 +66,9 @@ action versions and cross targets) and only publishes when the `publish` input
 is enabled.
 
 ```bash
-gh release download v0.2.0 --pattern '*x86_64-unknown-linux-musl*'
-tar -xzf rx-v0.2.0-x86_64-unknown-linux-musl.tar.gz
-./rx-v0.2.0-x86_64-unknown-linux-musl/rx --version
+gh release download v0.3.0 --pattern '*x86_64-unknown-linux-musl*'
+tar -xzf rx-v0.3.0-x86_64-unknown-linux-musl.tar.gz
+./rx-v0.3.0-x86_64-unknown-linux-musl/rx --version
 ```
 
 ### Versioning
