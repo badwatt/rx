@@ -25,11 +25,13 @@
       forEachSystem = systems: f: lib.genAttrs systems (system: f system);
       forAllSystems = forEachSystem allSystems;
 
+      version = lib.removeSuffix "\n" (builtins.readFile ./VERSION);
+
       mkRx =
         pkgs:
         pkgs.rustPlatform.buildRustPackage {
           pname = "rx";
-          version = lib.removeSuffix "\n" (builtins.readFile ./VERSION);
+          inherit version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           postInstall = ''
@@ -40,6 +42,56 @@
             license = pkgs.lib.licenses.mit;
             mainProgram = "rx";
             platforms = pkgs.lib.platforms.unix;
+          };
+        };
+      # The desktop companion.  GPUI brings a real dependency tree, so it lives
+      # in its own crate (`gui/`) with its own lockfile; the CLI stays
+      # dependency-free and keeps its strict coverage gate.
+      mkRxUi =
+        pkgs:
+        pkgs.rustPlatform.buildRustPackage {
+          pname = "rx-ui";
+          inherit version;
+          # Keep the repository root as the source so the binary can embed the
+          # shared VERSION file; cargo itself runs in `gui/`.
+          src = ./.;
+          cargoRoot = "gui";
+          # `cargoRoot` only redirects the lockfile/vendor paths; the build,
+          # check and install hooks need the subdirectory too.
+          buildAndTestSubdir = "gui";
+          cargoLock.lockFile = ./gui/Cargo.lock;
+
+          nativeBuildInputs = [
+            pkgs.makeWrapper
+            pkgs.pkg-config
+          ];
+          buildInputs = with pkgs; [
+            fontconfig
+            freetype
+            libx11
+            libxcb
+            libxcursor
+            libxi
+            libxkbcommon
+            libxrandr
+            wayland
+            wayland-protocols
+            vulkan-loader
+          ];
+
+          # Blade dlopens the Vulkan loader, so patchelf cannot record it.
+          postFixup = ''
+            wrapProgram $out/bin/rx-ui \
+              --prefix LD_LIBRARY_PATH : ${
+                pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.libxkbcommon ]
+              }
+          '';
+
+          meta = {
+            description = "Desktop companion for rx, the NixOS update CLI";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "rx-ui";
+            platforms = pkgs.lib.platforms.linux;
           };
         };
     in
@@ -54,6 +106,7 @@
           # e.g. nix build .#rx  (or plain: nix build)
           default = rx;
           rx = rx;
+          rx-ui = mkRxUi pkgs;
         }
       );
 
@@ -105,6 +158,19 @@
             rust-analyzer
             cargo-llvm-cov
             llvm
+            pkg-config
+            # `gui/` (GPUI) links against these at build time.
+            fontconfig
+            freetype
+            libx11
+            libxcb
+            libxcursor
+            libxi
+            libxkbcommon
+            libxrandr
+            wayland
+            wayland-protocols
+            vulkan-loader
           ];
         in
         {
