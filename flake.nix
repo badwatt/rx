@@ -79,8 +79,13 @@
             vulkan-loader
           ];
 
-          # Blade dlopens the Vulkan loader, so patchelf cannot record it.
+          # Blade dlopens the Vulkan loader and the Wayland client.  A RUNPATH
+          # covers dlopen too, so a copy of the ELF keeps working on this
+          # machine; the wrapper keeps it working when the environment is odd.
           postFixup = ''
+            patchelf --add-rpath ${
+              pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.libxkbcommon pkgs.wayland ]
+            } $out/bin/rxui
             wrapProgram $out/bin/rxui \
               --prefix LD_LIBRARY_PATH : ${
                 pkgs.lib.makeLibraryPath [
