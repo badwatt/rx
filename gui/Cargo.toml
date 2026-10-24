@@ -1,0 +1,24 @@
+[package]
+name = "rx-ui"
+# Placeholder: the real version lives in the repository-root VERSION file.
+version = "0.0.0"
+edition = "2024"
+description = "Desktop companion for rx, the NixOS update CLI"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "rx-ui"
+path = "src/main.rs"
+
+[lints.clippy]
+pedantic = "warn"
+
+[dependencies]
+gpui = "0.2.2"
+
+# gpui -> gpui_http_client -> zed-async-tar -> xattr 0.2.3, which references
+# `libc::ENOATTR`.  Linux reports a missing xattr as ENODATA, so the vendored
+# copy maps it there.  Drop this patch once upstream ships xattr >= 1.
+[patch.crates-io]
+xattr = { path = "vendor/xattr" }
