@@ -79,21 +79,17 @@
             vulkan-loader
           ];
 
-          # Blade dlopens the Vulkan loader and the Wayland client.  A RUNPATH
-          # covers dlopen too, so a copy of the ELF keeps working on this
-          # machine; the wrapper keeps it working when the environment is odd.
+          # Blade dlopens the Wayland client and the Vulkan loader, so patchelf
+          # cannot record them: wayland and xkbcommon go in the RUNPATH (which
+          # also covers dlopen).  The Vulkan loader must stay the system one —
+          # NixOS exports /run/opengl-driver/lib, whose ICDs are built against
+          # that driver — so it is only appended as a fallback.
           postFixup = ''
             patchelf --add-rpath ${
-              pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.libxkbcommon pkgs.wayland ]
+              pkgs.lib.makeLibraryPath [ pkgs.libxkbcommon pkgs.wayland ]
             } $out/bin/rxui
             wrapProgram $out/bin/rxui \
-              --prefix LD_LIBRARY_PATH : ${
-                pkgs.lib.makeLibraryPath [
-                  pkgs.vulkan-loader
-                  pkgs.libxkbcommon
-                  pkgs.wayland
-                ]
-              }
+              --suffix LD_LIBRARY_PATH : ${pkgs.vulkan-loader}/lib
           '';
 
           meta = {
