@@ -137,8 +137,11 @@ src/
   field and runs `sudo -S -p '' -v` — password on **stdin only** (never argv,
   never the environment, both readable through `/proc`), the `String` cleared
   as soon as sudo consumed it, wrong password keeps the phase and offers a
-  retry. The rebuild itself still runs through `rx`, reusing the cached
-  timestamp.
+  retry. Because a rebuild can outlive `timestamp_timeout`, the stash is also
+  handed to `sudo` through `SUDO_ASKPASS` (`rxui --askpass` prints the secret)
+  and a keepalive thread refreshes the timestamp with `sudo -n -v` every
+  minute while the pipeline runs; the file (`$XDG_RUNTIME_DIR`, 0600) is
+  removed when the run ends. The rebuild itself still runs through `rx`.
 - **Vendored `xattr`.** `gui/vendor/xattr` is xattr 0.2.3 with `ENOATTR` mapped
   to `ENODATA` on Linux (gpui → gpui_http_client → zed-async-tar pulls it).
   Remove the `[patch.crates-io]` entry once upstream ships xattr >= 1.

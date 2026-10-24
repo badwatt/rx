@@ -75,6 +75,8 @@ pub(crate) struct RxApp {
     auth: String,
     auth_error: bool,
     auth_busy: bool,
+    /// Stashed password for `sudo`'s askpass helper, removed after the run.
+    askpass: Option<std::path::PathBuf>,
     focus: FocusHandle,
     /// Why the last run could not start, or why a step failed.
     error: Option<String>,
@@ -107,6 +109,7 @@ impl RxApp {
             auth: String::new(),
             auth_error: false,
             auth_busy: false,
+            askpass: None,
             focus: cx.focus_handle(),
             error: None,
             feed: None,
@@ -222,7 +225,7 @@ impl RxApp {
         self.phase = Phase::Running;
         let (tx, rx) = std::sync::mpsc::channel();
         self.feed = Some(rx);
-        pipeline::run_all(self.cfg.clone(), binary, tx);
+        pipeline::run_all(self.cfg.clone(), binary, self.askpass.take(), tx);
         cx.notify();
     }
 
@@ -239,6 +242,7 @@ impl RxApp {
         if ok {
             self.auth_error = false;
             self.root_ready = true;
+            self.askpass = pipeline::stash_secret(&self.auth);
             self.begin(window, cx);
         } else {
             self.auth_error = true;

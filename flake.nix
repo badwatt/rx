@@ -87,6 +87,7 @@
             install -Dm644 ${./gui/assets/rxui.svg} $out/share/icons/hicolor/scalable/apps/$id.svg
             install -Dm644 ${./gui/assets/io.github.badwatt.rxui.png} $out/share/icons/hicolor/256x256/apps/$id.png
             install -Dm644 ${./gui/io.github.badwatt.rxui.metainfo.xml} $out/share/metainfo/$id.metainfo.xml
+            substituteInPlace $out/share/metainfo/$id.metainfo.xml --replace-fail '@VERSION@' ${version}
           '';
 
           # Blade dlopens the Wayland client and the Vulkan loader, so patchelf

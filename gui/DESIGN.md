@@ -68,7 +68,9 @@ are bundled under the OFL. Scale: 30 px headline, 12.5 px body, 10.5 px console,
   sudo is handled, what staging does, what cleanup keeps.
 - **Auth** replaces the primary action with a masked password field, an
   "Unlock" action, and "used once, never stored" as the only reassurance it
-  needs. A wrong password shakes the border red and keeps the phase.
+  needs. A wrong password marks the border red and keeps the phase. The secret
+  is used once (`sudo -S -v`), stashed only for `sudo`'s askpass helper so a
+  long rebuild never prompts with no terminal, and deleted when the run ends.
 - **Failed** names the step ("Rebuild failed"), says the pipeline stopped before
   cleanup, and states the running generation is untouched.
 - **CLI missing** is surfaced in the status line and blocks the primary action.

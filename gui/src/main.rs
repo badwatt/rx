@@ -3,6 +3,7 @@
 //! Owns only the presentation: the NixOS workflow itself lives in the `rx`
 //! CLI, which this binary supervises step by step.
 
+mod askpass;
 mod pipeline;
 mod theme;
 mod ui;
@@ -24,6 +25,10 @@ const FONTS: [&[u8]; 5] = [
 ];
 
 fn main() {
+    // `sudo` invokes this binary with SUDO_ASKPASS when it needs a password.
+    if std::env::args().any(|arg| arg == "--askpass") {
+        std::process::exit(i32::from(askpass::run() != std::process::ExitCode::SUCCESS));
+    }
     Application::new().run(|cx: &mut App| {
         // Bundled faces keep the composition identical on every machine.
         let text_system = cx.text_system();

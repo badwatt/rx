@@ -9,6 +9,8 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
@@ -259,34 +261,109 @@ pub(crate) fn authenticate(password: &str) -> bool {
     child.wait().is_ok_and(|status| status.success())
 }
 
+/// Stash the password for `sudo`'s askpass helper.
+///
+/// Prefers `$XDG_RUNTIME_DIR` (tmpfs, per-user); falls back to the temp dir.
+/// The file is `0600` and removed as soon as the run finishes.
+pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
+    let dir = std::env::var_os("XDG_RUNTIME_DIR").map_or_else(std::env::temp_dir, PathBuf::from);
+    let path = dir.join(format!("rxui-sudo-{}", std::process::id()));
+    let mut file = std::fs::File::create(&path).ok()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).ok()?;
+    }
+    file.write_all(password.as_bytes()).ok()?;
+    file.flush().ok()?;
+    Some(path)
+}
+
+/// Keep the sudo timestamp alive while a long rebuild runs.
+///
+/// `sudo -n -v` refreshes it without a password; without this a rebuild that
+/// outlives `timestamp_timeout` makes the nested `sudo nixos-rebuild` prompt
+/// again — with no terminal to answer it.
+struct KeepAlive {
+    stop: Arc<AtomicBool>,
+}
+
+impl KeepAlive {
+    fn start() -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let flag = stop.clone();
+        std::thread::spawn(move || {
+            while !flag.load(Ordering::Relaxed) {
+                let _ = Command::new("sudo")
+                    .args(["-n", "-v"])
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+                for _ in 0..600 {
+                    if flag.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+            }
+        });
+        Self { stop }
+    }
+}
+
+impl Drop for KeepAlive {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
 /// Run every planned step in order, reporting to `tx`.
-pub(crate) fn run_all(cfg: RunConfig, binary: PathBuf, tx: Sender<Msg>) {
+pub(crate) fn run_all(cfg: RunConfig, binary: PathBuf, askpass: Option<PathBuf>, tx: Sender<Msg>) {
     std::thread::spawn(move || {
         let total = Instant::now();
+        let keepalive = askpass.as_ref().map(|_| KeepAlive::start());
         let mut all_ok = true;
         for step in cfg.plan() {
             let _ = tx.send(Msg::Started(step));
             let started = Instant::now();
-            let ok = run_step(&cfg, step, &binary, &tx);
+            let ok = run_step(&cfg, step, &binary, askpass.as_deref(), &tx);
             let _ = tx.send(Msg::Finished(step, ok, started.elapsed()));
             if !ok {
                 all_ok = false;
                 break;
             }
         }
+        drop(keepalive);
+        if let Some(path) = &askpass {
+            let _ = std::fs::remove_file(path);
+        }
         let _ = tx.send(Msg::Done(all_ok, total.elapsed()));
     });
 }
 
 /// Run a single `rx --only <step>` and stream its output.
-fn run_step(cfg: &RunConfig, step: Step, binary: &PathBuf, tx: &Sender<Msg>) -> bool {
-    let spawned = Command::new(binary)
+fn run_step(
+    cfg: &RunConfig,
+    step: Step,
+    binary: &PathBuf,
+    askpass: Option<&std::path::Path>,
+    tx: &Sender<Msg>,
+) -> bool {
+    let mut command = Command::new(binary);
+    command
         .args(cfg.rx_args(step))
         .env("NO_COLOR", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+        .stderr(Stdio::piped());
+    // Without a terminal, sudo asks this helper instead of hanging.
+    if let (Some(path), Ok(exe)) = (askpass, std::env::current_exe()) {
+        command
+            .env("SUDO_ASKPASS", exe)
+            .env(crate::askpass::FILE_VAR, path);
+    }
+    let spawned = command.spawn();
     let mut child = match spawned {
         Ok(child) => child,
         Err(error) => {
