@@ -83,7 +83,11 @@
           postFixup = ''
             wrapProgram $out/bin/rxui \
               --prefix LD_LIBRARY_PATH : ${
-                pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.libxkbcommon ]
+                pkgs.lib.makeLibraryPath [
+                  pkgs.vulkan-loader
+                  pkgs.libxkbcommon
+                  pkgs.wayland
+                ]
               }
           '';
 
