@@ -120,6 +120,42 @@ src/
 - **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
 - **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
 
+## Desktop surface (`gui/`)
+
+- **Separate crate, never a workspace member.** `gui/` is the `rx-ui` package
+  with its own `Cargo.lock`, so the CLI keeps zero dependencies and the root
+  `cargo fmt/clippy/test/coverage` commands never see the GUI. CI still only
+  builds `rx`; `nix build .#rx-ui` is the packaging gate for the app.
+- **The GUI supervises the CLI.** One `rx --only <step> --yes --no-color`
+  process per step, in pipeline order, stopping on the first failure. The
+  workflow, its argv and its validation stay in `rx`; the app only decides when
+  a step runs and renders stdout/stderr. Do not re-implement steps in the GUI.
+- **One explicit confirmation.** A sheet lists the exact commands; `--yes` is
+  passed only after it. Cancelling runs nothing.
+- **Root access.** `sudo -n true` is checked before a real rebuild. If the
+  timestamp is stale the app stops in an `Auth` phase and asks for `sudo -v`
+  plus Retry — never a password prompt of its own, never a sudo call that
+  fails inside a pipe.
+- **Vendored `xattr`.** `gui/vendor/xattr` is xattr 0.2.3 with `ENOATTR` mapped
+  to `ENODATA` on Linux (gpui → gpui_http_client → zed-async-tar pulls it).
+  Remove the `[patch.crates-io]` entry once upstream ships xattr >= 1.
+- **Packaged fonts.** Inter and JetBrains Mono live in `gui/assets/fonts`
+  under the OFL and are registered at startup, so the composition does not
+  depend on what the host has installed.
+- **Design contract**: `gui/DESIGN.md` (tokens in `gui/src/theme.rs`). Operate
+  surface: ink canvas, one aurora accent for progress, mono for the machine's
+  voice, hairlines, no extra chrome.
+- **Tests**: the GUI is outside the 100 % coverage gate. Its unit tests cover
+  the parts that can be wrong without a window (argv building, plan selection,
+  output cleaning, ANSI stripping, duration formatting). Anything visual is
+  verified by screenshot.
+- **Headless visual QA**: `Xvfb :N -screen 0 1080x760x24 -fbdir DIR`, run the
+  app, then parse `DIR/Xvfb_screen0` (XWD, 32-bit ARGB, `off = len - bpl * h`);
+  `xwd`/ImageMagick return blank frames under llvmpipe. Point
+  `VK_ICD_FILENAMES` at `lvp_icd.x86_64.json`.
+- **Never drive the real workflow in a demo or test**: put a fake `rx` script
+  first on `PATH`, or use `--dry-run`.
+
 ## Build / packaging
 
 - `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).

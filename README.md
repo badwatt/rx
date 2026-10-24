@@ -16,6 +16,31 @@
 
 ---
 
+## 🖥️ Desktop app
+
+`gui/` builds `rx-ui`, a GPUI desktop companion for the CLI. It supervises the
+installed `rx` one step at a time (`rx --only <step> --yes --no-color`), so the
+workflow, its argv and its validation stay in `rx` — the GUI only decides when
+a step runs and renders what it writes.
+
+<img src="gui/assets/rx-ui.png" alt="rx-ui" width="900"/>
+
+```bash
+nix run .#rx-ui                                  # from this flake
+nix build .#rx-ui && ./result/bin/rx-ui          # or build it
+cd gui && nix develop .. --command cargo run     # hack on it
+```
+
+- Pipeline on the left, live output in the middle, one explicit confirmation
+  before anything touches the system.
+- `update` and `diff` are opt-in toggles; `dry run` prints commands instead of
+  running them.
+- The rebuild needs root. `rx-ui` checks `sudo -n true` first and stops in an
+  auth state rather than letting `sudo` fail inside a pipe: run `sudo -v` once,
+  then Retry.
+- Inter and JetBrains Mono ship with the app (OFL), so the composition is
+  identical on every machine.
+
 ## ✨ What it does
 
 `rx` automates the full NixOS update cycle:
