@@ -1,5 +1,5 @@
 [package]
-name = "rx-ui"
+name = "rxui"
 # Placeholder: the real version lives in the repository-root VERSION file.
 version = "0.0.0"
 edition = "2024"
@@ -8,7 +8,7 @@ license = "MIT"
 publish = false
 
 [[bin]]
-name = "rx-ui"
+name = "rxui"
 path = "src/main.rs"
 
 [lints.clippy]

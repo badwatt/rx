@@ -1,4 +1,4 @@
-//! rx-ui — the desktop companion for `rx`.
+//! rxui — the desktop companion for `rx`.
 //!
 //! Owns only the presentation: the NixOS workflow itself lives in the `rx`
 //! CLI, which this binary supervises step by step.

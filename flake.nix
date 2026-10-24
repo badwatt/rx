@@ -50,7 +50,7 @@
       mkRxUi =
         pkgs:
         pkgs.rustPlatform.buildRustPackage {
-          pname = "rx-ui";
+          pname = "rxui";
           inherit version;
           # Keep the repository root as the source so the binary can embed the
           # shared VERSION file; cargo itself runs in `gui/`.
@@ -81,7 +81,7 @@
 
           # Blade dlopens the Vulkan loader, so patchelf cannot record it.
           postFixup = ''
-            wrapProgram $out/bin/rx-ui \
+            wrapProgram $out/bin/rxui \
               --prefix LD_LIBRARY_PATH : ${
                 pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.libxkbcommon ]
               }
@@ -90,7 +90,7 @@
           meta = {
             description = "Desktop companion for rx, the NixOS update CLI";
             license = pkgs.lib.licenses.mit;
-            mainProgram = "rx-ui";
+            mainProgram = "rxui";
             platforms = pkgs.lib.platforms.linux;
           };
         };
@@ -106,7 +106,7 @@
           # e.g. nix build .#rx  (or plain: nix build)
           default = rx;
           rx = rx;
-          rx-ui = mkRxUi pkgs;
+          rxui = mkRxUi pkgs;
         }
       );
 

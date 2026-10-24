@@ -1,4 +1,4 @@
-# DESIGN.md — rx-ui
+# DESIGN.md — rxui
 
 The desktop surface for `rx`. **Mode: Operate** — the visitor completes a task;
 scanability, confidence and a calm hand outrank expression. Brand lives in the

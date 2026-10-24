@@ -4552,7 +4552,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rx-ui"
+name = "rxui"
 version = "0.0.0"
 dependencies = [
  "gpui",

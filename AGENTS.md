@@ -122,10 +122,10 @@ src/
 
 ## Desktop surface (`gui/`)
 
-- **Separate crate, never a workspace member.** `gui/` is the `rx-ui` package
+- **Separate crate, never a workspace member.** `gui/` is the `rxui` package
   with its own `Cargo.lock`, so the CLI keeps zero dependencies and the root
   `cargo fmt/clippy/test/coverage` commands never see the GUI. CI still only
-  builds `rx`; `nix build .#rx-ui` is the packaging gate for the app.
+  builds `rx`; `nix build .#rxui` is the packaging gate for the app.
 - **The GUI supervises the CLI.** One `rx --only <step> --yes --no-color`
   process per step, in pipeline order, stopping on the first failure. The
   workflow, its argv and its validation stay in `rx`; the app only decides when
