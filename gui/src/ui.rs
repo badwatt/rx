@@ -16,7 +16,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
-use gpui::{Context, Div, IntoElement, Render, Window, div, px, rgb};
+use gpui::{Context, Div, FocusHandle, IntoElement, KeyDownEvent, Render, Window, div, px, rgb};
 
 use crate::pipeline::{self, LineKind, Msg, RunConfig, Step};
 use crate::theme as t;
@@ -71,13 +71,18 @@ pub(crate) struct RxApp {
     system: (Option<String>, Option<String>),
     /// Newest system generations, current first.
     generations: Vec<Generation>,
+    /// Password being typed for `sudo -v`; cleared as soon as it is used.
+    auth: String,
+    auth_error: bool,
+    auth_busy: bool,
+    focus: FocusHandle,
     /// Why the last run could not start, or why a step failed.
     error: Option<String>,
     feed: Option<Receiver<Msg>>,
 }
 
 impl RxApp {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(cx: &mut Context<Self>) -> Self {
         let cfg = RunConfig::default();
         let rows = cfg
             .plan()
@@ -99,6 +104,10 @@ impl RxApp {
             root_ready: pipeline::root_is_ready(),
             system: system_identity(),
             generations: recent_generations(4),
+            auth: String::new(),
+            auth_error: false,
+            auth_busy: false,
+            focus: cx.focus_handle(),
             error: None,
             feed: None,
         }
@@ -181,7 +190,7 @@ impl RxApp {
         cx.notify();
     }
 
-    fn begin(&mut self, cx: &mut Context<Self>) {
+    fn begin(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(binary) = self.rx_binary.clone() else {
             self.phase = Phase::Failed;
             self.error = Some(String::from(
@@ -192,6 +201,7 @@ impl RxApp {
         };
         if self.cfg.needs_root() && !self.cfg.dry_run && !pipeline::root_is_ready() {
             self.phase = Phase::Auth;
+            window.focus(&self.focus);
             cx.notify();
             return;
         }
@@ -216,14 +226,124 @@ impl RxApp {
         cx.notify();
     }
 
-    /// Re-check the sudo timestamp after the visitor authenticated elsewhere.
-    fn retry_auth(&mut self, cx: &mut Context<Self>) {
-        self.root_ready = pipeline::root_is_ready();
-        if self.root_ready {
-            self.begin(cx);
+    /// Validate the typed password through `sudo -v`, then start.
+    fn submit_password(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.auth.is_empty() || self.auth_busy {
+            return;
+        }
+        self.auth_busy = true;
+        let ok = pipeline::authenticate(&self.auth);
+        // Never keep the secret around once sudo has consumed it.
+        self.auth.clear();
+        self.auth_busy = false;
+        if ok {
+            self.auth_error = false;
+            self.root_ready = true;
+            self.begin(window, cx);
         } else {
+            self.auth_error = true;
+            window.focus(&self.focus);
             cx.notify();
         }
+    }
+
+    fn on_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match event.keystroke.key.as_ref() {
+            "enter" => self.submit_password(window, cx),
+            "escape" => {
+                self.auth.clear();
+                self.phase = Phase::Idle;
+                cx.notify();
+            }
+            "backspace" => {
+                self.auth.pop();
+                self.auth_error = false;
+                cx.notify();
+            }
+            _ => {
+                if let Some(text) = event.keystroke.key_char.as_ref()
+                    && !text.chars().any(char::is_control)
+                    && self.auth.len() + text.len() <= 64
+                {
+                    self.auth.push_str(text);
+                    self.auth_error = false;
+                    cx.notify();
+                }
+            }
+        }
+    }
+
+    /// Masked password field plus the unlock action.
+    fn auth_row(&self, cx: &mut Context<Self>) -> Div {
+        let border = if self.auth_error {
+            t::RED
+        } else if self.auth_busy {
+            t::AMBER
+        } else {
+            t::LINE
+        };
+        div()
+            .mt(px(12.))
+            .flex()
+            .items_center()
+            .gap(px(10.))
+            .child(
+                div()
+                    .id("password")
+                    .track_focus(&self.focus)
+                    .w(px(240.))
+                    .h(px(38.))
+                    .px(px(12.))
+                    .rounded(px(9.))
+                    .border_1()
+                    .border_color(rgb(border))
+                    .bg(rgb(t::INK_SUNKEN))
+                    .flex()
+                    .items_center()
+                    .font_family(t::MONO)
+                    .text_size(px(13.))
+                    .text_color(rgb(t::TEXT))
+                    .child(if self.auth.is_empty() {
+                        div().text_color(rgb(t::FAINT)).child("sudo password")
+                    } else {
+                        div().child("•".repeat(self.auth.chars().count()))
+                    })
+                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                        this.on_key(event, window, cx);
+                    })),
+            )
+            .child(
+                div()
+                    .id("unlock")
+                    .h(px(38.))
+                    .px(px(18.))
+                    .rounded(px(9.))
+                    .bg(t::aurora())
+                    .flex()
+                    .items_center()
+                    .text_size(px(12.5))
+                    .font_weight(t::SEMIBOLD)
+                    .text_color(rgb(0x07101C))
+                    .cursor_pointer()
+                    .hover(|style| style.opacity(0.92))
+                    .on_click(cx.listener(|this, _, window, cx| this.submit_password(window, cx)))
+                    .child(if self.auth_busy {
+                        "Checking…"
+                    } else {
+                        "Unlock"
+                    }),
+            )
+            .child(
+                div()
+                    .font_family(t::MONO)
+                    .text_size(px(10.))
+                    .text_color(rgb(if self.auth_error { t::RED } else { t::FAINT }))
+                    .child(if self.auth_error {
+                        "wrong password"
+                    } else {
+                        "used once, never stored"
+                    }),
+            )
     }
 
     fn reset(&mut self, cx: &mut Context<Self>) {
@@ -596,7 +716,9 @@ impl RxApp {
                     "the pipeline stopped before cleanup; your running generation is untouched",
                 )
             }),
-            Phase::Auth => String::from("sudo needs a timestamp; authenticate once and retry"),
+            Phase::Auth => {
+                String::from("the rebuild runs as root — enter your password, or press Esc")
+            }
             _ => format!(
                 "{} · {} · stages, rebuilds, then prunes old generations",
                 self.cfg.repo, self.cfg.hostname
@@ -627,8 +749,16 @@ impl RxApp {
                     .flex()
                     .items_end()
                     .justify_between()
-                    .child(self.primary_action(cx))
-                    .child(self.ghost_toggles(cx)),
+                    .child(if self.phase == Phase::Auth {
+                        self.auth_row(cx).into_any_element()
+                    } else {
+                        self.primary_action(cx).into_any_element()
+                    })
+                    .child(if self.phase == Phase::Auth {
+                        div().into_any_element()
+                    } else {
+                        self.ghost_toggles(cx).into_any_element()
+                    }),
             )
     }
 
@@ -647,7 +777,7 @@ impl RxApp {
             Phase::Running => (String::from("Working"), false),
             Phase::Done => (String::from("Run again"), true),
             Phase::Failed => (String::from("Try again"), true),
-            Phase::Auth => (String::from("Retry"), true),
+            Phase::Auth => (String::from("Unlock"), true),
             _ => (String::from("Run update"), true),
         };
         let button = div()
@@ -675,8 +805,8 @@ impl RxApp {
             .cursor_pointer()
             .hover(|style| style.opacity(0.92))
             .active(|style| style.opacity(0.82))
-            .on_click(cx.listener(|this, _, _, cx| match this.phase {
-                Phase::Auth => this.retry_auth(cx),
+            .on_click(cx.listener(|this, _, window, cx| match this.phase {
+                Phase::Auth => this.begin(window, cx),
                 Phase::Done | Phase::Failed => this.reset(cx),
                 _ => this.request_run(cx),
             }))
@@ -994,7 +1124,7 @@ impl RxApp {
                             .cursor_pointer()
                             .hover(|style| style.opacity(0.92))
                             .active(|style| style.opacity(0.82))
-                            .on_click(cx.listener(|this, _, _, cx| this.begin(cx)))
+                            .on_click(cx.listener(|this, _, window, cx| this.begin(window, cx)))
                             .child("Start"),
                     ),
             )

@@ -35,9 +35,10 @@ cd gui && nix develop .. --command cargo run     # hack on it
   before anything touches the system.
 - `update` and `diff` are opt-in toggles; `dry run` prints commands instead of
   running them.
-- The rebuild needs root. `rxui` checks `sudo -n true` first and stops in an
-  auth state rather than letting `sudo` fail inside a pipe: run `sudo -v` once,
-  then Retry.
+- The rebuild needs root. `rxui` checks `sudo -n true` first and, when the
+  timestamp is stale, asks for the sudo password in a masked field (`sudo -S
+  -v`, stdin only, cleared immediately) — never a password prompt that
+  `nixos-rebuild` had to answer inside a pipe.
 - Inter and JetBrains Mono ship with the app (OFL), so the composition is
   identical on every machine.
 

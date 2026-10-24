@@ -6,7 +6,7 @@
 //! commands exactly as shipped.  The GUI only decides *when* a step runs and
 //! renders what the step wrote to stdout/stderr.
 
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::mpsc::Sender;
@@ -236,6 +236,27 @@ pub(crate) fn root_is_ready() -> bool {
         .stderr(Stdio::null())
         .status()
         .is_ok_and(|status| status.success())
+}
+
+/// Validate the sudo timestamp with `sudo -S -p '' -v`.
+///
+/// The password travels on stdin only: never in argv, never in the
+/// environment, both of which are world-readable through `/proc`.
+pub(crate) fn authenticate(password: &str) -> bool {
+    let spawned = Command::new("sudo")
+        .args(["-S", "-p", "", "-v"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    let Ok(mut child) = spawned else {
+        return false;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(password.as_bytes());
+        let _ = stdin.write_all(b"\n");
+    }
+    child.wait().is_ok_and(|status| status.success())
 }
 
 /// Run every planned step in order, reporting to `tx`.
@@ -510,7 +531,10 @@ mod tests {
             ..RunConfig::default()
         };
         assert_eq!(cfg.command(Step::Pull), "git pull --ff-only");
-        assert_eq!(cfg.command(Step::Rebuild), "nixos-rebuild switch --flake .#host");
+        assert_eq!(
+            cfg.command(Step::Rebuild),
+            "nixos-rebuild switch --flake .#host"
+        );
         assert!(cfg.command(Step::Cleanup).contains("+7"));
     }
 

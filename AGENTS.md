@@ -133,9 +133,12 @@ src/
 - **One explicit confirmation.** A sheet lists the exact commands; `--yes` is
   passed only after it. Cancelling runs nothing.
 - **Root access.** `sudo -n true` is checked before a real rebuild. If the
-  timestamp is stale the app stops in an `Auth` phase and asks for `sudo -v`
-  plus Retry — never a password prompt of its own, never a sudo call that
-  fails inside a pipe.
+  timestamp is stale the app stops in an `Auth` phase with a masked password
+  field and runs `sudo -S -p '' -v` — password on **stdin only** (never argv,
+  never the environment, both readable through `/proc`), the `String` cleared
+  as soon as sudo consumed it, wrong password keeps the phase and offers a
+  retry. The rebuild itself still runs through `rx`, reusing the cached
+  timestamp.
 - **Vendored `xattr`.** `gui/vendor/xattr` is xattr 0.2.3 with `ENOATTR` mapped
   to `ENODATA` on Linux (gpui → gpui_http_client → zed-async-tar pulls it).
   Remove the `[patch.crates-io]` entry once upstream ships xattr >= 1.

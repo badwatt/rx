@@ -66,7 +66,9 @@ are bundled under the OFL. Scale: 30 px headline, 12.5 px body, 10.5 px console,
 
 - **Idle console** lists the plan as commands, then three notes: what runs, how
   sudo is handled, what staging does, what cleanup keeps.
-- **Auth** replaces the primary action and explains `sudo -v` + Retry.
+- **Auth** replaces the primary action with a masked password field, an
+  "Unlock" action, and "used once, never stored" as the only reassurance it
+  needs. A wrong password shakes the border red and keeps the phase.
 - **Failed** names the step ("Rebuild failed"), says the pipeline stopped before
   cleanup, and states the running generation is untouched.
 - **CLI missing** is surfaced in the status line and blocks the primary action.

@@ -32,7 +32,7 @@ fn main() {
         }
 
         let bounds = Bounds::new(gpui::point(px(40.), px(40.)), size(px(1080.), px(760.)));
-        let app = cx.new(|_| RxApp::new());
+        let app = cx.new(RxApp::new);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
