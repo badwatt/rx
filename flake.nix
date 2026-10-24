@@ -79,6 +79,13 @@
             vulkan-loader
           ];
 
+          # Desktop entry + icon, so the app launches without a terminal and
+          # shows up in launchers once the package is installed.
+          postInstall = ''
+            install -Dm644 ${./gui/rxui.desktop} $out/share/applications/rxui.desktop
+            install -Dm644 ${./gui/assets/rxui.png} $out/share/icons/hicolor/256x256/apps/rxui.png
+          '';
+
           # Blade dlopens the Wayland client and the Vulkan loader, so patchelf
           # cannot record them: wayland and xkbcommon go in the RUNPATH (which
           # also covers dlopen).  The Vulkan loader must stay the system one —

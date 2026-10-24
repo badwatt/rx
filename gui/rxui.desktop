@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=rx
+GenericName=System Update
+Comment=Update the NixOS system: pull, stage, rebuild, clean up
+Exec=rxui
+Icon=rxui
+Terminal=false
+Categories=System;Settings;PackageManager;
+Keywords=nixos;update;rebuild;flake;system;
+StartupNotify=true
+StartupWMClass=rxui
