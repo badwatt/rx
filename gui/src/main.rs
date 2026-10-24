@@ -37,6 +37,13 @@ fn main() {
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(880.), px(620.))),
+                // Reverse-DNS identity, shared with the desktop entry and the
+                // AppStream metainfo so launchers can group the window.
+                app_id: Some(String::from("io.github.badwatt.rxui")),
+                titlebar: Some(gpui::TitlebarOptions {
+                    title: Some("rx — System Update".into()),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             |_, _cx| app.clone(),

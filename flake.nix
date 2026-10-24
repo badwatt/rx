@@ -82,8 +82,11 @@
           # Desktop entry + icon, so the app launches without a terminal and
           # shows up in launchers once the package is installed.
           postInstall = ''
-            install -Dm644 ${./gui/rxui.desktop} $out/share/applications/rxui.desktop
-            install -Dm644 ${./gui/assets/rxui.png} $out/share/icons/hicolor/256x256/apps/rxui.png
+            id=io.github.badwatt.rxui
+            install -Dm644 ${./gui/io.github.badwatt.rxui.desktop} $out/share/applications/$id.desktop
+            install -Dm644 ${./gui/assets/rxui.svg} $out/share/icons/hicolor/scalable/apps/$id.svg
+            install -Dm644 ${./gui/assets/io.github.badwatt.rxui.png} $out/share/icons/hicolor/256x256/apps/$id.png
+            install -Dm644 ${./gui/io.github.badwatt.rxui.metainfo.xml} $out/share/metainfo/$id.metainfo.xml
           '';
 
           # Blade dlopens the Wayland client and the Vulkan loader, so patchelf
@@ -103,6 +106,8 @@
             description = "Desktop companion for rx, the NixOS update CLI";
             license = pkgs.lib.licenses.mit;
             mainProgram = "rxui";
+            # Lets nixpkgs/desktop tooling find the bundled entry.
+            desktopFileName = "io.github.badwatt.rxui";
             platforms = pkgs.lib.platforms.linux;
           };
         };
