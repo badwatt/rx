@@ -236,13 +236,17 @@ impl RxApp {
         }
         self.auth_busy = true;
         let ok = pipeline::authenticate(&self.auth);
+        // Hand the secret to sudo's askpass helper before dropping it: a
+        // rebuild can outlive the timestamp and there is no terminal to
+        // answer a second prompt.
+        let stashed = ok.then(|| pipeline::stash_secret(&self.auth));
         // Never keep the secret around once sudo has consumed it.
         self.auth.clear();
         self.auth_busy = false;
         if ok {
             self.auth_error = false;
             self.root_ready = true;
-            self.askpass = pipeline::stash_secret(&self.auth);
+            self.askpass = stashed.flatten();
             self.begin(window, cx);
         } else {
             self.auth_error = true;
@@ -351,6 +355,9 @@ impl RxApp {
     }
 
     fn reset(&mut self, cx: &mut Context<Self>) {
+        if let Some(path) = self.askpass.take() {
+            let _ = std::fs::remove_file(&path);
+        }
         self.phase = Phase::Idle;
         self.started = None;
         self.elapsed = None;

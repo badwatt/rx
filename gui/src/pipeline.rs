@@ -268,12 +268,16 @@ pub(crate) fn authenticate(password: &str) -> bool {
 pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
     let dir = std::env::var_os("XDG_RUNTIME_DIR").map_or_else(std::env::temp_dir, PathBuf::from);
     let path = dir.join(format!("rxui-sudo-{}", std::process::id()));
-    let mut file = std::fs::File::create(&path).ok()?;
+    // Create the file at 0600 from the first byte: no window where the
+    // secret is world-readable.
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).ok()?;
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
     }
+    let mut file = options.open(&path).ok()?;
     file.write_all(password.as_bytes()).ok()?;
     file.flush().ok()?;
     Some(path)
@@ -598,6 +602,23 @@ mod tests {
         assert!(args.contains(&String::from("pull")));
         assert!(args.contains(&String::from("--yes")));
         assert!(args.contains(&String::from("/tmp/dotfiles")));
+    }
+
+    #[test]
+    fn stash_secret_keeps_the_secret_owner_readable_only() {
+        let path = stash_secret("hunter2").expect("stash");
+        assert_eq!(std::fs::read_to_string(&path).expect("read"), "hunter2");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path)
+                .expect("metadata")
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(mode, 0o600);
+        }
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
