@@ -114,12 +114,38 @@
         };
     in
     {
-      # GUI-friendly sudoers: one timestamp for the whole user, so the password
-      # entered once in the app also covers the nested `sudo` of the rebuild.
+      # Opt-in desktop surface: `programs.rxui.enable = true;` installs the CLI
+      # and the app and gives sudo one timestamp per user, so the password
+      # entered once also covers the nested sudo of the rebuild.
       nixosModules.default =
-        { ... }:
+        { config, lib, pkgs, ... }:
+        let
+          cfg = config.programs.rxui;
+          system = pkgs.stdenv.hostPlatform.system;
+        in
         {
-          security.sudo.extraConfig = "Defaults timestamp_type=global";
+          options.programs.rxui = {
+            enable = lib.mkEnableOption "the rx NixOS system updater";
+
+            globalSudoTimestamp = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = ''
+                Set `Defaults timestamp_type=global` so a GUI-entered sudo
+                password also covers the nested sudo of nixos-rebuild.
+              '';
+            };
+          };
+
+          config = lib.mkIf cfg.enable {
+            environment.systemPackages = [
+              self.packages.${system}.rx
+              self.packages.${system}.rxui
+            ];
+
+            security.sudo.extraConfig = lib.mkIf cfg.globalSudoTimestamp
+              "Defaults timestamp_type=global";
+          };
         };
 
       packages = forAllSystems (
