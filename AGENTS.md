@@ -138,10 +138,14 @@ src/
   never the environment, both readable through `/proc`), the `String` cleared
   as soon as sudo consumed it, wrong password keeps the phase and offers a
   retry. Because a rebuild can outlive `timestamp_timeout`, the stash is also
-  handed to `sudo` through `SUDO_ASKPASS` (`rxui --askpass` prints the secret)
-  and a keepalive thread refreshes the timestamp with `sudo -n -v` every
-  minute while the pipeline runs; the file (`$XDG_RUNTIME_DIR`, 0600) is
-  removed when the run ends. The rebuild itself still runs through `rx`.
+  handed to `sudo` through `SUDO_ASKPASS` (`rxui --askpass` prints it) and a
+  keepalive thread refreshes the timestamp with `sudo -n -v` every minute
+  while the pipeline runs; the file is 0600 at
+  `/run/user/<uid>/rxui-sudo-<uid>`, derived from the uid and never from the
+  environment (sudo resets it), and it is removed when the run ends.
+  `nixosModules.default` sets `Defaults timestamp_type=global`, which removes
+  the need for the stash altogether.
+  The rebuild itself still runs through `rx`.
 - **Vendored `xattr`.** `gui/vendor/xattr` is xattr 0.2.3 with `ENOATTR` mapped
   to `ENODATA` on Linux (gpui → gpui_http_client → zed-async-tar pulls it).
   Remove the `[patch.crates-io]` entry once upstream ships xattr >= 1.
