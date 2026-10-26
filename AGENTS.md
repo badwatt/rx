@@ -138,7 +138,7 @@ src/
   never the environment, both readable through `/proc`), the `String` cleared
   as soon as sudo consumed it, wrong password keeps the phase and offers a
   retry. Because a rebuild can outlive `timestamp_timeout`, the stash is also
-  handed to `sudo` through `SUDO_ASKPASS` (`rxui --askpass` prints it) and a
+  handed to `sudo` through `SUDO_ASKPASS` (a shim that runs `rxui --askpass`) and a
   keepalive thread refreshes the timestamp with `sudo -n -v` every minute
   while the pipeline runs; the file is 0600 at
   `/run/user/<uid>/rxui-sudo-<uid>`, derived from the uid and never from the

@@ -297,6 +297,29 @@ pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
     Some(path)
 }
 
+/// Path of the askpass program handed to sudo.
+///
+/// sudo executes `SUDO_ASKPASS` with the prompt as its only argument and
+/// expects the password on stdout, so the program cannot be the app itself:
+/// a tiny shell shim forwards to `rxui --askpass`, which is dispatched before
+/// GPUI starts a window.
+pub(crate) fn askpass_program() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let path = secret_path().with_file_name(format!("rxui-askpass-{}", std::process::id()));
+    let body = format!("#!/bin/sh\nexec '{}' --askpass\n", exe.display());
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o700);
+    }
+    let mut file = options.open(&path).ok()?;
+    file.write_all(body.as_bytes()).ok()?;
+    file.flush().ok()?;
+    Some(path)
+}
+
 /// Keep the sudo timestamp alive while a long rebuild runs.
 ///
 /// `sudo -n -v` refreshes it without a password; without this a rebuild that
@@ -355,6 +378,9 @@ pub(crate) fn run_all(cfg: RunConfig, binary: PathBuf, askpass: Option<PathBuf>,
         drop(keepalive);
         if let Some(path) = &askpass {
             let _ = std::fs::remove_file(path);
+            let _ = std::fs::remove_file(
+                path.with_file_name(format!("rxui-askpass-{}", std::process::id())),
+            );
         }
         let _ = tx.send(Msg::Done(all_ok, total.elapsed()));
     });
@@ -376,10 +402,12 @@ fn run_step(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     // Without a terminal, sudo asks this helper instead of hanging.
-    if let (Some(_), Ok(exe)) = (askpass, std::env::current_exe()) {
-        // sudo executes this helper when it has no terminal; the helper finds
-        // the secret at the uid-derived path on its own.
-        command.env("SUDO_ASKPASS", exe);
+    if askpass.is_some()
+        && let Some(program) = askpass_program()
+    {
+        // sudo runs this shim when it has no terminal; it forwards to
+        // `rxui --askpass`, which finds the secret at the uid-derived path.
+        command.env("SUDO_ASKPASS", program);
     }
     let spawned = command.spawn();
     let mut child = match spawned {
