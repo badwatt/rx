@@ -114,6 +114,14 @@
         };
     in
     {
+      # GUI-friendly sudoers: one timestamp for the whole user, so the password
+      # entered once in the app also covers the nested `sudo` of the rebuild.
+      nixosModules.default =
+        { ... }:
+        {
+          security.sudo.extraConfig = "Defaults timestamp_type=global";
+        };
+
       packages = forAllSystems (
         system:
         let

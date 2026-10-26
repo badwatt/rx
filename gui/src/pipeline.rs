@@ -7,6 +7,8 @@
 //! renders what the step wrote to stdout/stderr.
 
 use std::io::{BufRead, BufReader, Read, Write};
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::Arc;
@@ -261,15 +263,27 @@ pub(crate) fn authenticate(password: &str) -> bool {
     child.wait().is_ok_and(|status| status.success())
 }
 
+/// Where the askpass helper looks for the secret.
+///
+/// Derived from the uid, not from the environment: sudo resets the
+/// environment before running a command, so an env var passed to `rx` can be
+/// gone by the time the helper is executed.
+pub(crate) fn secret_path() -> PathBuf {
+    let uid = std::fs::metadata("/proc/self").map_or(0, |meta| meta.uid());
+    let runtime = PathBuf::from(format!("/run/user/{uid}"));
+    let dir = if runtime.is_dir() {
+        runtime
+    } else {
+        std::env::temp_dir()
+    };
+    dir.join(format!("rxui-sudo-{uid}"))
+}
+
 /// Stash the password for `sudo`'s askpass helper.
 ///
-/// Prefers `$XDG_RUNTIME_DIR` (tmpfs, per-user); falls back to the temp dir.
-/// The file is `0600` and removed as soon as the run finishes.
+/// Created at `0600` from the first byte and removed when the run ends.
 pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR").map_or_else(std::env::temp_dir, PathBuf::from);
-    let path = dir.join(format!("rxui-sudo-{}", std::process::id()));
-    // Create the file at 0600 from the first byte: no window where the
-    // secret is world-readable.
+    let path = secret_path();
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -362,10 +376,10 @@ fn run_step(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     // Without a terminal, sudo asks this helper instead of hanging.
-    if let (Some(path), Ok(exe)) = (askpass, std::env::current_exe()) {
-        command
-            .env("SUDO_ASKPASS", exe)
-            .env(crate::askpass::FILE_VAR, path);
+    if let (Some(_), Ok(exe)) = (askpass, std::env::current_exe()) {
+        // sudo executes this helper when it has no terminal; the helper finds
+        // the secret at the uid-derived path on its own.
+        command.env("SUDO_ASKPASS", exe);
     }
     let spawned = command.spawn();
     let mut child = match spawned {

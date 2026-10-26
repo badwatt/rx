@@ -6,19 +6,22 @@
 
 use std::process::ExitCode;
 
-/// Path of the stash, as exported to the child `rx` processes.
-pub(crate) const FILE_VAR: &str = "RXUI_ASKPASS_FILE";
+use crate::pipeline;
 
-/// Print the stashed secret for `sudo -A`.
+/// Print the stashed secret for `sudo`'s askpass mechanism.
+///
+/// The path is derived from the uid because sudo resets the environment
+/// before executing a command; a variable set on `rx` may not survive.
 pub(crate) fn run() -> ExitCode {
-    let Ok(path) = std::env::var(FILE_VAR) else {
-        return ExitCode::FAILURE;
-    };
-    match std::fs::read_to_string(path) {
+    let path = pipeline::secret_path();
+    match std::fs::read_to_string(&path) {
         Ok(secret) => {
             print!("{}", secret.trim_end_matches('\n'));
             ExitCode::SUCCESS
         }
-        Err(_) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("rxui: cannot read {}: {error}", path.display());
+            ExitCode::FAILURE
+        }
     }
 }
