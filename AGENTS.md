@@ -131,8 +131,10 @@ src/
   workflow, its argv and its validation stay in `rx`; the app only decides when
   a step runs and renders stdout/stderr. Do not re-implement steps in the GUI.
 - **Only the GUI remembers toggles.** `update`, `diff` and `dry run` are
-  persisted in `$XDG_CONFIG_HOME/rxui/config` (plain `key=value`, no serde) and
-  restored at launch; the CLI keeps its documented defaults and stays
+  persisted under `[ui]` in `$XDG_CONFIG_HOME/rx/config.toml` (the shared config
+  file, so the CLI can grow its own sections; written by hand, no serde) and
+  restored at launch; saving replaces only the `[ui]` table and keeps the rest
+  of the file; the CLI keeps its documented defaults and stays
   flag-driven. Unreadable config or a read-only home falls back to defaults and
   never blocks a run.
 - **One explicit confirmation.** A sheet lists the exact commands; `--yes` is

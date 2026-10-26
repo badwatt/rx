@@ -1,10 +1,13 @@
 //! Preferences that survive a restart.
 //!
-//! Only the GUI persists anything: the CLI keeps its documented defaults and
-//! stays flag-driven.  The file is a tiny `key=value` text format, so the app
-//! needs no serialization dependency.
+//! Only the GUI writes them: the CLI keeps its documented defaults and stays
+//! flag-driven.  They live in the shared `rx/config.toml`, under a `[ui]`
+//! table, so the CLI can grow its own sections without a second file.
 
 use std::path::{Path, PathBuf};
+
+/// Section owned by the desktop surface.
+const SECTION: &str = "ui";
 
 /// The three toggles of the confirmation sheet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -36,22 +39,39 @@ impl Prefs {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        let _ = std::fs::write(path, render(self));
+        let existing = std::fs::read_to_string(path).unwrap_or_default();
+        let _ = std::fs::write(path, merge(&existing, self));
     }
 }
 
-/// `$XDG_CONFIG_HOME/rxui/config`, or `~/.config/rxui/config`.
+/// `$XDG_CONFIG_HOME/rx/config.toml`, or `~/.config/rx/config.toml`.
 fn path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-    Some(base.join("rxui").join("config"))
+    Some(base.join("rx").join("config.toml"))
 }
 
-/// Parse `key=value` lines; unknown keys and junk are ignored.
+fn is_section(line: &str, section: &str) -> bool {
+    line.trim()
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+        .is_some_and(|name| name.trim() == section)
+}
+
+/// Parse the `[ui]` table; other sections and junk are ignored.
 fn parse(text: &str) -> Prefs {
     let mut prefs = Prefs::default();
+    let mut in_ui = false;
     for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_ui = is_section(line, SECTION);
+            continue;
+        }
+        if !in_ui {
+            continue;
+        }
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
@@ -66,11 +86,35 @@ fn parse(text: &str) -> Prefs {
     prefs
 }
 
-fn render(prefs: Prefs) -> String {
+fn render_block(prefs: Prefs) -> String {
     format!(
-        "update={}\ndiff={}\ndry_run={}\n",
+        "[{SECTION}]\nupdate = {}\ndiff = {}\ndry_run = {}\n",
         prefs.update, prefs.diff, prefs.dry_run
     )
+}
+
+/// Replace the `[ui]` table in place, keeping every other section.
+fn merge(existing: &str, prefs: Prefs) -> String {
+    let mut kept = String::new();
+    let mut in_ui = false;
+    for line in existing.lines() {
+        if line.trim_start().starts_with('[') {
+            in_ui = is_section(line, SECTION);
+            if in_ui {
+                continue;
+            }
+        }
+        if !in_ui {
+            kept.push_str(line);
+            kept.push('\n');
+        }
+    }
+    let kept = kept.trim_end();
+    if kept.is_empty() {
+        format!("# rx configuration\n\n{}", render_block(prefs))
+    } else {
+        format!("{kept}\n\n{}", render_block(prefs))
+    }
 }
 
 #[cfg(test)]
@@ -78,8 +122,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_reads_every_known_key() {
-        let prefs = parse("update=true\ndiff=true\ndry_run=true\n");
+    fn parse_reads_the_ui_table() {
+        let prefs = parse("[ui]\nupdate = true\ndiff = true\ndry_run = true\n");
         assert_eq!(
             prefs,
             Prefs {
@@ -91,15 +135,29 @@ mod tests {
     }
 
     #[test]
-    fn parse_ignores_unknown_and_malformed_lines() {
-        let prefs = parse("noise\nupdate=true\nfuture=1\ndiff\n");
+    fn parse_ignores_other_sections_and_junk() {
+        let prefs = parse("[cli]\nupdate = true\n\n[ui]\ndiff = true\nnoise\n");
         assert_eq!(
             prefs,
             Prefs {
-                update: true,
+                diff: true,
                 ..Prefs::default()
             }
         );
+    }
+
+    #[test]
+    fn merge_keeps_foreign_sections_and_replaces_the_ui_table() {
+        let existing = "[cli]\nrepo = \"/tmp/dotfiles\"\n\n[ui]\nupdate = true\n";
+        let prefs = Prefs {
+            update: false,
+            diff: true,
+            dry_run: false,
+        };
+        let merged = merge(existing, prefs);
+        assert!(merged.contains("repo = \"/tmp/dotfiles\""));
+        assert!(!merged.contains("update = true"));
+        assert_eq!(parse(&merged), prefs);
     }
 
     #[test]
@@ -109,19 +167,19 @@ mod tests {
             diff: false,
             dry_run: true,
         };
-        assert_eq!(parse(&render(prefs)), prefs);
+        assert_eq!(parse(&merge("", prefs)), prefs);
     }
 
     #[test]
     fn load_from_missing_file_yields_defaults() {
-        let missing = std::env::temp_dir().join("rxui-no-such-config");
+        let missing = std::env::temp_dir().join("rxui-no-such-config.toml");
         assert_eq!(Prefs::load_from(&missing), Prefs::default());
     }
 
     #[test]
     fn save_to_then_load_from_keeps_the_toggles() {
         let dir = std::env::temp_dir().join(format!("rxui-prefs-{}", std::process::id()));
-        let path = dir.join("nested").join("config");
+        let path = dir.join("nested").join("config.toml");
         let prefs = Prefs {
             update: true,
             diff: true,
