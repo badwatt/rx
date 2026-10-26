@@ -143,8 +143,14 @@
               self.packages.${system}.rxui
             ];
 
-            security.sudo.extraConfig = lib.mkIf cfg.globalSudoTimestamp
-              "Defaults timestamp_type=global";
+            security.sudo.extraConfig = lib.mkIf cfg.globalSudoTimestamp ''
+              Defaults timestamp_type=global
+              # nixos-rebuild elevates itself and resets the environment, so
+              # the inner `sudo nix-env --set` never sees SUDO_ASKPASS unless
+              # sudo keeps it. Without this the profile switch fails with
+              # "a terminal is required to read the password".
+              Defaults env_keep += "SUDO_ASKPASS"
+            '';
           };
         };
 
