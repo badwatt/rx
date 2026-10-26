@@ -71,10 +71,12 @@ pub(crate) struct RxApp {
     system: (Option<String>, Option<String>),
     /// Newest system generations, current first.
     generations: Vec<Generation>,
-    /// Password being typed for `sudo -v`; cleared as soon as it is used.
+    /// Password being typed for `sudo -v`; wiped as soon as sudo used it.
     auth: String,
     auth_error: bool,
     auth_busy: bool,
+    /// Result of the background `sudo -v`: `(ok, stash path)`.
+    auth_feed: Option<Receiver<(bool, Option<std::path::PathBuf>)>>,
     /// Stashed password for `sudo`'s askpass helper, removed after the run.
     askpass: Option<std::path::PathBuf>,
     focus: FocusHandle,
@@ -109,6 +111,7 @@ impl RxApp {
             auth: String::new(),
             auth_error: false,
             auth_busy: false,
+            auth_feed: None,
             askpass: None,
             focus: cx.focus_handle(),
             error: None,
@@ -132,6 +135,7 @@ impl RxApp {
                 }
             }
         }
+        self.drain_auth(cx);
         let changed = !drained.is_empty() || disconnected;
         for msg in drained {
             self.apply(msg);
@@ -193,7 +197,7 @@ impl RxApp {
         cx.notify();
     }
 
-    fn begin(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn begin(&mut self, cx: &mut Context<Self>) {
         let Some(binary) = self.rx_binary.clone() else {
             self.phase = Phase::Failed;
             self.error = Some(String::from(
@@ -204,7 +208,6 @@ impl RxApp {
         };
         if self.cfg.needs_root() && !self.cfg.dry_run && !pipeline::root_is_ready() {
             self.phase = Phase::Auth;
-            window.focus(&self.focus);
             cx.notify();
             return;
         }
@@ -229,37 +232,64 @@ impl RxApp {
         cx.notify();
     }
 
-    /// Validate the typed password through `sudo -v`, then start.
-    fn submit_password(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Validate the typed password on a worker thread.
+    ///
+    /// `sudo` can block on PAM, LDAP or a fingerprint reader, so it must not
+    /// run on the frame thread; the result arrives through [`Self::pump`].
+    fn submit_password(&mut self, cx: &mut Context<Self>) {
         if self.auth.is_empty() || self.auth_busy {
             return;
         }
         self.auth_busy = true;
-        let ok = pipeline::authenticate(&self.auth);
-        // Hand the secret to sudo's askpass helper before dropping it: a
-        // rebuild can outlive the timestamp and there is no terminal to
-        // answer a second prompt.
-        let stashed = ok.then(|| pipeline::stash_secret(&self.auth));
-        // Never keep the secret around once sudo has consumed it.
-        self.auth.clear();
+        self.auth_error = false;
+        let mut password = std::mem::take(&mut self.auth);
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.auth_feed = Some(rx);
+        std::thread::spawn(move || {
+            let ok = pipeline::authenticate(&password);
+            let stash = ok.then(|| pipeline::stash_secret(&password));
+            pipeline::wipe(&mut password);
+            let _ = tx.send((ok, stash.flatten()));
+        });
+        cx.notify();
+    }
+
+    /// Drain the auth result; called from the foreground poller.
+    fn drain_auth(&mut self, cx: &mut Context<Self>) {
+        let result = self
+            .auth_feed
+            .as_ref()
+            .and_then(|feed| feed.try_recv().ok());
+        let Some((ok, stash)) = result else {
+            return;
+        };
+        self.auth_feed = None;
         self.auth_busy = false;
         if ok {
-            self.auth_error = false;
-            self.root_ready = true;
-            self.askpass = stashed.flatten();
-            self.begin(window, cx);
+            if let Some(path) = stash {
+                self.askpass = Some(path);
+                self.root_ready = true;
+                self.begin(cx);
+            } else {
+                // Without the stash a long rebuild would prompt again with no
+                // terminal; stay here and say so instead of failing later.
+                self.auth_error = true;
+                self.error = Some(String::from(
+                    "could not store the password for sudo; try again",
+                ));
+                cx.notify();
+            }
         } else {
             self.auth_error = true;
-            window.focus(&self.focus);
             cx.notify();
         }
     }
 
-    fn on_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    fn on_key(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
         match event.keystroke.key.as_ref() {
-            "enter" => self.submit_password(window, cx),
+            "enter" => self.submit_password(cx),
             "escape" => {
-                self.auth.clear();
+                pipeline::wipe(&mut self.auth);
                 self.phase = Phase::Idle;
                 cx.notify();
             }
@@ -279,6 +309,11 @@ impl RxApp {
                 }
             }
         }
+    }
+
+    /// Is any worker still reporting to the UI?
+    pub(crate) fn is_busy(&self) -> bool {
+        self.feed.is_some() || self.auth_feed.is_some()
     }
 
     /// Masked password field plus the unlock action.
@@ -316,8 +351,8 @@ impl RxApp {
                     } else {
                         div().child("•".repeat(self.auth.chars().count()))
                     })
-                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                        this.on_key(event, window, cx);
+                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+                        this.on_key(event, cx);
                     })),
             )
             .child(
@@ -334,7 +369,7 @@ impl RxApp {
                     .text_color(rgb(0x07101C))
                     .cursor_pointer()
                     .hover(|style| style.opacity(0.92))
-                    .on_click(cx.listener(|this, _, window, cx| this.submit_password(window, cx)))
+                    .on_click(cx.listener(|this, _, _, cx| this.submit_password(cx)))
                     .child(if self.auth_busy {
                         "Checking…"
                     } else {
@@ -816,8 +851,8 @@ impl RxApp {
             .cursor_pointer()
             .hover(|style| style.opacity(0.92))
             .active(|style| style.opacity(0.82))
-            .on_click(cx.listener(|this, _, window, cx| match this.phase {
-                Phase::Auth => this.begin(window, cx),
+            .on_click(cx.listener(|this, _, _window, cx| match this.phase {
+                Phase::Auth => this.submit_password(cx),
                 Phase::Done | Phase::Failed => this.reset(cx),
                 _ => this.request_run(cx),
             }))
@@ -1135,7 +1170,7 @@ impl RxApp {
                             .cursor_pointer()
                             .hover(|style| style.opacity(0.92))
                             .active(|style| style.opacity(0.82))
-                            .on_click(cx.listener(|this, _, window, cx| this.begin(window, cx)))
+                            .on_click(cx.listener(|this, _, _window, cx| this.begin(cx)))
                             .child("Start"),
                     ),
             )

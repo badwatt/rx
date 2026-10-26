@@ -7,8 +7,7 @@
 //! renders what the step wrote to stdout/stderr.
 
 use std::io::{BufRead, BufReader, Read, Write};
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::Arc;
@@ -263,27 +262,42 @@ pub(crate) fn authenticate(password: &str) -> bool {
     child.wait().is_ok_and(|status| status.success())
 }
 
-/// Where the askpass helper looks for the secret.
-///
-/// Derived from the uid, not from the environment: sudo resets the
-/// environment before running a command, so an env var passed to `rx` can be
-/// gone by the time the helper is executed.
-pub(crate) fn secret_path() -> PathBuf {
-    let uid = std::fs::metadata("/proc/self").map_or(0, |meta| meta.uid());
+/// Effective uid, read from `/proc/self/status` (no libc dependency).
+fn current_uid() -> Option<u32> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Uid:"))
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|uid| uid.parse().ok())
+}
+
+/// Directory that holds the askpass secret: the user's runtime dir, or the
+/// temp dir when there is none.
+fn secret_dir(uid: u32) -> PathBuf {
     let runtime = PathBuf::from(format!("/run/user/{uid}"));
-    let dir = if runtime.is_dir() {
+    if runtime.is_dir() {
         runtime
     } else {
         std::env::temp_dir()
-    };
-    dir.join(format!("rxui-sudo-{uid}"))
+    }
 }
 
-/// Stash the password for `sudo`'s askpass helper.
+/// Where the askpass helper looks for the secret.
 ///
-/// Created at `0600` from the first byte and removed when the run ends.
-pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
-    let path = secret_path();
+/// Derived from the uid on both sides: sudo resets the environment before
+/// executing a command, so an env var passed to `rx` cannot be trusted.
+pub(crate) fn secret_path() -> Option<PathBuf> {
+    let uid = current_uid()?;
+    Some(secret_dir(uid).join(format!("rxui-sudo-{uid}")))
+}
+
+/// Stash the password for `sudo`'s askpass helper at `dir`.
+///
+/// Created at `0600` from the first byte; the caller removes it when the run
+/// ends.  `dir` is a parameter so tests never touch the live stash.
+pub(crate) fn stash_secret_in(dir: &Path, uid: u32, password: &str) -> Option<PathBuf> {
+    let path = dir.join(format!("rxui-sudo-{uid}"));
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -297,27 +311,19 @@ pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
     Some(path)
 }
 
-/// Path of the askpass program handed to sudo.
-///
-/// sudo executes `SUDO_ASKPASS` with the prompt as its only argument and
-/// expects the password on stdout, so the program cannot be the app itself:
-/// a tiny shell shim forwards to `rxui --askpass`, which is dispatched before
-/// GPUI starts a window.
-pub(crate) fn askpass_program() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let path = secret_path().with_file_name(format!("rxui-askpass-{}", std::process::id()));
-    let body = format!("#!/bin/sh\nexec '{}' --askpass\n", exe.display());
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o700);
+/// Stash the password where `rxui --askpass` will look for it.
+pub(crate) fn stash_secret(password: &str) -> Option<PathBuf> {
+    let uid = current_uid()?;
+    stash_secret_in(&secret_dir(uid), uid, password)
+}
+
+/// Best-effort wipe of a secret from its allocation before dropping it.
+pub(crate) fn wipe(secret: &mut String) {
+    let len = secret.len();
+    if len > 0 {
+        secret.replace_range(.., &"x".repeat(len));
     }
-    let mut file = options.open(&path).ok()?;
-    file.write_all(body.as_bytes()).ok()?;
-    file.flush().ok()?;
-    Some(path)
+    secret.clear();
 }
 
 /// Keep the sudo timestamp alive while a long rebuild runs.
@@ -401,12 +407,10 @@ fn run_step(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    // Without a terminal, sudo asks this helper instead of hanging.
+    // Without a terminal, sudo runs this helper instead of hanging.
     if askpass.is_some()
-        && let Some(program) = askpass_program()
+        && let Ok(program) = std::env::current_exe()
     {
-        // sudo runs this shim when it has no terminal; it forwards to
-        // `rxui --askpass`, which finds the secret at the uid-derived path.
         command.env("SUDO_ASKPASS", program);
     }
     let spawned = command.spawn();
@@ -648,7 +652,9 @@ mod tests {
 
     #[test]
     fn stash_secret_keeps_the_secret_owner_readable_only() {
-        let path = stash_secret("hunter2").expect("stash");
+        let dir = std::env::temp_dir().join(format!("rxui-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let path = stash_secret_in(&dir, 4242, "hunter2").expect("stash");
         assert_eq!(std::fs::read_to_string(&path).expect("read"), "hunter2");
         #[cfg(unix)]
         {
@@ -660,7 +666,16 @@ mod tests {
                 & 0o777;
             assert_eq!(mode, 0o600);
         }
-        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(dir);
+    }
+
+    #[test]
+    fn wipe_overwrites_the_secret_before_clearing() {
+        let mut secret = String::from("hunter2");
+        wipe(&mut secret);
+        assert!(secret.is_empty());
+        assert_ne!(secret.capacity(), 0);
     }
 
     #[test]

@@ -58,7 +58,14 @@ fn main() {
         // Foreground poller: drain supervisor messages, keep the clock live.
         cx.spawn(async move |cx| {
             loop {
-                Timer::after(Duration::from_millis(70)).await;
+                // Fast while a worker is reporting, cheap when idle.
+                let busy = app.update(cx, |app, _| app.is_busy()).unwrap_or(false);
+                let tick = if busy {
+                    Duration::from_millis(70)
+                } else {
+                    Duration::from_millis(400)
+                };
+                Timer::after(tick).await;
                 if app.update(cx, ui::RxApp::pump).is_err() {
                     break;
                 }
