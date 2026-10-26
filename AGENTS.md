@@ -130,6 +130,11 @@ src/
   process per step, in pipeline order, stopping on the first failure. The
   workflow, its argv and its validation stay in `rx`; the app only decides when
   a step runs and renders stdout/stderr. Do not re-implement steps in the GUI.
+- **Only the GUI remembers toggles.** `update`, `diff` and `dry run` are
+  persisted in `$XDG_CONFIG_HOME/rxui/config` (plain `key=value`, no serde) and
+  restored at launch; the CLI keeps its documented defaults and stays
+  flag-driven. Unreadable config or a read-only home falls back to defaults and
+  never blocks a run.
 - **One explicit confirmation.** A sheet lists the exact commands; `--yes` is
   passed only after it. Cancelling runs nothing.
 - **Root access.** `sudo -n true` is checked before a real rebuild. If the

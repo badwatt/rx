@@ -19,6 +19,7 @@ use gpui::prelude::*;
 use gpui::{Context, Div, FocusHandle, IntoElement, KeyDownEvent, Render, Window, div, px, rgb};
 
 use crate::pipeline::{self, LineKind, Msg, RunConfig, Step};
+use crate::prefs::Prefs;
 use crate::theme as t;
 
 /// The CLI version, single-sourced from the repository-root `VERSION` file.
@@ -87,7 +88,15 @@ pub(crate) struct RxApp {
 
 impl RxApp {
     pub(crate) fn new(cx: &mut Context<Self>) -> Self {
-        let cfg = RunConfig::default();
+        // The toggles the visitor picked last time come back on launch; the
+        // CLI itself keeps its documented defaults.
+        let prefs = Prefs::load();
+        let cfg = RunConfig {
+            update: prefs.update,
+            diff: prefs.diff,
+            dry_run: prefs.dry_run,
+            ..RunConfig::default()
+        };
         let rows = cfg
             .plan()
             .into_iter()
@@ -410,18 +419,31 @@ impl RxApp {
         cx.notify();
     }
 
+    /// Remember the toggles for the next launch.
+    fn persist(&self) {
+        Prefs {
+            update: self.cfg.update,
+            diff: self.cfg.diff,
+            dry_run: self.cfg.dry_run,
+        }
+        .save();
+    }
+
     fn toggle_update(&mut self, cx: &mut Context<Self>) {
         self.cfg.update = !self.cfg.update;
+        self.persist();
         self.reset(cx);
     }
 
     fn toggle_diff(&mut self, cx: &mut Context<Self>) {
         self.cfg.diff = !self.cfg.diff;
+        self.persist();
         self.reset(cx);
     }
 
     fn toggle_dry(&mut self, cx: &mut Context<Self>) {
         self.cfg.dry_run = !self.cfg.dry_run;
+        self.persist();
         cx.notify();
     }
 

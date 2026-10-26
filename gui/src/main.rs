@@ -5,6 +5,7 @@
 
 mod askpass;
 mod pipeline;
+mod prefs;
 mod theme;
 mod ui;
 
