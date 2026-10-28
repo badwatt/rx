@@ -5,6 +5,7 @@
 
 pub(crate) mod completions;
 pub(crate) mod defaults;
+pub(crate) mod entry;
 pub(crate) mod help;
 pub(crate) mod hostname;
 pub(crate) mod parse;
