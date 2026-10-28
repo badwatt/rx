@@ -12,6 +12,10 @@ pub(crate) fn program(cmd: &[String]) -> Result<&str, Error> {
     })
 }
 
+/// Extract the exit code from a process status.
+///
+/// Signal- and stop-terminated children report the shell convention `128 + N`;
+/// when no signal is available, report `1`.
 pub(crate) fn exit_code(status: std::process::ExitStatus) -> i32 {
     use std::os::unix::process::ExitStatusExt;
     match status.code() {

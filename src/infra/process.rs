@@ -81,16 +81,6 @@ pub(crate) fn probe_cmd(cmd: &[String]) -> Result<i32, Error> {
     Ok(exit_code(status))
 }
 
-/// Extract the exit code from a process status.
-///
-/// Signal- and stop-terminated children report the shell convention `128 + N`;
-/// when no signal is available, report `1`.
-#[cfg(unix)]
-#[cfg(not(unix))]
-fn exit_code(status: std::process::ExitStatus) -> i32 {
-    status.code().unwrap_or(1)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
