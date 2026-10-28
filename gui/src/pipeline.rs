@@ -196,8 +196,21 @@ impl RunConfig {
 pub(crate) enum Msg {
     Started(Step),
     Line(LineKind, String),
-    Finished(Step, bool, Duration),
-    Done(bool, Duration),
+    Finished(Step, Outcome, Duration),
+    Done(Outcome, Duration),
+}
+
+/// Result of one step, named instead of a bare `bool`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Outcome {
+    Ok,
+    Failed,
+}
+
+impl Outcome {
+    pub(crate) fn is_ok(self) -> bool {
+        self == Self::Ok
+    }
 }
 
 /// How a log line reads.
@@ -374,9 +387,9 @@ pub(crate) fn run_all(cfg: RunConfig, binary: PathBuf, askpass: Option<PathBuf>,
         for step in cfg.plan() {
             let _ = tx.send(Msg::Started(step));
             let started = Instant::now();
-            let ok = run_step(&cfg, step, &binary, askpass.as_deref(), &tx);
-            let _ = tx.send(Msg::Finished(step, ok, started.elapsed()));
-            if !ok {
+            let outcome = run_step(&cfg, step, &binary, askpass.as_deref(), &tx);
+            let _ = tx.send(Msg::Finished(step, outcome, started.elapsed()));
+            if !outcome.is_ok() {
                 all_ok = false;
                 break;
             }
@@ -388,7 +401,7 @@ pub(crate) fn run_all(cfg: RunConfig, binary: PathBuf, askpass: Option<PathBuf>,
                 path.with_file_name(format!("rxui-askpass-{}", std::process::id())),
             );
         }
-        let _ = tx.send(Msg::Done(all_ok, total.elapsed()));
+        let _ = tx.send(Msg::Done(outcome_of(all_ok), total.elapsed()));
     });
 }
 
@@ -399,7 +412,7 @@ fn run_step(
     binary: &PathBuf,
     askpass: Option<&std::path::Path>,
     tx: &Sender<Msg>,
-) -> bool {
+) -> Outcome {
     let mut command = Command::new(binary);
     command
         .args(cfg.rx_args(step))
@@ -421,7 +434,7 @@ fn run_step(
                 LineKind::Bad,
                 format!("cannot start {}: {error}", binary.display()),
             ));
-            return false;
+            return Outcome::Failed;
         }
     };
 
@@ -433,11 +446,20 @@ fn run_step(
         readers.push(spawn_reader(Stream::Err(stderr), tx.clone()));
     }
 
-    let ok = child.wait().is_ok_and(|status| status.success());
+    let status = child.wait();
     for reader in readers {
         let _ = reader.join();
     }
-    ok
+    if status.is_ok_and(|exit| exit.success()) {
+        Outcome::Ok
+    } else {
+        Outcome::Failed
+    }
+}
+
+/// Bridge from the boolean accumulator to the enum.
+fn outcome_of(ok: bool) -> Outcome {
+    if ok { Outcome::Ok } else { Outcome::Failed }
 }
 
 enum Stream {

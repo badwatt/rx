@@ -199,18 +199,26 @@ impl RxApp {
                 self.push(LineKind::Section, section_title(step));
             }
             Msg::Line(kind, text) => self.push(kind, text),
-            Msg::Finished(step, ok, took) => {
+            Msg::Finished(step, outcome, took) => {
                 if let Some(row) = self.row_mut(step) {
-                    row.status = if ok { Status::Ok } else { Status::Failed };
+                    row.status = if outcome.is_ok() {
+                        Status::Ok
+                    } else {
+                        Status::Failed
+                    };
                     row.took = Some(took);
                 }
-                if !ok {
+                if !outcome.is_ok() {
                     self.phase = Phase::Failed;
                 }
             }
-            Msg::Done(ok, took) => {
+            Msg::Done(outcome, took) => {
                 self.elapsed = Some(took);
-                self.phase = if ok { Phase::Done } else { Phase::Failed };
+                self.phase = if outcome.is_ok() {
+                    Phase::Done
+                } else {
+                    Phase::Failed
+                };
                 for row in &mut self.rows {
                     if row.status == Status::Running {
                         row.status = Status::Failed;
