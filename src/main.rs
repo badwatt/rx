@@ -11,8 +11,8 @@ use infra::command::CommandRunner;
 use infra::dry_run::DryRunRunner;
 use infra::process::ProcessRunner;
 use shared::ansi::Palette;
-use std::io::Write;
-use std::{env, io::stdout};
+use std::env;
+use std::io::{Write, stderr, stdout};
 use system_update::adapters::git::GitRepo;
 use system_update::adapters::nix::NixCli;
 use system_update::adapters::terminal::TerminalIo;
@@ -56,7 +56,7 @@ fn palettes(no_color: bool) -> (Palette, Palette) {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut out = stdout();
-    let mut err = std::io::stderr();
+    let mut err = stderr();
     let no_color = args.iter().any(|arg| arg == "--no-color");
     let (out_palette, err_palette) = palettes(no_color);
     if let Err(e) = run(&args, &mut out, &mut err, out_palette) {
