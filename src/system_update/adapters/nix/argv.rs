@@ -1,96 +1,13 @@
-use crate::domain::config::BuildOptions;
-use crate::domain::error::Error;
-use crate::infra::command::CommandRunner;
-use crate::system_update::ports::nix::Nix;
+//! Argv builders for the nix commands; pure, so they are tested without
+//! spawning anything.
 
-/// Which `nixos-rebuild` implementation is installed.
-///
-/// The classic shell script elevates the whole command and skips the
-/// self-rebuild re-exec with `--fast`; the `-ng` rewrite elevates only the
-/// activation with `--elevate=sudo` and spells the skip `--no-reexec`.
-#[derive(Debug, PartialEq, Clone, Copy)]
-enum RebuildFlavor {
-    Classic,
-    Ng,
-}
-
-/// [`Nix`] adapter backed by the `nix` / `nixos-rebuild` CLIs.
-pub(crate) struct NixCli<'a> {
-    runner: &'a dyn CommandRunner,
-}
-
-impl<'a> NixCli<'a> {
-    pub(crate) fn new(runner: &'a dyn CommandRunner) -> Self {
-        Self { runner }
-    }
-
-    /// Probe the installed `nixos-rebuild`: exit code 0 means the `-ng`
-    /// rewrite. Any other outcome (non-zero, spawn error) is conservatively
-    /// treated as classic.
-    fn detect_flavor(&self) -> RebuildFlavor {
-        if matches!(self.runner.probe(&rebuild_probe()), Ok(0)) {
-            RebuildFlavor::Ng
-        } else {
-            RebuildFlavor::Classic
-        }
-    }
-}
-
-impl Nix for NixCli<'_> {
-    fn update(&self, repo: &str) -> Result<(), Error> {
-        let status = self.runner.run(&cmd_update(repo))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::FlakeUpdateFailed)
-        }
-    }
-
-    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
-        let flavor = self.detect_flavor();
-        let status = self
-            .runner
-            .run(&cmd_rebuild(repo, hostname, flavor, options))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::RebuildFailed)
-        }
-    }
-
-    fn prune(&self, keep: u8) -> Result<(), Error> {
-        let status = self.runner.run(&cmd_prune(keep))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::CleanupFailed)
-        }
-    }
-
-    fn collect_garbage(&self) -> Result<(), Error> {
-        let status = self.runner.run(&cmd_collect_garbage())?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::CleanupFailed)
-        }
-    }
-
-    fn diff_closures(&self) -> Result<String, Error> {
-        let (status, output) = self.runner.capture(&cmd_diff_closures())?;
-        if status == 0 {
-            Ok(output)
-        } else {
-            Err(Error::DiffFailed)
-        }
-    }
-}
+use super::{BuildOptions, RebuildFlavor};
 
 /// Capability probe for the installed `nixos-rebuild`.
 ///
 /// `--elevate` only exists in the `-ng` rewrite, and `list-generations` is
 /// read-only, so exit code 0 means `-ng`.
-fn rebuild_probe() -> Vec<String> {
+pub(super) fn rebuild_probe() -> Vec<String> {
     vec![
         "nixos-rebuild".into(),
         "--elevate=none".into(),
@@ -99,7 +16,7 @@ fn rebuild_probe() -> Vec<String> {
 }
 
 /// `nix flake update --flake <repo>`
-fn cmd_update(repo: &str) -> Vec<String> {
+pub(super) fn cmd_update(repo: &str) -> Vec<String> {
     vec![
         "nix".into(),
         "flake".into(),
@@ -111,7 +28,7 @@ fn cmd_update(repo: &str) -> Vec<String> {
 
 /// `nixos-rebuild switch <flavor flags> --flake <repo>#<hostname> --show-trace`
 /// plus any parallelism caps.
-fn cmd_rebuild(
+pub(super) fn cmd_rebuild(
     repo: &str,
     hostname: &str,
     flavor: RebuildFlavor,
@@ -150,7 +67,7 @@ fn cmd_rebuild(
 }
 
 /// `nix-env --profile /nix/var/nix/profiles/system --delete-generations +<keep>`
-fn cmd_prune(keep: u8) -> Vec<String> {
+pub(super) fn cmd_prune(keep: u8) -> Vec<String> {
     vec![
         "sudo".into(),
         "nix-env".into(),
@@ -162,12 +79,12 @@ fn cmd_prune(keep: u8) -> Vec<String> {
 }
 
 /// `nix store gc` (modern replacement for `nix-collect-garbage`).
-fn cmd_collect_garbage() -> Vec<String> {
+pub(super) fn cmd_collect_garbage() -> Vec<String> {
     vec!["sudo".into(), "nix".into(), "store".into(), "gc".into()]
 }
 
 /// `nix profile diff-closures --profile /nix/var/nix/profiles/system`
-fn cmd_diff_closures() -> Vec<String> {
+pub(super) fn cmd_diff_closures() -> Vec<String> {
     vec![
         "nix".into(),
         "profile".into(),
@@ -180,7 +97,10 @@ fn cmd_diff_closures() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::error::Error;
     use crate::shared::test_helpers::StubRunner;
+    use crate::system_update::adapters::nix::NixCli;
+    use crate::system_update::ports::nix::Nix as _;
     use std::cell::RefCell;
     use std::rc::Rc;
 
