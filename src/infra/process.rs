@@ -1,6 +1,7 @@
 use std::process::{Command, Stdio};
 
 use crate::domain::error::Error;
+pub(crate) use crate::infra::argv::{exit_code, program};
 use crate::infra::command::CommandRunner;
 
 /// Production [`CommandRunner`] backed by `std::process`.
@@ -80,29 +81,11 @@ pub(crate) fn probe_cmd(cmd: &[String]) -> Result<i32, Error> {
     Ok(exit_code(status))
 }
 
-/// Return the program name, or an error when `cmd` is empty.
-fn program(cmd: &[String]) -> Result<&str, Error> {
-    cmd.first().map(String::as_str).ok_or_else(|| {
-        Error::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "empty command",
-        ))
-    })
-}
-
 /// Extract the exit code from a process status.
 ///
 /// Signal- and stop-terminated children report the shell convention `128 + N`;
 /// when no signal is available, report `1`.
 #[cfg(unix)]
-fn exit_code(status: std::process::ExitStatus) -> i32 {
-    use std::os::unix::process::ExitStatusExt;
-    match status.code() {
-        Some(code) => code,
-        None => status.signal().map_or(1, |signal| 128 + signal),
-    }
-}
-
 #[cfg(not(unix))]
 fn exit_code(status: std::process::ExitStatus) -> i32 {
     status.code().unwrap_or(1)
