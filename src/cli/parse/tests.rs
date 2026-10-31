@@ -539,6 +539,17 @@ fn parse_only_sets_the_step_selection() {
 }
 
 #[test]
+fn parse_only_wins_over_flags_given_after_it() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.set_only(vec![Step::Pull]);
+    assert_eq!(
+        parse(&args(&["rx", "--only", "pull", "-u", "-d"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
 fn parse_only_equals_accepts_a_single_step() {
     let mut buf = Vec::new();
     let mut expected = default_config();

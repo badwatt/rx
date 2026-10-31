@@ -1,7 +1,7 @@
 use std::io::{self, Read};
 
 use super::*;
-use crate::domain::config::{Step, Pipeline};
+use crate::domain::config::{Pipeline, Step};
 // Test-facing wrappers that pin the colored palette, so assertions stay
 // readable and the real functions keep a single palette parameter.
 fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
@@ -30,10 +30,11 @@ fn terminal() -> TerminalIo {
 }
 
 fn test_config() -> Config {
-
     Config {
-
-        pipeline: Pipeline::Default { update: false, diff: false },
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: false,
+        },
         repo: String::from("r"),
         hostname: Some(String::from("h")),
         keep: 1,
@@ -255,7 +256,10 @@ fn print_config_marks_an_undetected_hostname() {
 fn print_config_renders_all_fields() {
     let mut buf = Vec::new();
     let config = Config {
-            Pipeline::Default { update: false, diff: true },
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: true,
+        },
 
         repo: String::from("~/.dotfiles"),
         hostname: Some(String::from("nixos")),

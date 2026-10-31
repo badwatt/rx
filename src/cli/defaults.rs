@@ -5,10 +5,11 @@ use crate::domain::config::{Config, DEFAULT_KEEP, DEFAULT_REPO, Pipeline};
 /// from the OS (`None` when undetectable), keep `10`, update/diff/yes/dry-run
 /// `false`.
 pub(crate) fn default_config() -> Config {
-
     Config {
-
-        pipeline: Pipeline::Default { update: false, diff: false },
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: false,
+        },
         repo: expand_tilde(DEFAULT_REPO),
         hostname: hostname::resolve(),
         keep: DEFAULT_KEEP,

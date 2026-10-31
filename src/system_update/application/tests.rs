@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::*;
-use crate::domain::config::{BuildOptions, Step, Pipeline};
+use crate::domain::config::{BuildOptions, Pipeline, Step};
 // ------------------------------------------------------------------
 // Named defaults (shared, so their branches merge across tests)
 // ------------------------------------------------------------------
@@ -203,10 +203,11 @@ impl Log {
 }
 
 fn default_config() -> Config {
-
     Config {
-
-        pipeline: Pipeline::Default { update: false, diff: false },
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: false,
+        },
         repo: String::from("r"),
         hostname: Some(String::from("h")),
         keep: 1,
@@ -319,8 +320,10 @@ fn run_no_git_changes_skips_stage() {
 #[test]
 fn run_update_and_diff_true_runs_extra_commands() {
     let config = Config {
-        update: true,
-        diff: true,
+        pipeline: Pipeline::Default {
+            update: true,
+            diff: true,
+        },
         ..default_config()
     };
     assert!(run_ok(&config, &ok_ui(&Log::default())).is_ok());
@@ -491,7 +494,10 @@ fn run_pull_title_error_propagates() {
 #[test]
 fn run_flake_title_error_propagates() {
     let config = Config {
-        update: true,
+        pipeline: Pipeline::Default {
+            update: true,
+            diff: false,
+        },
         ..default_config()
     };
     assert!(run_ok(&config, &title_fails_on("Nix Update")).is_err());
@@ -500,7 +506,10 @@ fn run_flake_title_error_propagates() {
 #[test]
 fn run_flake_error_propagates() {
     let config = Config {
-        update: true,
+        pipeline: Pipeline::Default {
+            update: true,
+            diff: false,
+        },
         ..default_config()
     };
     let nix = MockNix {
@@ -711,7 +720,10 @@ fn run_cleanup_gc_error_propagates() {
 #[test]
 fn run_diff_title_error_propagates() {
     let config = Config {
-        diff: true,
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: true,
+        },
         ..default_config()
     };
     assert!(run_ok(&config, &title_fails_on("Nix Diff")).is_err());
@@ -720,7 +732,10 @@ fn run_diff_title_error_propagates() {
 #[test]
 fn run_diff_error_propagates() {
     let config = Config {
-        diff: true,
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: true,
+        },
         ..default_config()
     };
     let nix = MockNix {
@@ -733,7 +748,10 @@ fn run_diff_error_propagates() {
 #[test]
 fn run_diff_output_error_propagates() {
     let config = Config {
-        diff: true,
+        pipeline: Pipeline::Default {
+            update: false,
+            diff: true,
+        },
         ..default_config()
     };
     let ui = MockUi {
@@ -791,7 +809,7 @@ fn run_only_diff_runs_the_diff_alone() {
         ..MockNix::default()
     };
     let config = Config {
-            Pipeline::Only(vec![Step::Diff]),
+        pipeline: Pipeline::Only(vec![Step::Diff]),
 
         ..default_config()
     };

@@ -22,10 +22,7 @@ pub(crate) struct BuildOptions {
 pub(crate) enum Pipeline {
     /// The default pipeline: the flake update and the closure diff follow
     /// their own flags, everything else always runs.
-    Default {
-        update: bool,
-        diff: bool,
-    },
+    Default { update: bool, diff: bool },
     /// An explicit subset (`--only`), which wins over the flags.
     Only(Vec<Step>),
 }
@@ -174,10 +171,11 @@ mod tests {
     use super::*;
 
     fn sample() -> Config {
-
         Config {
-
-            pipeline: Pipeline::Default { update: true, diff: false },
+            pipeline: Pipeline::Default {
+                update: true,
+                diff: false,
+            },
             repo: String::from("repo"),
             hostname: Some(String::from("host")),
             keep: 5,
@@ -301,7 +299,7 @@ mod tests {
     #[test]
     fn runs_prefers_an_explicit_selection() {
         let config = Config {
-            Pipeline::Only(vec![Step::Diff]),
+            pipeline: Pipeline::Only(vec![Step::Diff]),
 
             ..sample()
         };
