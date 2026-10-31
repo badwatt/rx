@@ -1,13 +1,12 @@
 use std::fmt;
 
 use crate::domain::error::Error;
+pub(crate) use crate::domain::step::Step;
 
 /// Default dotfiles repository path (before `~` expansion).
 pub(crate) const DEFAULT_REPO: &str = "~/.dotfiles";
 /// Default number of generations to keep during cleanup.
 pub(crate) const DEFAULT_KEEP: u8 = 10;
-
-pub(crate) use crate::domain::step::Step;
 
 /// Parallelism caps passed to `nixos-rebuild`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

@@ -173,6 +173,46 @@ src/
 - **Never drive the real workflow in a demo or test**: put a fake `rx` script
   first on `PATH`, or use `--dry-run`.
 
+## Imports
+
+One pattern across `src/` and `gui/src/`, enforced by review and by rustfmt.
+
+Groups, in this order, separated by exactly one blank line:
+
+1. **std** — `std::`, `core::`, `alloc::`
+2. **external crates** — `gpui`, `serde`, whatever `Cargo.toml` declares
+3. **crate-local** — `crate::`, `super::`, `self::`
+
+```rust
+use std::io::Write;
+use std::time::Instant;
+
+use gpui::prelude::*;
+use gpui::{Context, div, px};
+
+use crate::domain::error::Error;
+use crate::theme as t;
+```
+
+Within a group, sort by the whole path. `rustfmt` keeps the order but does not
+create the groups, so a new import goes in its group by hand.
+
+- **One `use` per module path.** Combine items of the same module
+  (`use gpui::{div, px};`), never repeat the path.
+- **No globs**, except a framework prelude (`gpui::prelude::*`) and
+  `use super::*` inside `#[cfg(test)] mod tests`. Do not add project preludes;
+  `gui/src/ui/prelude.rs` is the one exception, kept because five modules of the
+  same surface share the same six imports.
+- **Types and traits imported unqualified**, free functions qualified by their
+  module (`fs::read`, `mem::take`, `pipeline::clock`).
+- **Import a trait where it is used** (inside the function) unless the whole
+  file needs it; `AppContext as _` in `main` is the model.
+- **Re-exports are individual** (`pub(crate) use crate::domain::step::Step;`),
+  never `pub use foo::*`, and they sit with the other imports of their group.
+- **Test-only imports** live in the test module, not at the top of the file.
+- An unused import is a `clippy -D warnings` failure; do not silence it with
+  `#[expect]`, delete it.
+
 ## Build / packaging
 
 - `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).

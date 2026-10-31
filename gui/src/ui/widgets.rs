@@ -1,9 +1,8 @@
 //! Pure building blocks: chips, labels, log lines and machine facts.
 
+use crate::pipeline::LineKind;
 use super::prelude::*;
 use super::{Line, Step};
-use crate::pipeline::LineKind;
-
 pub(super) fn eyebrow(text: &str, color: u32) -> Div {
     div()
         .font_family(t::MONO)

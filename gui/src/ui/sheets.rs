@@ -1,8 +1,9 @@
+
+use gpui::KeyDownEvent;
+
 use super::prelude::*;
 use super::widgets::eyebrow;
 use super::{Phase, RxApp, VERSION};
-use gpui::KeyDownEvent;
-
 impl RxApp {
     /// One row per planned step, separator between them.
     pub(super) fn confirm_rows(&self) -> Vec<Div> {

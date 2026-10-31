@@ -1,8 +1,8 @@
-use super::*;
-use crate::domain::config::{BuildOptions, Step};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use super::*;
+use crate::domain::config::{BuildOptions, Step};
 // ------------------------------------------------------------------
 // Named defaults (shared, so their branches merge across tests)
 // ------------------------------------------------------------------

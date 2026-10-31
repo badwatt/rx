@@ -3,7 +3,6 @@ use std::process::{Command, Stdio};
 use crate::domain::error::Error;
 pub(crate) use crate::infra::argv::{exit_code, program};
 use crate::infra::command::CommandRunner;
-
 /// Production [`CommandRunner`] backed by `std::process`.
 pub(crate) struct ProcessRunner;
 

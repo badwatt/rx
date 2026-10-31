@@ -1,7 +1,7 @@
-use super::*;
-use crate::domain::config::Step;
 use std::io::{self, Read};
 
+use super::*;
+use crate::domain::config::Step;
 // Test-facing wrappers that pin the colored palette, so assertions stay
 // readable and the real functions keep a single palette parameter.
 fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
