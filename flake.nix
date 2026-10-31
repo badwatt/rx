@@ -22,8 +22,8 @@
       ];
       allSystems = darwin ++ linux;
 
-      forEachSystem = systems: f: lib.genAttrs systems (system: f system);
-      forAllSystems = forEachSystem allSystems;
+      pkgsFor = system: import nixpkgs { inherit system; };
+      forAllSystems = lib.genAttrs allSystems;
 
       version = lib.trim (builtins.readFile ./VERSION);
 
@@ -50,8 +50,7 @@
       packages = forAllSystems (
         system:
         let
-          pkgs = import nixpkgs { inherit system; };
-          rx = mkRx pkgs;
+          rx = mkRx (pkgsFor system);
         in
         {
           # e.g. nix build .#rx  (or plain: nix build)
@@ -60,9 +59,9 @@
         }
       );
 
+      # `nix flake check` builds the package (and its man page) for the current
+      # system; the derivation is the same one `packages` exposes.
       checks = forAllSystems (system: {
-        # `nix flake check` builds the package (and its man page) for the
-        # current system; the derivation is the same one `packages` exposes.
         default = self.packages.${system}.default;
       });
 
@@ -72,38 +71,22 @@
       legacyPackages = forAllSystems (
         system:
         {
-          cross = forEachSystem (lib.filter (sys: sys != system) allSystems) (
-            targetSystem:
-            let
-              crossPkgs = import nixpkgs {
+          cross = lib.genAttrs (lib.filter (target: target != system) allSystems) (target: {
+            default = mkRx (
+              import nixpkgs {
                 inherit system;
-                crossSystem = targetSystem;
-              };
-            in
-            {
-              default = mkRx crossPkgs;
-            }
-          );
+                crossSystem = target;
+              }
+            );
+          });
         }
       );
 
       devShells = forAllSystems (
         system:
         let
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = pkgsFor system;
           llvm = pkgs.llvmPackages.llvm;
-          toolchain = with pkgs; [
-            gcc
-            gnumake
-            clippy
-            rustc
-            cargo
-            rustfmt
-            rust-analyzer
-            cargo-llvm-cov
-            llvm
-            pkg-config
-          ];
         in
         {
           default = pkgs.mkShell {
@@ -116,11 +99,22 @@
             LLVM_COV = "${llvm}/bin/llvm-cov";
             LLVM_PROFDATA = "${llvm}/bin/llvm-profdata";
 
-            packages = toolchain;
+            packages = with pkgs; [
+              gcc
+              gnumake
+              clippy
+              rustc
+              cargo
+              rustfmt
+              rust-analyzer
+              cargo-llvm-cov
+              llvm
+              pkg-config
+            ];
           };
         }
       );
 
-      formatter = forAllSystems (system: (import nixpkgs { inherit system; }).nixfmt-rfc-style);
+      formatter = forAllSystems (system: (pkgsFor system).nixfmt-rfc-style);
     };
 }
