@@ -25,7 +25,29 @@
       forEachSystem = systems: f: lib.genAttrs systems (system: f system);
       forAllSystems = forEachSystem allSystems;
 
-      version = lib.removeSuffix "\n" (builtins.readFile ./VERSION);
+      version = lib.trim (builtins.readFile ./VERSION);
+
+      # Reverse-DNS identity of the desktop surface: app id, window class,
+      # desktop entry and icon all carry it.
+      appId = "io.github.badwatt.rxui";
+
+      # Libraries `gui/` links against and needs at runtime.
+      guiLibraries =
+        pkgs:
+        with pkgs;
+        [
+          fontconfig
+          freetype
+          libx11
+          libxcb
+          libxcursor
+          libxi
+          libxkbcommon
+          libxrandr
+          vulkan-loader
+          wayland
+          wayland-protocols
+        ];
 
       mkRx =
         pkgs:
@@ -42,6 +64,7 @@
             license = pkgs.lib.licenses.mit;
             mainProgram = "rx";
             platforms = pkgs.lib.platforms.unix;
+            homepage = "https://github.com/badwatt/rx";
           };
         };
       # The desktop companion.  GPUI brings a real dependency tree, so it lives
@@ -65,29 +88,21 @@
             pkgs.makeWrapper
             pkgs.pkg-config
           ];
-          buildInputs = with pkgs; [
-            fontconfig
-            freetype
-            libx11
-            libxcb
-            libxcursor
-            libxi
-            libxkbcommon
-            libxrandr
-            wayland
-            wayland-protocols
-            vulkan-loader
-          ];
+          buildInputs = guiLibraries pkgs;
 
           # Desktop entry + icon, so the app launches without a terminal and
           # shows up in launchers once the package is installed.
           postInstall = ''
-            id=io.github.badwatt.rxui
-            install -Dm644 ${./gui/io.github.badwatt.rxui.desktop} $out/share/applications/$id.desktop
-            install -Dm644 ${./gui/assets/rxui.svg} $out/share/icons/hicolor/scalable/apps/$id.svg
-            install -Dm644 ${./gui/assets/io.github.badwatt.rxui.png} $out/share/icons/hicolor/256x256/apps/$id.png
-            install -Dm644 ${./gui/io.github.badwatt.rxui.metainfo.xml} $out/share/metainfo/$id.metainfo.xml
-            substituteInPlace $out/share/metainfo/$id.metainfo.xml --replace-fail '@VERSION@' ${version}
+            install -Dm644 ${./gui/io.github.badwatt.rxui.desktop} \
+              $out/share/applications/${appId}.desktop
+            install -Dm644 ${./gui/assets/rxui.svg} \
+              $out/share/icons/hicolor/scalable/apps/${appId}.svg
+            install -Dm644 ${./gui/assets/io.github.badwatt.rxui.png} \
+              $out/share/icons/hicolor/256x256/apps/${appId}.png
+            install -Dm644 ${./gui/io.github.badwatt.rxui.metainfo.xml} \
+              $out/share/metainfo/${appId}.metainfo.xml
+            substituteInPlace $out/share/metainfo/${appId}.metainfo.xml \
+              --replace-fail '@VERSION@' ${version}
           '';
 
           # Blade dlopens the Wayland client and the Vulkan loader, so patchelf
@@ -95,21 +110,24 @@
           # also covers dlopen).  The Vulkan loader must stay the system one —
           # NixOS exports /run/opengl-driver/lib, whose ICDs are built against
           # that driver — so it is only appended as a fallback.
-          postFixup = ''
-            patchelf --add-rpath ${
-              pkgs.lib.makeLibraryPath [ pkgs.libxkbcommon pkgs.wayland ]
-            } $out/bin/rxui
-            wrapProgram $out/bin/rxui \
-              --suffix LD_LIBRARY_PATH : ${pkgs.vulkan-loader}/lib
-          '';
+          postFixup =
+            let
+              runPath = pkgs.lib.makeLibraryPath [ pkgs.libxkbcommon pkgs.wayland ];
+            in
+            ''
+              patchelf --add-rpath ${runPath} $out/bin/rxui
+              wrapProgram $out/bin/rxui \
+                --suffix LD_LIBRARY_PATH : ${pkgs.vulkan-loader}/lib
+            '';
 
           meta = {
             description = "Desktop companion for rx, the NixOS update CLI";
             license = pkgs.lib.licenses.mit;
             mainProgram = "rxui";
             # Lets nixpkgs/desktop tooling find the bundled entry.
-            desktopFileName = "io.github.badwatt.rxui";
+            desktopFileName = appId;
             platforms = pkgs.lib.platforms.linux;
+            homepage = "https://github.com/badwatt/rx";
           };
         };
     in
@@ -168,17 +186,11 @@
         }
       );
 
-      checks = forAllSystems (
-        system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-        in
-        {
-          # `nix flake check` builds the package (and its man page) for the
-          # current system.
-          default = mkRx pkgs;
-        }
-      );
+      checks = forAllSystems (system: {
+        # `nix flake check` builds the package (and its man page) for the
+        # current system; the derivation is the same one `packages` exposes.
+        default = self.packages.${system}.default;
+      });
 
       # Cross builds live under legacyPackages so `packages` stays purely
       # derivations and `nix flake show` stays quiet.
@@ -206,7 +218,7 @@
         let
           pkgs = import nixpkgs { inherit system; };
           llvm = pkgs.llvmPackages.llvm;
-          devRequirements = with pkgs; [
+          toolchain = with pkgs; [
             gcc
             gnumake
             clippy
@@ -217,18 +229,6 @@
             cargo-llvm-cov
             llvm
             pkg-config
-            # `gui/` (GPUI) links against these at build time.
-            fontconfig
-            freetype
-            libx11
-            libxcb
-            libxcursor
-            libxi
-            libxkbcommon
-            libxrandr
-            wayland
-            wayland-protocols
-            vulkan-loader
           ];
         in
         {
@@ -242,10 +242,11 @@
             LLVM_COV = "${llvm}/bin/llvm-cov";
             LLVM_PROFDATA = "${llvm}/bin/llvm-profdata";
 
-            buildInputs = devRequirements;
-            packages = devRequirements;
+            packages = toolchain ++ guiLibraries pkgs;
           };
         }
       );
+
+      formatter = forAllSystems (system: (import nixpkgs { inherit system; }).nixfmt-rfc-style);
     };
 }
