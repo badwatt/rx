@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::*;
-use crate::domain::config::{BuildOptions, Step};
+use crate::domain::config::{BuildOptions, Step, Pipeline};
 // ------------------------------------------------------------------
 // Named defaults (shared, so their branches merge across tests)
 // ------------------------------------------------------------------
@@ -203,17 +203,17 @@ impl Log {
 }
 
 fn default_config() -> Config {
+
     Config {
+
+        pipeline: Pipeline::Default { update: false, diff: false },
         repo: String::from("r"),
         hostname: Some(String::from("h")),
         keep: 1,
-        update: false,
-        diff: false,
         yes: false,
         dry_run: false,
         jobs: None,
         cores: None,
-        only: None,
     }
 }
 
@@ -624,7 +624,7 @@ fn run_rebuild_error_propagates() {
 fn run_only_diff_without_a_hostname_succeeds() {
     let config = Config {
         hostname: None,
-        only: Some(vec![Step::Diff]),
+        pipeline: Pipeline::Only(vec![Step::Diff]),
         ..default_config()
     };
     assert!(
@@ -642,7 +642,7 @@ fn run_only_diff_without_a_hostname_succeeds() {
 fn run_only_cleanup_without_a_hostname_succeeds() {
     let config = Config {
         hostname: None,
-        only: Some(vec![Step::Pull, Step::Cleanup]),
+        pipeline: Pipeline::Only(vec![Step::Pull, Step::Cleanup]),
         ..default_config()
     };
     assert!(
@@ -747,7 +747,7 @@ fn run_diff_output_error_propagates() {
 fn run_only_rebuild_skips_pull_and_stage() {
     let log = Log::default();
     let config = Config {
-        only: Some(vec![Step::Rebuild]),
+        pipeline: Pipeline::Only(vec![Step::Rebuild]),
         ..default_config()
     };
     assert!(
@@ -768,7 +768,7 @@ fn run_only_rebuild_skips_pull_and_stage() {
 fn run_only_cleanup_skips_rebuild() {
     let log = Log::default();
     let config = Config {
-        only: Some(vec![Step::Cleanup]),
+        pipeline: Pipeline::Only(vec![Step::Cleanup]),
         ..default_config()
     };
     assert!(
@@ -791,9 +791,8 @@ fn run_only_diff_runs_the_diff_alone() {
         ..MockNix::default()
     };
     let config = Config {
-        only: Some(vec![Step::Diff]),
-        update: true,
-        diff: true,
+            Pipeline::Only(vec![Step::Diff]),
+
         ..default_config()
     };
     assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&log)).is_ok());

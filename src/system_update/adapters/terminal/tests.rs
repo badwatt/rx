@@ -1,7 +1,7 @@
 use std::io::{self, Read};
 
 use super::*;
-use crate::domain::config::Step;
+use crate::domain::config::{Step, Pipeline};
 // Test-facing wrappers that pin the colored palette, so assertions stay
 // readable and the real functions keep a single palette parameter.
 fn print_title(writer: &mut dyn Write, text: &str) -> Result<(), Error> {
@@ -30,17 +30,17 @@ fn terminal() -> TerminalIo {
 }
 
 fn test_config() -> Config {
+
     Config {
+
+        pipeline: Pipeline::Default { update: false, diff: false },
         repo: String::from("r"),
         hostname: Some(String::from("h")),
         keep: 1,
-        update: false,
-        diff: false,
         yes: false,
         dry_run: false,
         jobs: None,
         cores: None,
-        only: None,
     }
 }
 
@@ -208,7 +208,7 @@ fn confirm_error_from_reader_read_line() {
 #[test]
 fn print_config_fails_when_only_the_step_line_cannot_be_written() {
     let config = Config {
-        only: Some(vec![Step::Pull]),
+        pipeline: Pipeline::Only(vec![Step::Pull]),
         ..test_config()
     };
     // repo, hostname, keep, update, diff succeed; the step list fails.
@@ -231,7 +231,7 @@ fn fail_after_writer_succeeds_until_the_budget_runs_out() {
 fn print_config_lists_an_explicit_step_selection() {
     let mut buf = Vec::new();
     let config = Config {
-        only: Some(vec![Step::Pull, Step::Diff]),
+        pipeline: Pipeline::Only(vec![Step::Pull, Step::Diff]),
         ..test_config()
     };
     assert!(print_config(&mut buf, &config).is_ok());
@@ -255,16 +255,15 @@ fn print_config_marks_an_undetected_hostname() {
 fn print_config_renders_all_fields() {
     let mut buf = Vec::new();
     let config = Config {
+            Pipeline::Default { update: false, diff: true },
+
         repo: String::from("~/.dotfiles"),
         hostname: Some(String::from("nixos")),
         keep: 10,
-        update: false,
-        diff: true,
         yes: false,
         dry_run: false,
         jobs: None,
         cores: None,
-        only: None,
     };
     assert!(print_config(&mut buf, &config).is_ok());
     let s = String::from_utf8_lossy(&buf);

@@ -143,8 +143,8 @@ pub(crate) fn print_config(
     let hostname = config.hostname.as_deref().unwrap_or("<not detected>");
     print_config_line(writer, "hostname", hostname, palette)?;
     print_config_line(writer, "keep", &config.keep.to_string(), palette)?;
-    print_config_line(writer, "update", &config.update.to_string(), palette)?;
-    print_config_line(writer, "diff", &config.diff.to_string(), palette)?;
+    print_config_line(writer, "update", &config.update().to_string(), palette)?;
+    print_config_line(writer, "diff", &config.diff().to_string(), palette)?;
     if let Some(jobs) = config.jobs {
         print_config_line(writer, "jobs", &jobs.to_string(), palette)?;
     }
@@ -152,7 +152,7 @@ pub(crate) fn print_config(
         print_config_line(writer, "cores", &cores.to_string(), palette)?;
     }
     // Shown only when set, so the summary never lies about the pipeline.
-    if let Some(steps) = &config.only {
+    if let Some(steps) = config.only() {
         let names: Vec<&str> = steps.iter().map(|step| step.name()).collect();
         print_config_line(writer, "only", &names.join(","), palette)?;
     }

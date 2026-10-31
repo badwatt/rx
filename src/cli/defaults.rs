@@ -1,21 +1,21 @@
 use crate::cli::hostname;
-use crate::domain::config::{Config, DEFAULT_KEEP, DEFAULT_REPO};
+use crate::domain::config::{Config, DEFAULT_KEEP, DEFAULT_REPO, Pipeline};
 
 /// Build a fresh [`Config`] from defaults: repo `~/.dotfiles`, hostname resolved
 /// from the OS (`None` when undetectable), keep `10`, update/diff/yes/dry-run
 /// `false`.
 pub(crate) fn default_config() -> Config {
+
     Config {
+
+        pipeline: Pipeline::Default { update: false, diff: false },
         repo: expand_tilde(DEFAULT_REPO),
         hostname: hostname::resolve(),
         keep: DEFAULT_KEEP,
-        update: false,
-        diff: false,
         yes: false,
         dry_run: false,
         jobs: None,
         cores: None,
-        only: None,
     }
 }
 

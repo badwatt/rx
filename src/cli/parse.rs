@@ -109,7 +109,7 @@ fn parse_long(
         }
         "--only" => {
             let (value, consumed) = long_value(name, inline, args, i, writer)?;
-            config.only = Some(parse_steps(&value, writer)?);
+            config.set_only(parse_steps(&value, writer)?);
             Ok(consumed)
         }
         "--repo" | "--hostname" | "--keep" | "--jobs" | "--cores" => {
@@ -126,11 +126,11 @@ fn parse_long(
                 "--help" => Err(Intent::Help),
                 "--version" => Err(Intent::Version),
                 "--update" => {
-                    config.update = true;
+                    config.set_update(true);
                     Ok(0)
                 }
                 "--diff" => {
-                    config.diff = true;
+                    config.set_diff(true);
                     Ok(0)
                 }
                 "--yes" => {
@@ -199,8 +199,8 @@ fn parse_short(
         match flag {
             'h' => return Err(Intent::Help),
             'v' => return Err(Intent::Version),
-            'd' => config.diff = true,
-            'u' => config.update = true,
+            'd' => config.set_diff(true),
+            'u' => config.set_update(true),
             'y' => config.yes = true,
             'r' | 'n' | 'k' | 'j' | 'c' => {
                 let label = format!("-{flag}");

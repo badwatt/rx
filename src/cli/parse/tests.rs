@@ -195,7 +195,7 @@ fn parse_k_with_value_sets_keep() {
 fn parse_d_flag_sets_diff() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.diff = true;
+    expected.set_diff(true);
     assert_eq!(parse(&args(&["rx", "-d"]), &mut buf), Intent::Run(expected));
 }
 
@@ -203,7 +203,7 @@ fn parse_d_flag_sets_diff() {
 fn parse_u_flag_sets_update() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.update = true;
+    expected.set_update(true);
     assert_eq!(parse(&args(&["rx", "-u"]), &mut buf), Intent::Run(expected));
 }
 
@@ -219,8 +219,8 @@ fn parse_y_flag_sets_yes() {
 fn parse_d_and_u_together() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.update = true;
-    expected.diff = true;
+    expected.set_update(true);
+    expected.set_diff(true);
     assert_eq!(
         parse(&args(&["rx", "-d", "-u"]), &mut buf),
         Intent::Run(expected)
@@ -234,8 +234,8 @@ fn parse_combined_flags_and_values() {
     expected.repo = String::from("/my/repo");
     expected.hostname = Some(String::from("myhost"));
     expected.keep = 3;
-    expected.update = true;
-    expected.diff = true;
+    expected.set_update(true);
+    expected.set_diff(true);
     assert_eq!(
         parse(
             &args(&[
@@ -325,7 +325,7 @@ fn parse_version_long_returns_version() {
 fn parse_update_long_sets_update() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.update = true;
+    expected.set_update(true);
     assert_eq!(
         parse(&args(&["rx", "--update"]), &mut buf),
         Intent::Run(expected)
@@ -336,7 +336,7 @@ fn parse_update_long_sets_update() {
 fn parse_diff_long_sets_diff() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.diff = true;
+    expected.set_diff(true);
     assert_eq!(
         parse(&args(&["rx", "--diff"]), &mut buf),
         Intent::Run(expected)
@@ -531,7 +531,7 @@ fn parse_help_long_with_value_returns_error() {
 fn parse_only_sets_the_step_selection() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.only = Some(vec![Step::Pull, Step::Diff]);
+    expected.set_only(vec![Step::Pull, Step::Diff]);
     assert_eq!(
         parse(&args(&["rx", "--only", "pull,diff"]), &mut buf),
         Intent::Run(expected)
@@ -542,7 +542,7 @@ fn parse_only_sets_the_step_selection() {
 fn parse_only_equals_accepts_a_single_step() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.only = Some(vec![Step::Rebuild]);
+    expected.set_only(vec![Step::Rebuild]);
     assert_eq!(
         parse(&args(&["rx", "--only=rebuild"]), &mut buf),
         Intent::Run(expected)
@@ -565,7 +565,7 @@ fn parse_only_unknown_step_returns_error() {
 fn parse_only_accepts_update_as_an_alias_for_flake() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.only = Some(vec![Step::Flake]);
+    expected.set_only(vec![Step::Flake]);
     assert_eq!(
         parse(&args(&["rx", "--only", "update"]), &mut buf),
         Intent::Run(expected)
@@ -614,7 +614,7 @@ fn parse_equals_value_does_not_swallow_the_next_flag() {
 fn parse_only_equals_does_not_swallow_the_next_flag() {
     let mut buf = Vec::new();
     let mut expected = default_config();
-    expected.only = Some(vec![Step::Diff]);
+    expected.set_only(vec![Step::Diff]);
     expected.yes = true;
     assert_eq!(
         parse(&args(&["rx", "--only=diff", "-y"]), &mut buf),

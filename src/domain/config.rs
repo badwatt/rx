@@ -17,11 +17,50 @@ pub(crate) struct BuildOptions {
     pub(crate) cores: Option<u16>,
 }
 
+/// Which steps a run performs.
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Pipeline {
+    /// The default pipeline: the flake update and the closure diff follow
+    /// their own flags, everything else always runs.
+    Default {
+        update: bool,
+        diff: bool,
+    },
+    /// An explicit subset (`--only`), which wins over the flags.
+    Only(Vec<Step>),
+}
+
+impl Pipeline {
+    /// Whether the flake update runs.
+    fn update(&self) -> bool {
+        match self {
+            Self::Default { update, .. } => *update,
+            Self::Only(steps) => steps.contains(&Step::Flake),
+        }
+    }
+
+    /// Whether the closure diff runs.
+    fn diff(&self) -> bool {
+        match self {
+            Self::Default { diff, .. } => *diff,
+            Self::Only(steps) => steps.contains(&Step::Diff),
+        }
+    }
+
+    /// Whether `step` belongs to this run.
+    pub(crate) fn runs(&self, step: Step) -> bool {
+        match self {
+            Self::Default { update, diff } => match step {
+                Step::Flake => *update,
+                Step::Diff => *diff,
+                Step::Pull | Step::Stage | Step::Rebuild | Step::Cleanup => true,
+            },
+            Self::Only(steps) => steps.contains(&step),
+        }
+    }
+}
+
 /// Parsed CLI configuration.
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "independent CLI flags are naturally boolean"
-)]
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Config {
     pub(crate) repo: String,
@@ -29,8 +68,6 @@ pub(crate) struct Config {
     /// detected and no `--hostname` was given.
     pub(crate) hostname: Option<String>,
     pub(crate) keep: u8,
-    pub(crate) update: bool,
-    pub(crate) diff: bool,
     /// Assume "yes" for all confirmation prompts.
     pub(crate) yes: bool,
     /// Print commands instead of executing them.
@@ -39,8 +76,8 @@ pub(crate) struct Config {
     pub(crate) jobs: Option<u16>,
     /// `--cores` cap for the rebuild.
     pub(crate) cores: Option<u16>,
-    /// Explicit step selection (`--only`), or `None` for the default pipeline.
-    pub(crate) only: Option<Vec<Step>>,
+    /// Which steps this run performs.
+    pub(crate) pipeline: Pipeline,
 }
 
 impl fmt::Display for Config {
@@ -51,8 +88,8 @@ impl fmt::Display for Config {
             self.repo,
             self.hostname.as_deref().unwrap_or("<not detected>"),
             self.keep,
-            self.update,
-            self.diff
+            self.update(),
+            self.diff()
         )
     }
 }
@@ -83,14 +120,44 @@ impl Config {
     /// `--only` wins when given; otherwise pull/stage/rebuild/cleanup always run
     /// and the flake update / closure diff follow their own flags.
     pub(crate) fn runs(&self, step: Step) -> bool {
-        match &self.only {
-            Some(steps) => steps.contains(&step),
-            None => match step {
-                Step::Flake => self.update,
-                Step::Diff => self.diff,
-                Step::Pull | Step::Stage | Step::Rebuild | Step::Cleanup => true,
-            },
+        self.pipeline.runs(step)
+    }
+
+    /// Whether the flake update runs.
+    pub(crate) fn update(&self) -> bool {
+        self.pipeline.update()
+    }
+
+    /// Whether the closure diff runs.
+    pub(crate) fn diff(&self) -> bool {
+        self.pipeline.diff()
+    }
+
+    /// The explicit `--only` list, or `None` for the default pipeline.
+    pub(crate) fn only(&self) -> Option<&[Step]> {
+        match &self.pipeline {
+            Pipeline::Only(steps) => Some(steps),
+            Pipeline::Default { .. } => None,
         }
+    }
+
+    /// `--update`: only meaningful in the default pipeline.
+    pub(crate) fn set_update(&mut self, on: bool) {
+        if let Pipeline::Default { update, .. } = &mut self.pipeline {
+            *update = on;
+        }
+    }
+
+    /// `--diff`: only meaningful in the default pipeline.
+    pub(crate) fn set_diff(&mut self, on: bool) {
+        if let Pipeline::Default { diff, .. } = &mut self.pipeline {
+            *diff = on;
+        }
+    }
+
+    /// `--only`: an explicit list wins over the flags.
+    pub(crate) fn set_only(&mut self, steps: Vec<Step>) {
+        self.pipeline = Pipeline::Only(steps);
     }
 
     /// Parallelism caps for the rebuild step.
@@ -107,17 +174,17 @@ mod tests {
     use super::*;
 
     fn sample() -> Config {
+
         Config {
+
+            pipeline: Pipeline::Default { update: true, diff: false },
             repo: String::from("repo"),
             hostname: Some(String::from("host")),
             keep: 5,
-            update: true,
-            diff: false,
             yes: false,
             dry_run: false,
             jobs: None,
             cores: None,
-            only: None,
         }
     }
 
@@ -234,9 +301,8 @@ mod tests {
     #[test]
     fn runs_prefers_an_explicit_selection() {
         let config = Config {
-            only: Some(vec![Step::Diff]),
-            update: true,
-            diff: false,
+            Pipeline::Only(vec![Step::Diff]),
+
             ..sample()
         };
         assert!(config.runs(Step::Diff));
