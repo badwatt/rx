@@ -1,3 +1,9 @@
+//! Composition root for `rx`.
+//!
+//! Parses the arguments, selects the adapters (process or dry-run) and runs
+//! the update workflow. Process policy lives in `cli::entry`; every external
+//! command lives in the adapters.
+
 mod cli;
 mod domain;
 mod infra;
