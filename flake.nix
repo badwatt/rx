@@ -1,5 +1,5 @@
 {
-  description = "RX";
+  description = "rx — pull, stage, rebuild and clean up your NixOS system";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs";
@@ -10,17 +10,15 @@
     let
       lib = nixpkgs.lib;
 
-      darwin = [
+      # Native systems plus the cross targets the release matrix needs.
+      allSystems = [
         "x86_64-darwin"
         "aarch64-darwin"
-      ];
-      linux = [
         "x86_64-linux"
         "x86_64-linux-musl"
         "aarch64-linux"
         "i686-linux"
       ];
-      allSystems = darwin ++ linux;
 
       pkgsFor = system: import nixpkgs { inherit system; };
       forAllSystems = lib.genAttrs allSystems;
