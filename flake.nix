@@ -36,6 +36,13 @@
           cargoLock.lockFile = ./Cargo.lock;
           postInstall = ''
             install -Dm644 ${./rx.1} "$out/share/man/man1/rx.1"
+
+            # The binary prints its own completions, so they never drift from
+            # the parser.
+            install -d "$out/share/bash-completion/completions" "$out/share/zsh/site-functions" "$out/share/fish/vendor_completions.d"
+            "$out/bin/rx" --completions bash > "$out/share/bash-completion/completions/rx"
+            "$out/bin/rx" --completions zsh  > "$out/share/zsh/site-functions/_rx"
+            "$out/bin/rx" --completions fish > "$out/share/fish/vendor_completions.d/rx.fish"
           '';
           meta = {
             description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system";
