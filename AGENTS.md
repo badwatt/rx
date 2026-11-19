@@ -132,7 +132,8 @@ src/
 
 ## Versioning & releases
 
+- **CalVer, `YYYY.MM.DD`** (`2026.11.19`), not SemVer: `rx` has no library API whose breaks a version number could announce, and "did this build include the change I read about" is answered better by a date. A same-day second release would reuse the tag, so the release job stays idempotent instead of publishing twice.
 - `VERSION` (repository root) is the **single source of truth** for the project version. `Cargo.toml` carries a `0.0.0` placeholder (`cargo` cannot read the file), `flake.nix` reads `VERSION`, and the binary embeds it via `include_str!("../../VERSION")`.
-- To release: bump `VERSION` and push to `main`. `.github/workflows/release.yml` then tests, builds a static `x86_64-unknown-linux-musl` binary, tags `v<VERSION>` and attaches `rx-v<VERSION>-x86_64-unknown-linux-musl.tar.gz`.
+- To release: set `VERSION` to the release date and push to `main`. `.github/workflows/release.yml` then tests, builds a static `x86_64-unknown-linux-musl` binary, tags `v<VERSION>` and attaches `rx-v<VERSION>-x86_64-unknown-linux-musl.tar.gz`.
 - The release job is idempotent: if the tag `v<VERSION>` already exists it publishes nothing, so unrelated pushes stay quiet.
 - Never hardcode the version in code or tests — read `VERSION` (unit: `cli::help::version()`, integration: `version()` helper).
