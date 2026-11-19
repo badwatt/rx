@@ -47,9 +47,41 @@ impl CommandRunner for DryRunRunner<'_> {
     }
 }
 
+/// Render `cmd` as a copy-pasteable shell command line.
+fn render(cmd: &[String]) -> String {
+    cmd.iter()
+        .map(|arg| quote_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Single-quote `arg` unless it is already a simple shell word.
+///
+/// Embedded single quotes become `'\''`, so the preview survives a paste.
+fn quote_arg(arg: &str) -> String {
+    let simple = !arg.is_empty()
+        && arg
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c));
+    if simple {
+        return arg.to_string();
+    }
+    let mut out = String::with_capacity(arg.len() + 2);
+    out.push('\'');
+    for c in arg.chars() {
+        if c == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
+}
+
 /// Print a command as `$ prog arg1 arg2 …`.
 fn print_command(writer: &mut dyn Write, cmd: &[String]) -> Result<(), Error> {
-    ansi::write_flush(writer, &format!("$ {}\n", cmd.join(" ")))?;
+    ansi::write_flush(writer, &format!("$ {}\n", render(cmd)))?;
     Ok(())
 }
 
@@ -61,7 +93,8 @@ fn print_command_env(
     var: &str,
     value: &str,
 ) -> Result<(), Error> {
-    ansi::write_flush(writer, &format!("$ {var}={value} {}\n", cmd.join(" ")))?;
+    let (var, value) = (quote_arg(var), quote_arg(value));
+    ansi::write_flush(writer, &format!("$ {var}={value} {}\n", render(cmd)))?;
     Ok(())
 }
 
@@ -137,5 +170,29 @@ mod tests {
                 .expect("probe"),
             1
         );
+    }
+
+    #[test]
+    fn print_command_quotes_arguments_that_need_it() {
+        let mut buf = Vec::new();
+        let cmd = vec![
+            String::from("prog"),
+            String::from("two words"),
+            String::from("it's"),
+            String::new(),
+        ];
+        assert!(print_command(&mut buf, &cmd).is_ok());
+        assert_eq!(
+            String::from_utf8_lossy(&buf),
+            "$ prog 'two words' 'it'\\''s' ''\n"
+        );
+    }
+
+    #[test]
+    fn print_command_env_quotes_the_value() {
+        let mut buf = Vec::new();
+        let cmd = vec![String::from("git"), String::from("pull")];
+        assert!(print_command_env(&mut buf, &cmd, "VAR", "a b").is_ok());
+        assert_eq!(String::from_utf8_lossy(&buf), "$ VAR='a b' git pull\n");
     }
 }
