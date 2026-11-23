@@ -53,6 +53,8 @@ fn execute(config: &Config, repo: &dyn Repo, nix: &dyn Nix, ui: &dyn UserIo) -> 
             let _ = ui.output("Aborted.\n");
             return Ok(());
         }
+        // The user answered, so the tab is working again.
+        ui.progress(State::Working, "Starting the system update")?;
     }
 
     if config.runs(Step::Pull) {

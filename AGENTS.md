@@ -119,6 +119,7 @@ src/
 - **Completions**: `rx --completions <bash|zsh|fish>` prints static scripts; a test asserts every script mentions the binary and the shared flags, so a new flag cannot silently miss them. `rx.1` is the man page and is installed by the flake.
 - **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
 - **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
+- **Status reports**: `UserIo::progress` writes OSC 7501 (`working`, `blocked:kind=permission` at a confirmation, `blocked:kind=auth` while sudo waits for a password, `done`, `error`) only on a TTY and never on `--dry-run`. A prompt must be followed by `working` once the user answers, or an unfocused tab keeps showing "needs attention" while the workflow runs. `Nix::password_pending` probes `sudo -n true` (silent, read-only), so a pending password is announced before the elevated command.
 
 ## Build / packaging
 

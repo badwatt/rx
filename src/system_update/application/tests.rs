@@ -63,6 +63,14 @@ fn no_diff() -> Result<String, Error> {
     Ok(String::new())
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "mock must match the port trait signature"
+)]
+fn no_password_pending() -> Result<bool, Error> {
+    Ok(false)
+}
+
 fn pull_errs(_: &str) -> Result<(), Error> {
     Err(Error::GitPullFailed)
 }
@@ -113,6 +121,7 @@ impl Default for MockRepo {
 }
 
 type RebuildFn = Box<dyn Fn(&str, &str, BuildOptions) -> Result<(), Error>>;
+type PendingFn = Box<dyn Fn() -> Result<bool, Error>>;
 type PruneFn = Box<dyn Fn(u8) -> Result<(), Error>>;
 type GcFn = Box<dyn Fn() -> Result<(), Error>>;
 type DiffFn = Box<dyn Fn() -> Result<String, Error>>;
@@ -120,6 +129,7 @@ type DiffFn = Box<dyn Fn() -> Result<String, Error>>;
 struct MockNix {
     update: StrFn,
     rebuild: RebuildFn,
+    password_pending: PendingFn,
     prune: PruneFn,
     gc: GcFn,
     diff: DiffFn,
@@ -131,6 +141,9 @@ impl Nix for MockNix {
     }
     fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
         (self.rebuild)(repo, hostname, options)
+    }
+    fn password_pending(&self) -> Result<bool, Error> {
+        (self.password_pending)()
     }
     fn prune(&self, keep: u8) -> Result<(), Error> {
         (self.prune)(keep)
@@ -148,6 +161,7 @@ impl Default for MockNix {
         Self {
             update: Box::new(ok_str),
             rebuild: Box::new(ok_rebuild),
+            password_pending: Box::new(no_password_pending),
             prune: Box::new(ok_prune),
             gc: Box::new(ok_gc),
             diff: Box::new(no_diff),
@@ -204,6 +218,12 @@ impl Log {
     }
     fn contains(&self, needle: &str) -> bool {
         self.0.borrow().iter().any(|m| m.contains(needle))
+    }
+    fn position(&self, needle: &str) -> Option<usize> {
+        self.0.borrow().iter().position(|m| m.contains(needle))
+    }
+    fn last_position(&self, needle: &str) -> Option<usize> {
+        self.0.borrow().iter().rposition(|m| m.contains(needle))
     }
 }
 
@@ -607,6 +627,177 @@ fn run_failed_progress_error_keeps_the_step_error() {
     let err = run(&default_config(), &MockRepo::default(), &nix, &ui)
         .expect_err("rebuild failure must win");
     assert_eq!(err.to_string(), "NixOS rebuild failed");
+}
+
+#[test]
+fn run_reports_blocked_auth_when_sudo_will_prompt() {
+    let log = Log::default();
+    let nix = MockNix {
+        password_pending: Box::new(|| Ok(true)),
+        ..MockNix::default()
+    };
+    assert!(run(&default_config(), &MockRepo::default(), &nix, &ok_ui(&log)).is_ok());
+    assert!(log.contains("BlockedAuth"));
+}
+
+#[test]
+fn run_skips_blocked_auth_when_credentials_are_cached() {
+    let log = Log::default();
+    assert!(run_ok(&default_config(), &ok_ui(&log)).is_ok());
+    assert!(!log.contains("BlockedAuth"));
+}
+
+#[test]
+fn run_clears_blocked_permission_after_the_prompt() {
+    let log = Log::default();
+    assert!(run_ok(&default_config(), &ok_ui(&log)).is_ok());
+    let blocked = log.position("BlockedPermission").expect("blocked report");
+    let cleared = log.last_position("Working").expect("working report");
+    assert!(blocked < cleared);
+}
+
+#[test]
+fn run_clears_blocked_auth_after_the_password() {
+    let log = Log::default();
+    let nix = MockNix {
+        password_pending: Box::new(|| Ok(true)),
+        ..MockNix::default()
+    };
+    assert!(run(&default_config(), &MockRepo::default(), &nix, &ok_ui(&log)).is_ok());
+    let blocked = log.position("BlockedAuth").expect("blocked report");
+    let cleared = log.last_position("Working").expect("working report");
+    assert!(blocked < cleared);
+}
+
+#[test]
+fn run_post_prompt_progress_error_propagates() {
+    let calls = Rc::new(std::cell::Cell::new(0usize));
+    let counter = Rc::clone(&calls);
+    let ui = MockUi {
+        progress: Box::new(move |_, _| {
+            let n = counter.get() + 1;
+            counter.set(n);
+            if n == 3 {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run_ok(&default_config(), &ui).is_err());
+}
+
+#[test]
+fn run_stage_blocked_progress_error_propagates() {
+    let repo = repo_with_changes();
+    let ui = MockUi {
+        progress: Box::new(|_, msg| {
+            if msg.contains("staging") {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
+}
+
+#[test]
+fn run_stage_working_progress_error_propagates() {
+    let repo = repo_with_changes();
+    let ui = MockUi {
+        progress: Box::new(|_, msg| {
+            if msg.contains("Staging") {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
+}
+
+#[test]
+fn run_password_pending_error_propagates() {
+    let nix = MockNix {
+        password_pending: Box::new(|| Err(Error::RebuildFailed)),
+        ..MockNix::default()
+    };
+    assert!(
+        run(
+            &default_config(),
+            &MockRepo::default(),
+            &nix,
+            &ok_ui(&Log::default())
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn run_blocked_auth_progress_error_propagates() {
+    let nix = MockNix {
+        password_pending: Box::new(|| Ok(true)),
+        ..MockNix::default()
+    };
+    let ui = MockUi {
+        progress: Box::new(|state, _| {
+            if state == State::BlockedAuth {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run(&default_config(), &MockRepo::default(), &nix, &ui).is_err());
+}
+
+#[test]
+fn run_password_clear_progress_error_propagates() {
+    let nix = MockNix {
+        password_pending: Box::new(|| Ok(true)),
+        ..MockNix::default()
+    };
+    let ui = MockUi {
+        progress: Box::new(|state, msg| {
+            if state == State::Working && msg.contains("Rebuilding") {
+                Err(Error::RebuildFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run(&default_config(), &MockRepo::default(), &nix, &ui).is_err());
+}
+
+#[test]
+fn run_password_prompt_failure_keeps_the_step_error() {
+    let nix = MockNix {
+        password_pending: Box::new(|| Ok(true)),
+        rebuild: Box::new(rebuild_errs),
+        ..MockNix::default()
+    };
+    let err = run(
+        &default_config(),
+        &MockRepo::default(),
+        &nix,
+        &ok_ui(&Log::default()),
+    )
+    .expect_err("rebuild failure must win");
+    assert_eq!(err.to_string(), "NixOS rebuild failed");
+}
+
+#[test]
+fn run_stage_reports_blocked_permission_before_the_prompt() {
+    let log = Log::default();
+    let repo = repo_with_changes();
+    assert!(run(&default_config(), &repo, &MockNix::default(), &ok_ui(&log)).is_ok());
+    assert!(log.contains("BlockedPermission"));
 }
 
 // ------------------------------------------------------------------

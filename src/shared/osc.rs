@@ -15,6 +15,8 @@ use crate::shared::ansi;
 pub(crate) enum State {
     Working,
     BlockedPermission,
+    /// Blocked on a credential: sudo is asking for a password.
+    BlockedAuth,
     Done,
     Failed,
 }
@@ -24,20 +26,27 @@ impl State {
     fn name(self) -> &'static str {
         match self {
             Self::Working => "working",
-            Self::BlockedPermission => "blocked",
+            Self::BlockedPermission | Self::BlockedAuth => "blocked",
             Self::Done => "done",
             Self::Failed => "error",
+        }
+    }
+
+    /// Why the program is blocked; only `blocked` carries a `kind`.
+    fn kind(self) -> Option<&'static str> {
+        match self {
+            Self::BlockedPermission => Some("permission"),
+            Self::BlockedAuth => Some("auth"),
+            Self::Working | Self::Done | Self::Failed => None,
         }
     }
 }
 
 /// Write one `OSC 7501` report for `state`, with `msg` base64-encoded.
 pub(crate) fn report(writer: &mut dyn Write, state: State, msg: &str) -> Result<(), Error> {
-    // `kind` only qualifies `blocked`, and `permission` is the only reason
-    // `rx` blocks: it is waiting for the user to approve a step.
-    let kind = match state {
-        State::BlockedPermission => ":kind=permission",
-        State::Working | State::Done | State::Failed => "",
+    let kind = match state.kind() {
+        Some(kind) => format!(":kind={kind}"),
+        None => String::new(),
     };
     let sequence = format!(
         "\x1b]7501;state={}{}:app=rx:msg={}\x1b\\",
@@ -95,6 +104,13 @@ mod tests {
             buf,
             b"\x1b]7501;state=blocked:kind=permission:app=rx:msg=\x1b\\"
         );
+    }
+
+    #[test]
+    fn report_blocked_auth_adds_the_auth_kind() {
+        let mut buf = Vec::new();
+        assert!(report(&mut buf, State::BlockedAuth, "").is_ok());
+        assert_eq!(buf, b"\x1b]7501;state=blocked:kind=auth:app=rx:msg=\x1b\\");
     }
 
     #[test]

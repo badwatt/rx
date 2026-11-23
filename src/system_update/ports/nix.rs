@@ -7,6 +7,8 @@ pub(crate) trait Nix {
     fn update(&self, repo: &str) -> Result<(), Error>;
     /// Rebuild and switch the system for `hostname`.
     fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error>;
+    /// Whether the next elevated command will ask for a sudo password.
+    fn password_pending(&self) -> Result<bool, Error>;
     /// Delete old generations, keeping `keep`.
     fn prune(&self, keep: u8) -> Result<(), Error>;
     /// Free unreferenced store paths.

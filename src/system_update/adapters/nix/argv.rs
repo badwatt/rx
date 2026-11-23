@@ -15,6 +15,11 @@ pub(super) fn rebuild_probe() -> Vec<String> {
     ]
 }
 
+/// `sudo -n true`: succeeds only when sudo would not ask for a password.
+pub(super) fn sudo_probe() -> Vec<String> {
+    vec!["sudo".into(), "-n".into(), "true".into()]
+}
+
 /// `nix flake update --flake <repo>`
 pub(super) fn cmd_update(repo: &str) -> Vec<String> {
     vec![
@@ -110,6 +115,11 @@ mod tests {
             rebuild_probe(),
             vec!["nixos-rebuild", "--elevate=none", "list-generations"]
         );
+    }
+
+    #[test]
+    fn sudo_probe_argv() {
+        assert_eq!(sudo_probe(), vec!["sudo", "-n", "true"]);
     }
 
     #[test]
