@@ -35,7 +35,9 @@ fn spawn_keep_alive(interval: Duration, refresh: Box<RefreshFn>) -> std::thread:
 
 /// Renew the sudo ticket without a prompt; `false` when sudo stops obliging.
 fn refresh_sudo_ticket() -> bool {
-    matches!(ProcessRunner.probe(&sudo_keep_alive()), Ok(0))
+    // `.ok() == Some(0)` keeps the outcome a plain value: a `matches!` arm
+    // would add a region only one of the two outcomes ever executes.
+    ProcessRunner.probe(&sudo_keep_alive()).ok() == Some(0)
 }
 
 /// Which `nixos-rebuild` implementation is installed.
