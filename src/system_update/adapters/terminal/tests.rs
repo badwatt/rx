@@ -26,7 +26,12 @@ fn print_config_line(writer: &mut dyn Write, label: &str, value: &str) -> Result
 }
 
 fn terminal() -> TerminalIo {
-    TerminalIo::new(Palette::COLOR)
+    TerminalIo::new(Palette::COLOR, false)
+}
+
+/// Interactive terminal, so OSC 7501 reports are written to stdout.
+fn terminal_with_osc() -> TerminalIo {
+    TerminalIo::detect(Palette::COLOR, true, false)
 }
 
 fn test_config() -> Config {
@@ -470,6 +475,35 @@ fn terminal_io_config_does_not_panic() {
 #[test]
 fn terminal_io_output_does_not_panic() {
     terminal().output("raw\n").expect("output");
+}
+
+#[test]
+fn terminal_io_progress_writes_on_a_tty() {
+    terminal_with_osc()
+        .progress(State::Working, "Working")
+        .expect("progress");
+}
+
+#[test]
+fn terminal_io_progress_is_silent_off_a_tty() {
+    terminal()
+        .progress(State::Working, "Working")
+        .expect("progress");
+}
+
+#[test]
+fn terminal_io_progress_is_silent_on_a_tty_dry_run() {
+    TerminalIo::detect(Palette::COLOR, true, true)
+        .progress(State::BlockedPermission, "Waiting")
+        .expect("progress");
+}
+
+#[test]
+fn osc_enabled_requires_a_tty_and_no_dry_run() {
+    assert!(osc_enabled(true, false));
+    assert!(!osc_enabled(false, false));
+    assert!(!osc_enabled(true, true));
+    assert!(!osc_enabled(false, true));
 }
 
 #[test]

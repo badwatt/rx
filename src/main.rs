@@ -56,7 +56,7 @@ fn run(
 
 /// Composition root for the workflow: wire the adapters and run the use case.
 fn run_workflow(config: &Config, out_palette: Palette) -> Result<(), Error> {
-    let ui = TerminalIo::new(out_palette);
+    let ui = TerminalIo::new(out_palette, config.dry_run);
     let real = ProcessRunner;
     let dry = DryRunRunner::new(&real);
     let runner: &dyn CommandRunner = if config.dry_run { &dry } else { &real };

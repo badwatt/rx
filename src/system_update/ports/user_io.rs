@@ -1,5 +1,6 @@
 use crate::domain::config::Config;
 use crate::domain::error::Error;
+use crate::shared::osc::State;
 
 /// Driven port: user-facing presentation and interaction.
 ///
@@ -8,6 +9,8 @@ use crate::domain::error::Error;
 pub(crate) trait UserIo {
     /// Print a banner title.
     fn title(&self, text: &str) -> Result<(), Error>;
+    /// Report the program state through OSC 7501; an adapter may drop it.
+    fn progress(&self, state: State, msg: &str) -> Result<(), Error>;
     /// Prompt for a yes/no confirmation, returning `default` on empty input.
     fn confirm(&self, default: bool, msg: Option<&str>) -> Result<bool, Error>;
     /// Print a success message.

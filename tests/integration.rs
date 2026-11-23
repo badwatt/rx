@@ -107,6 +107,8 @@ fn dry_run_prints_commands_without_executing() {
     let stdout = stdout_of(&output);
     assert!(stdout.contains("$ "));
     assert!(stdout.contains("nixos-rebuild"));
+    // A dry run claims nothing: no OSC 7501 status report is written.
+    assert!(!stdout.contains("\x1b]7501"));
 }
 
 #[test]

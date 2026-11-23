@@ -8,17 +8,34 @@ pub(crate) mod steps;
 
 use crate::domain::config::{Config, Step};
 use crate::domain::error::Error;
+use crate::shared::osc::State;
 use crate::system_update::ports::nix::Nix;
 use crate::system_update::ports::repo::Repo;
 use crate::system_update::ports::user_io::UserIo;
 
-/// Run the full NixOS update workflow.
+/// Run the full NixOS update workflow, bracketed by OSC 7501 status reports.
 pub(crate) fn run(
     config: &Config,
     repo: &dyn Repo,
     nix: &dyn Nix,
     ui: &dyn UserIo,
 ) -> Result<(), Error> {
+    ui.progress(State::Working, "Starting the system update")?;
+    match execute(config, repo, nix, ui) {
+        Ok(()) => {
+            ui.progress(State::Done, "System update finished")?;
+            Ok(())
+        }
+        Err(error) => {
+            // Best effort: the step failure is the error `main` reports.
+            let _ = ui.progress(State::Failed, &error.to_string());
+            Err(error)
+        }
+    }
+}
+
+/// The pipeline proper; [`run`] adds the state reports around it.
+fn execute(config: &Config, repo: &dyn Repo, nix: &dyn Nix, ui: &dyn UserIo) -> Result<(), Error> {
     config.validate()?;
 
     // Resolve the hostname before any side effect (pull, flake update,
@@ -29,10 +46,13 @@ pub(crate) fn run(
     ui.title("RX Configuration")?;
     ui.config(config)?;
 
-    if !config.yes && !ui.confirm(true, None)? {
-        // Best-effort: the workflow is ending anyway.
-        let _ = ui.output("Aborted.\n");
-        return Ok(());
+    if !config.yes {
+        ui.progress(State::BlockedPermission, "Waiting for confirmation")?;
+        if !ui.confirm(true, None)? {
+            // Best-effort: the workflow is ending anyway.
+            let _ = ui.output("Aborted.\n");
+            return Ok(());
+        }
     }
 
     if config.runs(Step::Pull) {

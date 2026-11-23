@@ -1,8 +1,9 @@
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, IsTerminal, Write};
 
 use crate::domain::config::Config;
 use crate::domain::error::Error;
 use crate::shared::ansi::{self, Palette};
+use crate::shared::osc::{self, State};
 use crate::system_update::ports::user_io::UserIo;
 
 /// Production [`UserIo`]: prompts and status on stdout.
@@ -11,18 +12,43 @@ use crate::system_update::ports::user_io::UserIo;
 /// `main` on stderr, so a failing step never prints twice.
 pub(crate) struct TerminalIo {
     out: Palette,
+    /// Whether OSC 7501 reports may be written: an interactive terminal and
+    /// not a dry run.
+    osc: bool,
 }
 
 impl TerminalIo {
-    pub(crate) fn new(out: Palette) -> Self {
-        Self { out }
+    pub(crate) fn new(out: Palette, dry_run: bool) -> Self {
+        Self::detect(out, io::stdout().is_terminal(), dry_run)
     }
+
+    /// Constructor with the TTY gate pinned, so tests cover both sides.
+    fn detect(out: Palette, is_tty: bool, dry_run: bool) -> Self {
+        Self {
+            out,
+            osc: osc_enabled(is_tty, dry_run),
+        }
+    }
+}
+
+/// A status report only makes sense for a real terminal, and a dry run must
+/// not claim the workflow is running.
+pub(crate) fn osc_enabled(is_tty: bool, dry_run: bool) -> bool {
+    is_tty && !dry_run
 }
 
 impl UserIo for TerminalIo {
     fn title(&self, text: &str) -> Result<(), Error> {
         let mut out = io::stdout();
         print_title(&mut out, text, self.out)
+    }
+
+    fn progress(&self, state: State, msg: &str) -> Result<(), Error> {
+        if !self.osc {
+            return Ok(());
+        }
+        let mut out = io::stdout();
+        osc::report(&mut out, state, msg)
     }
 
     fn confirm(&self, default: bool, msg: Option<&str>) -> Result<bool, Error> {

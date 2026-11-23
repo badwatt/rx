@@ -73,7 +73,7 @@ domain kernel, non-business helpers and generic infrastructure are shared.
 src/
 ├── main.rs              # composition root: parse → wire adapters → run
 ├── domain/              # shared kernel (pure): config.rs, error.rs
-├── shared/              # non-business cross-cutting: ansi.rs, test_helpers.rs
+├── shared/              # non-business cross-cutting: ansi.rs, osc.rs, test_helpers.rs
 ├── infra/               # generic process mechanism (not business, not a port)
 │   ├── command.rs       # CommandRunner (adapter-internal argv seam)
 │   ├── process.rs       # ProcessRunner (std::process)

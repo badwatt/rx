@@ -160,12 +160,14 @@ impl Default for MockNix {
 // ------------------------------------------------------------------
 
 type TitleFn = Box<dyn Fn(&str) -> Result<(), Error>>;
+type ProgressFn = Box<dyn Fn(State, &str) -> Result<(), Error>>;
 type ConfirmFn = Box<dyn Fn(bool, Option<&str>) -> Result<bool, Error>>;
 type MsgFn = Box<dyn Fn(&str) -> Result<(), Error>>;
 type ConfigFn = Box<dyn Fn(&Config) -> Result<(), Error>>;
 
 struct MockUi {
     title: TitleFn,
+    progress: ProgressFn,
     confirm: ConfirmFn,
     success: MsgFn,
     output: MsgFn,
@@ -175,6 +177,9 @@ struct MockUi {
 impl UserIo for MockUi {
     fn title(&self, text: &str) -> Result<(), Error> {
         (self.title)(text)
+    }
+    fn progress(&self, state: State, msg: &str) -> Result<(), Error> {
+        (self.progress)(state, msg)
     }
     fn confirm(&self, default: bool, msg: Option<&str>) -> Result<bool, Error> {
         (self.confirm)(default, msg)
@@ -222,11 +227,16 @@ fn default_config() -> Config {
 fn ok_ui(log: &Log) -> MockUi {
     let confirm_log = log.clone();
     let title_log = log.clone();
+    let progress_log = log.clone();
     let success_log = log.clone();
     let output_log = log.clone();
     MockUi {
         title: Box::new(move |text| {
             title_log.record(text);
+            Ok(())
+        }),
+        progress: Box::new(move |state, msg| {
+            progress_log.record(&format!("{state:?} {msg}"));
             Ok(())
         }),
         confirm: Box::new(move |_, _| {
@@ -480,6 +490,123 @@ fn run_invalid_config_returns_error() {
         ..default_config()
     };
     assert!(run_ok(&config, &ok_ui(&Log::default())).is_err());
+}
+
+// ------------------------------------------------------------------
+// OSC 7501 state reports
+// ------------------------------------------------------------------
+
+#[test]
+fn run_reports_working_rebuilding_and_done() {
+    let log = Log::default();
+    assert!(run_ok(&default_config(), &ok_ui(&log)).is_ok());
+    assert!(log.contains("Working"));
+    assert!(log.contains("Rebuilding"));
+    assert!(log.contains("Done"));
+}
+
+#[test]
+fn run_reports_blocked_permission_before_the_prompt() {
+    let log = Log::default();
+    assert!(run_ok(&default_config(), &ok_ui(&log)).is_ok());
+    assert!(log.contains("BlockedPermission"));
+}
+
+#[test]
+fn run_yes_skips_blocked_permission() {
+    let log = Log::default();
+    let config = Config {
+        yes: true,
+        ..default_config()
+    };
+    assert!(run_ok(&config, &ok_ui(&log)).is_ok());
+    assert!(!log.contains("BlockedPermission"));
+}
+
+#[test]
+fn run_reports_failed_when_a_step_fails() {
+    let log = Log::default();
+    let nix = MockNix {
+        rebuild: Box::new(rebuild_errs),
+        ..MockNix::default()
+    };
+    assert!(run(&default_config(), &MockRepo::default(), &nix, &ok_ui(&log)).is_err());
+    assert!(log.contains("Failed"));
+}
+
+#[test]
+fn run_start_progress_error_propagates() {
+    let ui = MockUi {
+        progress: Box::new(|_, _| Err(Error::GitPullFailed)),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run_ok(&default_config(), &ui).is_err());
+}
+
+#[test]
+fn run_done_progress_error_propagates() {
+    let ui = MockUi {
+        progress: Box::new(|state, _| {
+            if state == State::Done {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run_ok(&default_config(), &ui).is_err());
+}
+
+#[test]
+fn run_blocked_progress_error_propagates() {
+    let ui = MockUi {
+        progress: Box::new(|state, _| {
+            if state == State::BlockedPermission {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run_ok(&default_config(), &ui).is_err());
+}
+
+#[test]
+fn run_rebuild_progress_error_propagates() {
+    let ui = MockUi {
+        progress: Box::new(|_, msg| {
+            if msg.contains("Rebuilding") {
+                Err(Error::RebuildFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run_ok(&default_config(), &ui).is_err());
+}
+
+#[test]
+fn run_failed_progress_error_keeps_the_step_error() {
+    let nix = MockNix {
+        rebuild: Box::new(rebuild_errs),
+        ..MockNix::default()
+    };
+    let ui = MockUi {
+        progress: Box::new(|state, _| {
+            if state == State::Failed {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    let err = run(&default_config(), &MockRepo::default(), &nix, &ui)
+        .expect_err("rebuild failure must win");
+    assert_eq!(err.to_string(), "NixOS rebuild failed");
 }
 
 // ------------------------------------------------------------------
