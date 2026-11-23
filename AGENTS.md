@@ -119,7 +119,7 @@ src/
 - **Completions**: `rx --completions <bash|zsh|fish>` prints static scripts; a test asserts every script mentions the binary and the shared flags, so a new flag cannot silently miss them. `rx.1` is the man page and is installed by the flake.
 - **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
 - **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
-- **Status reports**: `UserIo::progress` writes OSC 7501 (`working`, `blocked:kind=permission` at a confirmation, `blocked:kind=auth` while sudo waits for a password, `done`, `error`) only on a TTY and never on `--dry-run`. A prompt must be followed by `working` once the user answers, or an unfocused tab keeps showing "needs attention" while the workflow runs. `Nix::password_pending` probes `sudo -n true` (silent, read-only) and `Nix::refresh_credentials` then runs `sudo -v`, so the password question is announced while it happens and the command itself runs as `working` (`nixos-rebuild -ng` builds before it elevates). A build longer than sudo's timestamp timeout can prompt again, unannounced.
+- **Status reports**: `UserIo::progress` writes OSC 7501 (`working`, `blocked:kind=permission` at a confirmation, `blocked:kind=auth` while sudo waits for a password, `done`, `error`) only on a TTY and never on `--dry-run`. A prompt must be followed by `working` once the user answers, or an unfocused tab keeps showing "needs attention" while the workflow runs. `Nix::password_pending` probes `sudo -n true` (silent, read-only) and `Nix::refresh_credentials` then runs `sudo -v`, so the password question is announced while it happens and the command itself runs as `working` (`nixos-rebuild -ng` builds before it elevates). It also starts a background thread that renews the ticket with `sudo -n -v` every 60 s, so a build longer than sudo's timestamp timeout cannot ask again unannounced; the thread ends with the process.
 
 ## Build / packaging
 
@@ -133,7 +133,7 @@ src/
 
 ## Versioning & releases
 
-- **CalVer, `YYYY.MM.DD`** (`2026.11.19`), not SemVer: `rx` has no library API whose breaks a version number could announce, and "did this build include the change I read about" is answered better by a date. A same-day second release would reuse the tag, so the release job stays idempotent instead of publishing twice.
+- **CalVer, `YYYY.MM.DD`** (`2026.11.19`), not SemVer: `rx` has no library API whose breaks a number could announce, and "did this build include the change I read about" is answered better by a date. A second release on the same day appends a micro counter — `YYYY.MM.DD.MICRO` (`2026.11.23.1`) — never a letter suffix (`2026.11.23a` reads as a pre-release to semver tooling and sorts before `2026.11.23`). Each bump gets its own tag, so the release job stays idempotent.
 - `VERSION` (repository root) is the **single source of truth** for the project version. `Cargo.toml` carries a `0.0.0` placeholder (`cargo` cannot read the file), `flake.nix` reads `VERSION`, and the binary embeds it via `include_str!("../../VERSION")`.
 - To release: set `VERSION` to the release date and push to `main`. `.github/workflows/release.yml` then tests, builds a static `x86_64-unknown-linux-musl` binary, tags `v<VERSION>` and attaches `rx-v<VERSION>-x86_64-unknown-linux-musl.tar.gz`.
 - The release job is idempotent: if the tag `v<VERSION>` already exists it publishes nothing, so unrelated pushes stay quiet.
