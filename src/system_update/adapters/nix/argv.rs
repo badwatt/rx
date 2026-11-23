@@ -25,6 +25,11 @@ pub(super) fn sudo_validate() -> Vec<String> {
     vec!["sudo".into(), "-v".into()]
 }
 
+/// `sudo -n -v`: renew the cached credentials only when no prompt is needed.
+pub(super) fn sudo_keep_alive() -> Vec<String> {
+    vec!["sudo".into(), "-n".into(), "-v".into()]
+}
+
 /// `nix flake update --flake <repo>`
 pub(super) fn cmd_update(repo: &str) -> Vec<String> {
     vec![
@@ -109,7 +114,7 @@ mod tests {
     use super::*;
     use crate::domain::error::Error;
     use crate::shared::test_helpers::StubRunner;
-    use crate::system_update::adapters::nix::NixCli;
+    use crate::system_update::adapters::nix::{NixCli, refresh_sudo_ticket, spawn_keep_alive};
     use crate::system_update::ports::nix::Nix as _;
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -125,6 +130,11 @@ mod tests {
     #[test]
     fn sudo_probe_argv() {
         assert_eq!(sudo_probe(), vec!["sudo", "-n", "true"]);
+    }
+
+    #[test]
+    fn sudo_keep_alive_argv() {
+        assert_eq!(sudo_keep_alive(), vec!["sudo", "-n", "-v"]);
     }
 
     #[test]
@@ -252,6 +262,24 @@ mod tests {
     fn password_pending_true_when_the_probe_errors() {
         let runner = StubRunner::new().with_probe(|_| Err(Error::Io(std::io::Error::other("x"))));
         assert!(NixCli::new(&runner).password_pending().expect("sudo probe"));
+    }
+
+    #[test]
+    fn keep_alive_refreshes_until_the_probe_fails() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let calls = std::sync::Arc::new(AtomicUsize::new(0));
+        let counter = std::sync::Arc::clone(&calls);
+        let handle = spawn_keep_alive(
+            std::time::Duration::ZERO,
+            Box::new(move || counter.fetch_add(1, Ordering::SeqCst) < 2),
+        );
+        handle.join().expect("keep-alive thread");
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn refresh_sudo_ticket_reports_the_probe_outcome() {
+        let _ = refresh_sudo_ticket();
     }
 
     #[test]

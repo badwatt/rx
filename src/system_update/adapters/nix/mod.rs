@@ -1,14 +1,42 @@
 use crate::domain::config::BuildOptions;
 use crate::domain::error::Error;
+use std::time::Duration;
+
 use crate::infra::command::CommandRunner;
+use crate::infra::process::ProcessRunner;
 
 mod argv;
 
 use self::argv::{
     cmd_collect_garbage, cmd_diff_closures, cmd_prune, cmd_rebuild, cmd_update, rebuild_probe,
-    sudo_probe, sudo_validate,
+    sudo_keep_alive, sudo_probe, sudo_validate,
 };
 use crate::system_update::ports::nix::Nix;
+
+/// How often the background thread renews the cached sudo credentials.
+const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Renews the sudo ticket; returns `false` once it cannot be renewed.
+type RefreshFn = dyn Fn() -> bool + Send + Sync + 'static;
+
+/// Keep the cached sudo credentials fresh in the background.
+///
+/// `sudo -v` extends the ticket for `timestamp_timeout` only (five minutes by
+/// default), and a `nixos-rebuild -ng` build can outlast it: the activation
+/// would then ask for a password that no report announces. A thread that
+/// renews the ticket removes that prompt. It ends with the process.
+fn spawn_keep_alive(interval: Duration, refresh: Box<RefreshFn>) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        while refresh() {
+            std::thread::sleep(interval);
+        }
+    })
+}
+
+/// Renew the sudo ticket without a prompt; `false` when sudo stops obliging.
+fn refresh_sudo_ticket() -> bool {
+    matches!(ProcessRunner.probe(&sudo_keep_alive()), Ok(0))
+}
 
 /// Which `nixos-rebuild` implementation is installed.
 ///
@@ -73,11 +101,13 @@ impl Nix for NixCli<'_> {
 
     fn refresh_credentials(&self) -> Result<(), Error> {
         let status = self.runner.run(&sudo_validate())?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::PasswordFailed)
+        if status != 0 {
+            return Err(Error::PasswordFailed);
         }
+        // Detached on purpose: the ticket must stay fresh while the elevated
+        // command runs, and the thread dies with the process.
+        let _ = spawn_keep_alive(KEEP_ALIVE_INTERVAL, Box::new(refresh_sudo_ticket));
+        Ok(())
     }
 
     fn prune(&self, keep: u8) -> Result<(), Error> {
