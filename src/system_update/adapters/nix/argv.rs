@@ -20,6 +20,11 @@ pub(super) fn sudo_probe() -> Vec<String> {
     vec!["sudo".into(), "-n".into(), "true".into()]
 }
 
+/// `sudo -v`: validate (or prompt for) the sudo credentials up front.
+pub(super) fn sudo_validate() -> Vec<String> {
+    vec!["sudo".into(), "-v".into()]
+}
+
 /// `nix flake update --flake <repo>`
 pub(super) fn cmd_update(repo: &str) -> Vec<String> {
     vec![
@@ -120,6 +125,11 @@ mod tests {
     #[test]
     fn sudo_probe_argv() {
         assert_eq!(sudo_probe(), vec!["sudo", "-n", "true"]);
+    }
+
+    #[test]
+    fn sudo_validate_argv() {
+        assert_eq!(sudo_validate(), vec!["sudo", "-v"]);
     }
 
     #[test]
@@ -224,6 +234,48 @@ mod tests {
                 "/nix/var/nix/profiles/system"
             ]
         );
+    }
+
+    #[test]
+    fn password_pending_true_when_sudo_would_prompt() {
+        let runner = StubRunner::new().with_probe(|_| Ok(1));
+        assert!(NixCli::new(&runner).password_pending().expect("sudo probe"));
+    }
+
+    #[test]
+    fn password_pending_false_when_credentials_are_cached() {
+        let runner = StubRunner::new().with_probe(|_| Ok(0));
+        assert!(!NixCli::new(&runner).password_pending().expect("sudo probe"));
+    }
+
+    #[test]
+    fn password_pending_true_when_the_probe_errors() {
+        let runner = StubRunner::new().with_probe(|_| Err(Error::Io(std::io::Error::other("x"))));
+        assert!(NixCli::new(&runner).password_pending().expect("sudo probe"));
+    }
+
+    #[test]
+    fn refresh_credentials_ok_on_zero() {
+        let runner = StubRunner::new();
+        assert!(NixCli::new(&runner).refresh_credentials().is_ok());
+    }
+
+    #[test]
+    fn refresh_credentials_errs_on_nonzero() {
+        let runner = StubRunner::new().with_run(|_| Ok(1));
+        let err = NixCli::new(&runner)
+            .refresh_credentials()
+            .expect_err("refused password");
+        assert_eq!(err.to_string(), "Failed to obtain sudo credentials");
+    }
+
+    #[test]
+    fn refresh_credentials_propagates_run_error() {
+        let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
+        let err = NixCli::new(&runner)
+            .refresh_credentials()
+            .expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]

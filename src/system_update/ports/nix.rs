@@ -9,6 +9,9 @@ pub(crate) trait Nix {
     fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error>;
     /// Whether the next elevated command will ask for a sudo password.
     fn password_pending(&self) -> Result<bool, Error>;
+    /// Prompt for and cache the sudo credentials now, so a later elevated
+    /// command does not have to block.
+    fn refresh_credentials(&self) -> Result<(), Error>;
     /// Delete old generations, keeping `keep`.
     fn prune(&self, keep: u8) -> Result<(), Error>;
     /// Free unreferenced store paths.

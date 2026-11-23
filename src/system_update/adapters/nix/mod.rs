@@ -6,7 +6,7 @@ mod argv;
 
 use self::argv::{
     cmd_collect_garbage, cmd_diff_closures, cmd_prune, cmd_rebuild, cmd_update, rebuild_probe,
-    sudo_probe,
+    sudo_probe, sudo_validate,
 };
 use crate::system_update::ports::nix::Nix;
 
@@ -69,6 +69,15 @@ impl Nix for NixCli<'_> {
         // `sudo -n true` only succeeds when no password is needed; any other
         // outcome means a prompt is coming.
         Ok(!matches!(self.runner.probe(&sudo_probe()), Ok(0)))
+    }
+
+    fn refresh_credentials(&self) -> Result<(), Error> {
+        let status = self.runner.run(&sudo_validate())?;
+        if status == 0 {
+            Ok(())
+        } else {
+            Err(Error::PasswordFailed)
+        }
     }
 
     fn prune(&self, keep: u8) -> Result<(), Error> {

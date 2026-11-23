@@ -12,6 +12,8 @@ pub(crate) enum Error {
     NotAGitRepo,
     FlakeUpdateFailed,
     RebuildFailed,
+    /// `sudo -v` failed: the user refused or could not enter the password.
+    PasswordFailed,
     HostnameUnknown,
     CleanupFailed,
     GitAddFailed,
@@ -29,6 +31,7 @@ impl fmt::Display for Error {
             Error::NotAGitRepo => write!(f, "Repository is not a git working tree"),
             Error::FlakeUpdateFailed => write!(f, "Failed to update flake inputs"),
             Error::RebuildFailed => write!(f, "NixOS rebuild failed"),
+            Error::PasswordFailed => write!(f, "Failed to obtain sudo credentials"),
             Error::HostnameUnknown => {
                 write!(f, "Could not determine hostname; pass --hostname")
             }
@@ -50,6 +53,7 @@ impl std::error::Error for Error {
             | Error::NotAGitRepo
             | Error::FlakeUpdateFailed
             | Error::RebuildFailed
+            | Error::PasswordFailed
             | Error::HostnameUnknown
             | Error::CleanupFailed
             | Error::GitAddFailed
@@ -110,6 +114,14 @@ mod tests {
         assert_eq!(
             Error::FlakeUpdateFailed.to_string(),
             "Failed to update flake inputs"
+        );
+    }
+
+    #[test]
+    fn display_password_failed_matches_literal() {
+        assert_eq!(
+            Error::PasswordFailed.to_string(),
+            "Failed to obtain sudo credentials"
         );
     }
 

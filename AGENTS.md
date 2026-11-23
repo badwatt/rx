@@ -106,7 +106,7 @@ src/
 - **Single output channel**: user-facing output flows through `UserIo`; parse errors and the single top-level error go to **stderr**, the rest to stdout.
 - **NO_COLOR / non-TTY / `--no-color`**: each stream picks its own `ansi::Palette` from `NO_COLOR` (non-empty) + `is_terminal()`; `--no-color` forces plain.
 - **Exit codes**: `2` invalid args/config, `141` (128 + SIGPIPE) on early stdout close, `128 + N` for signal-terminated children, else `1`.
-- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
+- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `PasswordFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
 - **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
 - **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
 - **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
@@ -119,7 +119,7 @@ src/
 - **Completions**: `rx --completions <bash|zsh|fish>` prints static scripts; a test asserts every script mentions the binary and the shared flags, so a new flag cannot silently miss them. `rx.1` is the man page and is installed by the flake.
 - **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
 - **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
-- **Status reports**: `UserIo::progress` writes OSC 7501 (`working`, `blocked:kind=permission` at a confirmation, `blocked:kind=auth` while sudo waits for a password, `done`, `error`) only on a TTY and never on `--dry-run`. A prompt must be followed by `working` once the user answers, or an unfocused tab keeps showing "needs attention" while the workflow runs. `Nix::password_pending` probes `sudo -n true` (silent, read-only), so a pending password is announced before the elevated command.
+- **Status reports**: `UserIo::progress` writes OSC 7501 (`working`, `blocked:kind=permission` at a confirmation, `blocked:kind=auth` while sudo waits for a password, `done`, `error`) only on a TTY and never on `--dry-run`. A prompt must be followed by `working` once the user answers, or an unfocused tab keeps showing "needs attention" while the workflow runs. `Nix::password_pending` probes `sudo -n true` (silent, read-only) and `Nix::refresh_credentials` then runs `sudo -v`, so the password question is announced while it happens and the command itself runs as `working` (`nixos-rebuild -ng` builds before it elevates). A build longer than sudo's timestamp timeout can prompt again, unannounced.
 
 ## Build / packaging
 

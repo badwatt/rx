@@ -122,6 +122,7 @@ impl Default for MockRepo {
 
 type RebuildFn = Box<dyn Fn(&str, &str, BuildOptions) -> Result<(), Error>>;
 type PendingFn = Box<dyn Fn() -> Result<bool, Error>>;
+type RefreshFn = Box<dyn Fn() -> Result<(), Error>>;
 type PruneFn = Box<dyn Fn(u8) -> Result<(), Error>>;
 type GcFn = Box<dyn Fn() -> Result<(), Error>>;
 type DiffFn = Box<dyn Fn() -> Result<String, Error>>;
@@ -130,6 +131,7 @@ struct MockNix {
     update: StrFn,
     rebuild: RebuildFn,
     password_pending: PendingFn,
+    refresh_credentials: RefreshFn,
     prune: PruneFn,
     gc: GcFn,
     diff: DiffFn,
@@ -144,6 +146,9 @@ impl Nix for MockNix {
     }
     fn password_pending(&self) -> Result<bool, Error> {
         (self.password_pending)()
+    }
+    fn refresh_credentials(&self) -> Result<(), Error> {
+        (self.refresh_credentials)()
     }
     fn prune(&self, keep: u8) -> Result<(), Error> {
         (self.prune)(keep)
@@ -162,6 +167,7 @@ impl Default for MockNix {
             update: Box::new(ok_str),
             rebuild: Box::new(ok_rebuild),
             password_pending: Box::new(no_password_pending),
+            refresh_credentials: Box::new(ok_gc),
             prune: Box::new(ok_prune),
             gc: Box::new(ok_gc),
             diff: Box::new(no_diff),
@@ -718,6 +724,23 @@ fn run_stage_working_progress_error_propagates() {
         ..ok_ui(&Log::default())
     };
     assert!(run(&default_config(), &repo, &MockNix::default(), &ui).is_err());
+}
+
+#[test]
+fn run_credentials_error_propagates() {
+    let nix = MockNix {
+        password_pending: Box::new(|| Ok(true)),
+        refresh_credentials: Box::new(|| Err(Error::PasswordFailed)),
+        ..MockNix::default()
+    };
+    let err = run(
+        &default_config(),
+        &MockRepo::default(),
+        &nix,
+        &ok_ui(&Log::default()),
+    )
+    .expect_err("refused password must abort");
+    assert_eq!(err.to_string(), "Failed to obtain sudo credentials");
 }
 
 #[test]
