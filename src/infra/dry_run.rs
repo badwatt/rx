@@ -23,22 +23,17 @@ impl<'a> DryRunRunner<'a> {
 
 impl CommandRunner for DryRunRunner<'_> {
     fn run(&self, cmd: &[String]) -> Result<i32, Error> {
-        let mut out = std::io::stdout();
-        // Echo failure is non-critical; mirrors `write_parse_error`.
-        let _ = print_command(&mut out, cmd);
+        echo(cmd, None);
         Ok(0)
     }
 
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
-        let mut out = std::io::stdout();
-        // Echo failure is non-critical; mirrors `write_parse_error`.
-        let _ = print_command_env(&mut out, cmd, var, value);
+        echo(cmd, Some((var, value)));
         Ok(0)
     }
 
     fn capture(&self, cmd: &[String]) -> Result<(i32, String), Error> {
-        let mut out = std::io::stdout();
-        let _ = print_command(&mut out, cmd);
+        echo(cmd, None);
         Ok((0, String::new()))
     }
 
@@ -47,26 +42,47 @@ impl CommandRunner for DryRunRunner<'_> {
     }
 }
 
-/// Render `cmd` as a copy-pasteable shell command line.
+/// Print the command a real run would execute, with an optional environment
+/// assignment. Echo failure is non-critical, mirroring `write_parse_error`.
+fn echo(cmd: &[String], env: Option<(&str, &str)>) {
+    let mut out = std::io::stdout();
+    let _ = match env {
+        Some((var, value)) => print_command_env(&mut out, cmd, var, value),
+        None => print_command(&mut out, cmd),
+    };
+}
+
+/// Render `cmd` as a copy-pasteable shell command line in one allocation.
 fn render(cmd: &[String]) -> String {
-    cmd.iter()
-        .map(|arg| quote_arg(arg))
-        .collect::<Vec<_>>()
-        .join(" ")
+    let mut out = String::new();
+    for (index, arg) in cmd.iter().enumerate() {
+        if index > 0 {
+            out.push(' ');
+        }
+        push_quoted(&mut out, arg);
+    }
+    out
 }
 
 /// Single-quote `arg` unless it is already a simple shell word.
+fn quote_arg(arg: &str) -> String {
+    let mut out = String::with_capacity(arg.len() + 2);
+    push_quoted(&mut out, arg);
+    out
+}
+
+/// Append `arg` to `out`, quoting it when the shell needs it.
 ///
 /// Embedded single quotes become `'\''`, so the preview survives a paste.
-fn quote_arg(arg: &str) -> String {
+fn push_quoted(out: &mut String, arg: &str) {
     let simple = !arg.is_empty()
         && arg
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c));
     if simple {
-        return arg.to_string();
+        out.push_str(arg);
+        return;
     }
-    let mut out = String::with_capacity(arg.len() + 2);
     out.push('\'');
     for c in arg.chars() {
         if c == '\'' {
@@ -76,7 +92,6 @@ fn quote_arg(arg: &str) -> String {
         }
     }
     out.push('\'');
-    out
 }
 
 /// Print a command as `$ prog arg1 arg2 …`.

@@ -2,6 +2,7 @@ use crate::domain::config::BuildOptions;
 use crate::domain::error::Error;
 use std::time::Duration;
 
+use crate::infra::argv::ensure_success;
 use crate::infra::command::CommandRunner;
 use crate::infra::process::ProcessRunner;
 
@@ -76,11 +77,7 @@ impl<'a> NixCli<'a> {
 impl Nix for NixCli<'_> {
     fn update(&self, repo: &str) -> Result<(), Error> {
         let status = self.runner.run(&cmd_update(repo))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::FlakeUpdateFailed)
-        }
+        ensure_success(status, Error::FlakeUpdateFailed)
     }
 
     fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
@@ -88,11 +85,7 @@ impl Nix for NixCli<'_> {
         let status = self
             .runner
             .run(&cmd_rebuild(repo, hostname, flavor, options))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::RebuildFailed)
-        }
+        ensure_success(status, Error::RebuildFailed)
     }
 
     fn password_pending(&self) -> Result<bool, Error> {
@@ -103,9 +96,7 @@ impl Nix for NixCli<'_> {
 
     fn refresh_credentials(&self) -> Result<(), Error> {
         let status = self.runner.run(&sudo_validate())?;
-        if status != 0 {
-            return Err(Error::PasswordFailed);
-        }
+        ensure_success(status, Error::PasswordFailed)?;
         // Detached on purpose: the ticket must stay fresh while the elevated
         // command runs, and the thread dies with the process.
         let _ = spawn_keep_alive(KEEP_ALIVE_INTERVAL, Box::new(refresh_sudo_ticket));
@@ -114,28 +105,17 @@ impl Nix for NixCli<'_> {
 
     fn prune(&self, keep: u8) -> Result<(), Error> {
         let status = self.runner.run(&cmd_prune(keep))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::CleanupFailed)
-        }
+        ensure_success(status, Error::CleanupFailed)
     }
 
     fn collect_garbage(&self) -> Result<(), Error> {
         let status = self.runner.run(&cmd_collect_garbage())?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::CleanupFailed)
-        }
+        ensure_success(status, Error::CleanupFailed)
     }
 
     fn diff_closures(&self) -> Result<String, Error> {
         let (status, output) = self.runner.capture(&cmd_diff_closures())?;
-        if status == 0 {
-            Ok(output)
-        } else {
-            Err(Error::DiffFailed)
-        }
+        ensure_success(status, Error::DiffFailed)?;
+        Ok(output)
     }
 }

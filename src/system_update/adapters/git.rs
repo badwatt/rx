@@ -1,4 +1,5 @@
 use crate::domain::error::Error;
+use crate::infra::argv::ensure_success;
 use crate::infra::command::CommandRunner;
 use crate::system_update::ports::repo::Repo;
 
@@ -28,11 +29,7 @@ impl Repo for GitRepo<'_> {
         let status = self
             .runner
             .run_with_env(&pull(repo), "GIT_TERMINAL_PROMPT", "0")?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::GitPullFailed)
-        }
+        ensure_success(status, Error::GitPullFailed)
     }
 
     fn changes(&self, repo: &str) -> Result<String, Error> {
@@ -46,11 +43,7 @@ impl Repo for GitRepo<'_> {
 
     fn add_all(&self, repo: &str) -> Result<(), Error> {
         let status = self.runner.run(&add(repo))?;
-        if status == 0 {
-            Ok(())
-        } else {
-            Err(Error::GitAddFailed)
-        }
+        ensure_success(status, Error::GitAddFailed)
     }
 }
 

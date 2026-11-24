@@ -12,6 +12,14 @@ pub(crate) fn program(cmd: &[String]) -> Result<&str, Error> {
     })
 }
 
+/// `Ok(())` when `status` is a success, else `error`.
+///
+/// Every adapter maps a non-zero exit to its own error variant; the check
+/// lives here instead of being repeated at each call site.
+pub(crate) fn ensure_success(status: i32, error: Error) -> Result<(), Error> {
+    if status == 0 { Ok(()) } else { Err(error) }
+}
+
 /// Extract the exit code from a process status.
 ///
 /// Signal- and stop-terminated children report the shell convention `128 + N`;
@@ -21,5 +29,21 @@ pub(crate) fn exit_code(status: std::process::ExitStatus) -> i32 {
     match status.code() {
         Some(code) => code,
         None => status.signal().map_or(1, |signal| 128 + signal),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_success_accepts_zero() {
+        assert!(ensure_success(0, Error::GitPullFailed).is_ok());
+    }
+
+    #[test]
+    fn ensure_success_maps_a_nonzero_status_to_the_given_error() {
+        let error = ensure_success(1, Error::GitPullFailed).expect_err("nonzero status");
+        assert_eq!(error.to_string(), "Failed to pull changes");
     }
 }
