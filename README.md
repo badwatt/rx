@@ -71,6 +71,11 @@ Each release also ships `SHA256SUMS`. The macOS binaries are unsigned, so
 Gatekeeper quarantines them after download; clear it with
 `xattr -d com.apple.quarantine ./rx`.
 
+Release notes are a categorized changelog: the conventional commit subjects
+since the previous release are grouped into breaking changes, features, fixes,
+performance, refactor, tests, docs, style, build, CI, chore and revert, with a
+link to the full diff.
+
 A manual `workflow_dispatch` run always builds the matrix (validating the
 action versions and cross targets) and only publishes when the `publish` input
 is enabled.

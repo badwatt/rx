@@ -135,6 +135,92 @@ jobs:
       (github.event_name == 'push' || inputs.publish)
     runs-on: ubuntu-latest
     steps:
+      # The changelog needs every commit and tag between the two releases.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Previous tag
+        id: prev
+        run: echo "tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Build changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v6
+        with:
+          fromTag: ${{ steps.prev.outputs.tag }}
+          toTag: ${{ github.sha }}
+          mode: "COMMIT"
+          configurationJson: |
+            {
+              "template": "#{{CHANGELOG}}\n\n#{{UNCATEGORIZED}}\n\n**Full changelog**: #{{RELEASE_DIFF}}",
+              "commit_template": "- #{{TITLE}}",
+              "categories": [
+                {
+                  "title": "## 🚨 Breaking Changes",
+                  "labels": ["breaking"]
+                },
+                {
+                  "title": "## 🚀 Features",
+                  "labels": ["feat", "feature"]
+                },
+                {
+                  "title": "## 🐛 Fixes",
+                  "labels": ["fix", "bug"]
+                },
+                {
+                  "title": "## ⚡️ Performance",
+                  "labels": ["perf"]
+                },
+                {
+                  "title": "## ♻️ Refactor",
+                  "labels": ["refactor"]
+                },
+                {
+                  "title": "## 🧪 Tests",
+                  "labels": ["test"]
+                },
+                {
+                  "title": "## 📝 Docs",
+                  "labels": ["docs"]
+                },
+                {
+                  "title": "## 💄 Style",
+                  "labels": ["style"]
+                },
+                {
+                  "title": "## 🔨 Build",
+                  "labels": ["build"]
+                },
+                {
+                  "title": "## 👷 CI",
+                  "labels": ["ci"]
+                },
+                {
+                  "title": "## 🧹 Chore",
+                  "labels": ["chore"]
+                },
+                {
+                  "title": "## ⏪ Revert",
+                  "labels": ["revert"]
+                }
+              ],
+              "label_extractor": [
+                {
+                  "pattern": "^[a-z]+(\\([^)]*\\))?!:",
+                  "target": "breaking",
+                  "on_property": "title"
+                },
+                {
+                  "pattern": "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\\([^)]*\\))?!?:",
+                  "target": "$1",
+                  "on_property": "title"
+                }
+              ]
+            }
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -147,11 +233,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.check.outputs.version }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
         run: |
-          # No checkout in this job: name the repository explicitly so `gh`
-          # does not look for a git remote.
+          # Name the repository explicitly so `gh` does not depend on a remote.
           gh release create "v$VERSION" ./dist/*.tar.gz ./dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --title "v$VERSION" \
-            --generate-notes \
+            --notes "$CHANGELOG" \
             --target "$GITHUB_SHA"
