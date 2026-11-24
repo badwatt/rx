@@ -38,6 +38,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99
       - run: cargo test --all-targets
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.99
+      - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items
+
   coverage:
     runs-on: ubuntu-latest
     steps:

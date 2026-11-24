@@ -192,7 +192,7 @@ cargo llvm-cov --all-targets --no-default-ignore-filename-regex
 ```
 
 - `nix flake check` debe pasar (evalúa el paquete y el man page).
-- CI (`.github/workflows/ci.yml`): `fmt`, `clippy -D warnings`, `test` y `coverage` con `--fail-under-lines/functions/regions 100`. Se queda en verde siempre.
+- CI (`.github/workflows/ci.yml`): `fmt`, `clippy -D warnings`, `test`, `doc` con `RUSTDOCFLAGS=-D warnings` y `coverage` con `--fail-under-lines/functions/regions 100`. Se queda en verde siempre.
 
 **Terminado** cuando: hay un test que falla sin el cambio y pasa con él · cobertura 100 sin bajar · los cuatro comandos y `nix flake check` en verde · el código respeta las skills de Rust aplicables · no hay `unwrap`, `clone` ni dependencia nuevos sin justificar · README/rustdoc actualizados si cambió el comportamiento público · si cambió `version`, las notas del release las genera el workflow (no hay `CHANGELOG.md`).
 
