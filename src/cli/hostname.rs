@@ -19,7 +19,14 @@ fn from_cmd() -> Option<String> {
 /// Inner logic extracted for testability.
 fn from_cmd_inner(output: Option<std::process::Output>) -> Option<String> {
     let out = output?;
-    String::from_utf8(out.stdout).ok()
+    clean(String::from_utf8(out.stdout).ok())
+}
+
+/// Trim a source's answer; a blank one is no answer, so the next source runs.
+fn clean(value: Option<String>) -> Option<String> {
+    value
+        .map(|name| name.trim().to_owned())
+        .filter(|name| !name.is_empty())
 }
 
 #[cfg(not(test))]
@@ -43,10 +50,9 @@ pub(crate) fn resolve_from(
     env_hostname: impl FnOnce() -> Option<String>,
     cmd_hostname: impl FnOnce() -> Option<String>,
 ) -> Option<String> {
-    proc_hostname()
-        .map(|s| s.trim().to_owned())
-        .or_else(env_hostname)
-        .or_else(cmd_hostname)
+    clean(proc_hostname())
+        .or_else(|| clean(env_hostname()))
+        .or_else(|| clean(cmd_hostname()))
 }
 
 #[cfg(test)]
@@ -57,6 +63,28 @@ mod tests {
     fn resolve_from_proc_succeeds() {
         let result = resolve_from(|| Some(String::from("myhost\n")), || None, || None);
         assert_eq!(result, Some(String::from("myhost")));
+    }
+
+    #[test]
+    fn resolve_from_trims_the_env_answer() {
+        let result = resolve_from(|| None, || Some(String::from("envhost\n")), || None);
+        assert_eq!(result, Some(String::from("envhost")));
+    }
+
+    #[test]
+    fn resolve_from_trims_the_command_answer() {
+        let result = resolve_from(|| None, || None, || Some(String::from("cmdhost\n")));
+        assert_eq!(result, Some(String::from("cmdhost")));
+    }
+
+    #[test]
+    fn resolve_from_skips_a_blank_source() {
+        let result = resolve_from(
+            || Some(String::from("  \n")),
+            || Some(String::from("envhost")),
+            || None,
+        );
+        assert_eq!(result, Some(String::from("envhost")));
     }
 
     #[test]
@@ -89,9 +117,7 @@ mod tests {
             stdout: b"myhost\n".to_vec(),
             stderr: Vec::new(),
         });
-        let result = from_cmd_inner(output);
-        assert!(result.is_some());
-        assert_ne!(result.expect("hostname").trim(), "");
+        assert_eq!(from_cmd_inner(output), Some(String::from("myhost")));
     }
 
     #[test]
