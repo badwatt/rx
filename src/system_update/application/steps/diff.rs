@@ -15,12 +15,15 @@ pub(crate) fn run(nix: &dyn Nix, ui: &dyn UserIo) -> Result<(), Error> {
 /// Mirrors the former `tac | awk '/Version/{print; exit} 1' | tac` pipeline:
 /// when no `Version` line exists, the whole output is returned unchanged.
 pub(crate) fn tail_from_last_version(output: &str) -> String {
-    let lines: Vec<&str> = output.lines().collect();
-    match lines.iter().rposition(|line| line.contains("Version")) {
-        Some(start) => {
-            let mut result = lines[start..].join("\n");
-            result.push('\n');
-            result
+    match output.rfind("Version") {
+        Some(index) => {
+            let start = output[..index].rfind('\n').map_or(0, |newline| newline + 1);
+            let mut tail = String::with_capacity(output.len() - start + 1);
+            tail.push_str(&output[start..]);
+            if !tail.ends_with('\n') {
+                tail.push('\n');
+            }
+            tail
         }
         None => output.to_owned(),
     }
@@ -55,5 +58,10 @@ mod tests {
     #[test]
     fn tail_from_last_version_match_on_last_line() {
         assert_eq!(tail_from_last_version("a\nVersion 3\n"), "Version 3\n");
+    }
+
+    #[test]
+    fn tail_from_last_version_adds_a_final_newline() {
+        assert_eq!(tail_from_last_version("Version 3"), "Version 3\n");
     }
 }

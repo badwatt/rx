@@ -19,6 +19,10 @@ fn from_cmd() -> Option<String> {
 /// Inner logic extracted for testability.
 fn from_cmd_inner(output: Option<std::process::Output>) -> Option<String> {
     let out = output?;
+    // A failing `hostname` is no answer, whatever it printed.
+    if !out.status.success() {
+        return None;
+    }
     clean(String::from_utf8(out.stdout).ok())
 }
 
@@ -118,6 +122,17 @@ mod tests {
             stderr: Vec::new(),
         });
         assert_eq!(from_cmd_inner(output), Some(String::from("myhost")));
+    }
+
+    #[test]
+    fn from_cmd_inner_returns_none_on_a_failing_command() {
+        use std::os::unix::process::ExitStatusExt;
+        let output = std::process::Output {
+            status: std::process::ExitStatus::from_raw(1 << 8),
+            stdout: b"junk\n".to_vec(),
+            stderr: Vec::new(),
+        };
+        assert!(from_cmd_inner(Some(output)).is_none());
     }
 
     #[test]
