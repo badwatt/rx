@@ -33,7 +33,10 @@
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           postInstall = ''
-            install -Dm644 ${./rx.1} "$out/share/man/man1/rx.1"
+            # The version lives in Cargo.toml: render it into the man page.
+            install -d "$out/share/man/man1"
+            substitute ${./rx.1} "$out/share/man/man1/rx.1" \
+              --replace-fail '@VERSION@' "${version}"
 
             # The binary prints its own completions, so they never drift from
             # the parser.
