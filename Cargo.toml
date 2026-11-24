@@ -1,7 +1,6 @@
 [package]
 name = "rx"
-# Placeholder: the real version lives in the repository-root VERSION file.
-version = "0.0.0"
+version = "26.11.0"
 edition = "2024"
 description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system"
 license = "MIT"

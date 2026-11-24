@@ -3,13 +3,13 @@ use std::io::Write;
 use crate::domain::error::Error;
 use crate::shared::ansi::{self, Palette};
 
-/// Project version, read from the repository-root `VERSION` file (single source
-/// of truth). `Cargo.toml` only carries a placeholder version.
-const VERSION_FILE: &str = include_str!("../../VERSION");
+/// Project version, embedded from `[package].version` in `Cargo.toml` — the
+/// single source of truth.
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Version string without the file's trailing newline.
+/// Version string.
 fn version() -> &'static str {
-    VERSION_FILE.trim()
+    VERSION
 }
 
 /// Print the help banner.
@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn print_version_prints_file_version() {
+    fn print_version_prints_the_package_version() {
         let mut buf = Vec::new();
         assert!(print_version(&mut buf, Palette::PLAIN).is_ok());
         assert_eq!(

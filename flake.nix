@@ -23,7 +23,7 @@
       pkgsFor = system: import nixpkgs { inherit system; };
       forAllSystems = lib.genAttrs allSystems;
 
-      version = lib.trim (builtins.readFile ./VERSION);
+      version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 
       mkRx =
         pkgs:

@@ -57,8 +57,8 @@ shipped as `rx.1`; the flake installs it under `share/man/man1`.
 
 ### Release binary
 
-Every `VERSION` bump on `main` gets published as a GitHub release with static
-binaries for:
+Every version bump in `Cargo.toml` on `main` gets published as a GitHub
+release with static binaries for:
 
 | Target                        | Runner        | Notes                     |
 |-------------------------------|---------------|---------------------------|
@@ -76,21 +76,23 @@ action versions and cross targets) and only publishes when the `publish` input
 is enabled.
 
 ```bash
-gh release download v2026.11.19 --pattern '*x86_64-unknown-linux-musl*'
-tar -xzf rx-v2026.11.19-x86_64-unknown-linux-musl.tar.gz
-./rx-v2026.11.19-x86_64-unknown-linux-musl/rx --version
+gh release download v26.11.0 --pattern '*x86_64-unknown-linux-musl*'
+tar -xzf rx-v26.11.0-x86_64-unknown-linux-musl.tar.gz
+./rx-v26.11.0-x86_64-unknown-linux-musl/rx --version
 ```
 
 ### Versioning
 
-`VERSION` (repository root) is the single source of truth. `Cargo.toml` carries
-a `0.0.0` placeholder and `flake.nix` reads the file. To release, bump
-`VERSION`; CI builds, tags `v<VERSION>` and attaches the binaries. A push that
-does not change `VERSION` publishes nothing.
+CalVer in the [memos](https://github.com/usememos/memos) style, `YY.MM.N`
+(`26.11.0`): the year and month of the release plus a counter for further
+releases in the same month. Not SemVer: `rx` has no library API whose breaks a
+number could announce.
 
-Tradeoff: because `cargo` cannot read a version file, `Cargo.toml` keeps a
-`0.0.0` placeholder. `cargo install --path .` therefore records `0.0.0` in the
-cargo metadata, while `rx --version` always prints the real `VERSION`.
+`[package].version` in `Cargo.toml` is the single source of truth. The binary
+embeds it with `env!("CARGO_PKG_VERSION")`, `flake.nix` reads it with
+`builtins.fromTOML`, and the release workflow tags `v<version>` for it. To
+release, bump that version and push; a push that does not change it publishes
+nothing. `cargo install --path .` records the same version.
 
 ### Nix
 

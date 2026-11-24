@@ -1,17 +1,18 @@
 name: Release
 
-# Publishes one release per VERSION bump: when the tag `v<VERSION>` does not
-# exist yet, the binaries are built, packaged and attached to a new release.
+# Publishes one release per version bump (`[package].version` in Cargo.toml):
+# when the tag `v<version>` does not exist yet, the binaries are built,
+# packaged and attached to a new release.
 #
 # A manual run always builds (so the matrix and the action versions can be
-# validated without bumping VERSION); it only publishes when asked to.
+# validated without a version bump); it only publishes when asked to.
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish the release when VERSION has no tag yet"
+        description: "Publish the release when the version has no tag yet"
         type: boolean
         default: false
 
@@ -34,9 +35,11 @@ jobs:
           # Tags are needed to detect an already released version.
           fetch-depth: 0
 
-      - name: Read VERSION
+      - name: Read version
         id: version
-        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(awk -F'"' '/^\[package\]/{p=1} p&&/^version/{print $2; exit}' Cargo.toml)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check for existing release tag
         id: tag
@@ -52,7 +55,9 @@ jobs:
 
       - name: Skip
         if: github.event_name == 'push' && steps.tag.outputs.released == 'true'
-        run: echo "v$(cat VERSION) already released; bump VERSION to publish."
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: echo "v$VERSION already released; bump the version in Cargo.toml to publish."
 
   build:
     needs: check

@@ -4,9 +4,9 @@ use std::process::{Command, Output, Stdio};
 /// Path to the compiled `rx` binary, provided by Cargo for integration tests.
 const RX: &str = env!("CARGO_BIN_EXE_rx");
 
-/// Project version, sourced from the repository-root `VERSION` file.
+/// Project version, the `[package].version` this test binary was built with.
 fn version() -> &'static str {
-    include_str!("../VERSION").trim()
+    env!("CARGO_PKG_VERSION")
 }
 
 /// Run `rx` with `args` (stdin closed), capturing stdout/stderr and status.

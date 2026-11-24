@@ -128,13 +128,13 @@ src/
 - Release matrix (`.github/workflows/release.yml`): `x86_64-unknown-linux-musl` (tested + built natively), `aarch64-unknown-linux-musl` (via `cross`), `aarch64-apple-darwin` and `x86_64-apple-darwin` (macOS runners, unsigned). Artifacts are uploaded per target, checksummed (`SHA256SUMS`) and published by a separate job.
 - `checks.<system>.default` mirrors the package, so `nix flake check` works; CI evaluates all outputs (`nix flake check --no-build`) and runs `nix build .#default`. The package installs `rx.1` under `share/man/man1`.
 - No CI build cache on purpose: the crate has zero dependencies and every job finishes well under a minute, so a cache adds a third-party action for no measurable win.
-- A `workflow_dispatch` run always builds the matrix but only publishes with the `publish` input enabled and no tag for `VERSION`; use it to validate action bumps without a release.
+- A `workflow_dispatch` run always builds the matrix but only publishes with the `publish` input enabled and no tag for the version; use it to validate action bumps without a release.
 - CI pins rust 1.99 via `dtolnay/rust-toolchain@1.99`; keep it in sync with `rust-toolchain.toml`.
 
 ## Versioning & releases
 
-- **CalVer, `YYYY.MM.DD`** (`2026.11.19`), not SemVer: `rx` has no library API whose breaks a number could announce, and "did this build include the change I read about" is answered better by a date. A second release on the same day appends a micro counter — `YYYY.MM.DD.MICRO` (`2026.11.23.1`) — never a letter suffix (`2026.11.23a` reads as a pre-release to semver tooling and sorts before `2026.11.23`). Each bump gets its own tag, so the release job stays idempotent.
-- `VERSION` (repository root) is the **single source of truth** for the project version. `Cargo.toml` carries a `0.0.0` placeholder (`cargo` cannot read the file), `flake.nix` reads `VERSION`, and the binary embeds it via `include_str!("../../VERSION")`.
-- To release: set `VERSION` to the release date and push to `main`. `.github/workflows/release.yml` then tests, builds a static `x86_64-unknown-linux-musl` binary, tags `v<VERSION>` and attaches `rx-v<VERSION>-x86_64-unknown-linux-musl.tar.gz`.
-- The release job is idempotent: if the tag `v<VERSION>` already exists it publishes nothing, so unrelated pushes stay quiet.
-- Never hardcode the version in code or tests — read `VERSION` (unit: `cli::help::version()`, integration: `version()` helper).
+- **CalVer, `YY.MM.N`** (`26.11.0`), the scheme memos uses, not SemVer: `rx` has no library API whose breaks a number could announce, and "did this build include the change I read about" is answered better by a date. `N` counts releases within the month (`26.11.1` next). Never a letter suffix (`26.11.0a` reads as a pre-release to semver tooling and sorts before `26.11.0`). Each bump gets its own tag, so the release job stays idempotent.
+- `[package].version` in `Cargo.toml` is the **single source of truth**. The binary embeds it via `env!("CARGO_PKG_VERSION")`, `flake.nix` reads it with `builtins.fromTOML`, and `.github/workflows/release.yml` parses it out of the `[package]` table. There is no `VERSION` file.
+- To release: bump `[package].version` and push to `main`. The workflow then tests, builds a static `x86_64-unknown-linux-musl` binary, tags `v<version>` and attaches `rx-v<version>-x86_64-unknown-linux-musl.tar.gz`.
+- The release job is idempotent: if the tag `v<version>` already exists it publishes nothing, so unrelated pushes stay quiet.
+- Never hardcode the version in code or tests — read `env!("CARGO_PKG_VERSION")` (unit: `cli::help::version()`, integration: `version()` helper).
