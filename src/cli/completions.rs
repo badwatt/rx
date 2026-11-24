@@ -148,14 +148,45 @@ mod tests {
         assert_eq!(Shell::names(), "bash,zsh,fish");
     }
 
+    /// Every long flag the parser accepts, read from its source so a new flag
+    /// cannot silently miss the completion scripts.
+    fn parser_long_flags() -> Vec<&'static str> {
+        include_str!("parse.rs")
+            .split('"')
+            .filter(|token| token.starts_with("--") && token.len() > 2)
+            .collect()
+    }
+
+    /// Fish spells long options `-l only`, the others `--only`.
+    fn mentions_flag(script: &str, flag: &str) -> bool {
+        script.contains(flag) || script.contains(&format!("-l {}", &flag[2..]))
+    }
+
     #[test]
-    fn every_script_completes_the_binary_and_its_flags() {
+    fn every_script_completes_the_binary_every_flag_and_every_step() {
+        let flags = parser_long_flags();
+        assert_eq!(flags.len(), 14);
         for shell in Shell::ALL {
             let script = shell.script();
             assert!(script.contains("rx"));
-            // Fish spells long options `-l only`.
-            assert!(script.contains("only"));
-            assert!(script.contains("completions"));
+            for flag in &flags {
+                assert!(
+                    mentions_flag(script, flag),
+                    "{flag} missing from {}",
+                    shell.name()
+                );
+            }
+            for step in crate::domain::step::Step::ALL {
+                assert!(
+                    script.contains(step.name()),
+                    "step {} missing from {}",
+                    step.name(),
+                    shell.name()
+                );
+            }
+            for name in ["bash", "zsh", "fish"] {
+                assert!(script.contains(name), "{name} missing from {}", shell.name());
+            }
         }
     }
 
