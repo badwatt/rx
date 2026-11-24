@@ -69,7 +69,7 @@ tests/integration.rs       binario real, sin efectos
 - **Raíz del repo obligatoria**: `git rev-parse --show-prefix` vacío; un subdirectorio de otro repo se rechaza.
 - **Hostname**: `/proc/sys/kernel/hostname` → `$HOSTNAME` → `hostname` (cada fuente se recorta; una vacía pasa a la siguiente).
 - **Sudo**: `sudo -n true` (probe silencioso) y `sudo -v` (prompt) antes del comando elevado, nunca en `--dry-run`; un hilo detached renueva el ticket con `sudo -n -v` cada 60 s para que un build largo no vuelva a preguntar sin anunciarlo.
-- **OSC 7501**: `UserIo::progress` reporta `working`, `blocked:kind=permission|auth`, `done`, `error` y `idle` (abortar o declinar no finge un `done`) solo en TTY y nunca en `--dry-run`; se valida la config antes de reportar y tras cada prompt se vuelve a `working`, o el tab sin foco se queda en "needs attention".
+- **OSC 7501**: `UserIo::progress` reporta `working`, `blocked:kind=permission|auth`, `done`, `error` y `idle` (abortar o declinar no finge un `done`) solo en TTY y nunca en `--dry-run`; `msg` sanea caracteres de control (el terminal descartaría el report entero) y se capa a 512 bytes; se valida la config antes de reportar y tras cada prompt se vuelve a `working`, o el tab sin foco se queda en "needs attention".
 - **Completions**: `--completions bash|zsh|fish` imprime scripts estáticos; un test garantiza que mencionan el binario y las flags compartidas. `rx.1` es la página de manual.
 - **Dry-run honesto**: `DryRunRunner` delega `probe` al runner real (silencioso), así el preview muestra el flavor realmente instalado; el resto no se ejecuta y sudo no se toca.
 - **Cleanup**: `nix-env --delete-generations +N` y luego `nix store gc` (sin `-d`, para respetar `--keep N`).

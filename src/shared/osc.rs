@@ -45,6 +45,23 @@ impl State {
     }
 }
 
+/// Longest `msg` sent: a terminal drops a report that exceeds its limits, so
+/// one oversized message must not take the whole report down.
+const MSG_LIMIT: usize = 512;
+
+/// Replace control characters (the protocol forbids them in `msg`) with
+/// spaces and cap the length.
+fn sanitize(msg: &str) -> String {
+    let mut out = String::with_capacity(msg.len().min(MSG_LIMIT));
+    for character in msg.chars() {
+        if out.len() >= MSG_LIMIT {
+            break;
+        }
+        out.push(if character.is_control() { ' ' } else { character });
+    }
+    out
+}
+
 /// Write one `OSC 7501` report for `state`, with `msg` base64-encoded.
 pub(crate) fn report(writer: &mut dyn Write, state: State, msg: &str) -> Result<(), Error> {
     let kind = match state.kind() {
@@ -55,7 +72,7 @@ pub(crate) fn report(writer: &mut dyn Write, state: State, msg: &str) -> Result<
         "\x1b]7501;state={}{}:app=rx:msg={}\x1b\\",
         state.name(),
         kind,
-        base64(msg)
+        base64(&sanitize(msg))
     );
     ansi::write_flush(writer, &sequence)?;
     Ok(())
@@ -142,6 +159,25 @@ mod tests {
         let mut buf = Vec::new();
         assert!(report(&mut buf, State::Done, "ñ€").is_ok());
         assert_eq!(buf, b"\x1b]7501;state=done:app=rx:msg=w7Higqw=\x1b\\");
+    }
+
+    #[test]
+    fn report_replaces_control_characters() {
+        let mut buf = Vec::new();
+        assert!(report(&mut buf, State::Done, "a\nb\tc").is_ok());
+        assert_eq!(buf, b"\x1b]7501;state=done:app=rx:msg=YSBiIGM=\x1b\\");
+    }
+
+    #[test]
+    fn report_caps_an_oversized_message() {
+        let long = "x".repeat(2_000);
+        let mut buf = Vec::new();
+        assert!(report(&mut buf, State::Done, &long).is_ok());
+        let expected = format!(
+            "\x1b]7501;state=done:app=rx:msg={}\x1b\\",
+            base64(&"x".repeat(MSG_LIMIT))
+        );
+        assert_eq!(String::from_utf8_lossy(&buf), expected);
     }
 
     #[test]
