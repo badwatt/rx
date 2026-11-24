@@ -1,6 +1,6 @@
 [package]
 name = "rx"
-version = "26.11.1"
+version = "26.11.2"
 edition = "2024"
 description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system"
 license = "MIT"
