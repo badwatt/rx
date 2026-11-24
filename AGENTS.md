@@ -1,141 +1,216 @@
-# AGENTS.md — Project Rules for `rx`
+# rx
 
-## Communication
+**rx** — CLI mínimo para actualizar NixOS desde tu repo de dotfiles: `git pull`, `nix flake update`, stage de los cambios, `nixos-rebuild switch`, limpieza de generaciones y diff de closures. Cero dependencias de Rust; pensado para un único usuario en su máquina.
 
-- **CAVEMAN MODE FULL** always. Drop articles, filler, pleasantries. Short synonyms. Fragments fine. Technical terms exact. Code blocks unchanged. Pattern: thing action reason.
-- Conversation in Spanish OK. Code, commits, docs in English.
+> ⚠️ **Usa las skills de Rust: obligatorio, sin excepciones.** Antes de escribir, revisar, refactorizar o portar código, carga las skills de Rust disponibles (descúbrelas si hace falta). Si hay varias, aplica la que corresponda; si dudas, todas. Código que contradiga una skill de Rust está mal aunque compile.
 
-## Workflow
+## 0. Comunicación
 
-- **TDD estricto**: write failing test first, then implement, then green. Always.
-- **Coverage 100% strict**: regions, functions, lines — all must be 100%. Command:
-  `cargo llvm-cov --all-targets --no-default-ignore-filename-regex`. No exceptions.
-- **Never push without explicit permission**. Ask every time. No autonomous git push ever.
-- Ask before destructive operations (purge, delete, force-push, rebase).
-- **CI must stay green** (`.github/workflows/ci.yml`): `fmt`, `clippy -D warnings`, `test`, `coverage`.
+- Conversación en español; código, commits, docs y comentarios en inglés.
+- CAVEMAN MODE: frases cortas, sin relleno. Términos técnicos exactos; los bloques de código no se tocan.
+- Antes de implementar: di los supuestos. Si hay dos lecturas, preséntalas. Si algo no cuadra, para y pregunta.
 
-## Coverage
+## 1. Datos del proyecto: se leen, no se escriben
 
-- Tool: `cargo llvm-cov --all-targets --no-default-ignore-filename-regex` exclusively. Rejected alternatives (tarpaulin).
-- **Tests count too**: `--no-default-ignore-filename-regex` disables cargo-llvm-cov's built-in exclusion of `tests.rs` / `tests/`. Without it test code is silently ignored.
-- Toolchain pinned in `rust-toolchain.toml` (1.99). No nightly, no `#![feature(coverage_attribute)]` currently. No `rust-version` field: the pinned toolchain is the supported one, so there is no unverified MSRV claim.
-- **Prefer structural fixes** over `#[coverage(off)]`. Use it only as last resort for impossible-to-cover branches.
-- **`dyn Write` over generics**: prefer `&mut dyn Write` instead of `<W: Write>` for IO functions. Generic monomorphizations create uncovered per-type regions.
-- Every `?` creates a branch. Both paths (Ok, Err) must be exercised by tests.
-- No `#[should_panic]` tests — they leave the normal return path uncovered. Use `std::panic::catch_unwind` in normal tests if panic-path coverage is needed.
-- Closures are instrumented per expression site, not per call — share one named `fn` for common mock behavior so its branches merge across tests.
+| Dato | Dónde vive | Cómo se lee |
+|---|---|---|
+| Nombre | `[package] name` (`rx`) | `env!("CARGO_PKG_NAME")` |
+| Versión | `[package] version`, CalVer `YY.MM.N` | `env!("CARGO_PKG_VERSION")` |
+| Edición | `[package] edition` (`2024`) | `Cargo.toml`, y el CI lo compila |
+| MSRV | `rust-toolchain.toml` (1.99, pineado) | el devShell del flake |
+| Tipo | binario (`src/main.rs`, `pub(crate)` en todo) | lo que exista en el repo |
+| Toolchain y herramientas | `flake.nix` + `rust-toolchain.toml` | el devShell del flake |
+| Cobertura mínima | `.github/workflows/ci.yml` | **100** regiones/funciones/líneas |
 
-## Code Style
+- No hay campo `rust-version`: el toolchain pineado **es** el soportado; no se declara un MSRV sin verificar.
+- ⛔ Archivo `VERSION`, literales repetidos (README, rustdoc, `--version`, títulos) y tags escritos a mano.
+- ⛔ Copiar aquí o en el README la edición, el MSRV o la lista de herramientas: se leen del repo.
+- El workflow de release lee `[package] version` con un `awk` anclado a la tabla (`rx` no es workspace). Si algún día hay workspace (`version.workspace = true`), pasa a `cargo metadata --no-deps --format-version 1` / `cargo pkgid`. ⛔ Regex sobre el TOML que asuma `version = "..."` en cualquier sitio.
+- El tag `v<version>` es **consecuencia** de la versión, nunca su causa.
+- `name`, `version`, `edition` y `rust-version` se consultan con el usuario.
 
-- **No `.unwrap()` anywhere** — neither production nor test code.
-- Use `.expect("context")` with descriptive messages in tests.
-- Use `.is_ok()`, `.is_err()`, `.is_some()`, `.is_none()` for boolean assertions.
-- Use `String::from_utf8_lossy(&buf)` instead of `String::from_utf8(buf).unwrap()`.
-- Use `.expect_err("context")` instead of `.unwrap_err()`.
-- **Rust best practices skill**: always apply `rust-best-practices` skill guidelines (borrowing over cloning, `?` over match chains, iterators over loops, descriptive test names, one assertion per test when possible, doc comments on items).
-- **SOLID / DRY / Clean Code**: extract functions for single responsibility. DRY repeated patterns. Keep functions small and readable.
-- **Zero dependencies preference**: keep `Cargo.toml` dependency-free unless strong justification. Manual `Display`/`Error` impls over `thiserror` for binaries.
-- **`pub(crate)`, not `pub`**: this is a binary crate; `pub` exposes a fictional API surface.
+## 2. Arquitectura
 
-## Linting
-
-- Run `cargo clippy --all-targets -- -D warnings` before considering work done. Zero warnings allowed.
-- Use `#[expect(clippy::lint_name, reason = "...")]` over `#[allow(...)]` if a lint must be suppressed.
-- Prefer `assert_ne!(x, "")` / `assert_eq!(x, "")` over `assert!(!x.is_empty())` — `clippy::assert_is_empty` (1.99) rejects the latter.
-- The toolchain pin exists to stop new stable lints from breaking CI silently.
-
-## Commits
-
-- **Conventional Commits** format: `type(scope): description`
-- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `chore`, `ci`, `perf`, `build`, `revert`
-- Imperative mood in description. Body optional for context.
-- Small, focused commits preferred.
-- Generate message from `git diff --cached` before committing.
-
-## Testing
-
-- Descriptive test names: `unit_should_return_x_when_y` or `function_returns_error_when_input_empty`.
-- One assertion per test when possible.
-- No `assert!`/`assert_eq!` macro overrides for coverage — use structural fixes instead.
-- Test helpers (e.g., `no_run`, `ok_ui`) must have both branches covered.
-- Unit tests live next to their module: inline `#[cfg(test)] mod tests` or a sibling `tests.rs` (`#[cfg(test)] mod tests;`).
-- Integration tests in `tests/integration.rs` — exercise the compiled binary via `Command`.
-- **Integration tests must be side-effect free.** Never let them run the real workflow: use `--dry-run -y`, decline on stdin (`n`), or a nonexistent `--repo`. Otherwise they can `git pull`/`git add` in the user's real `~/.dotfiles`.
-- When a test drives the rebuild step, pass `--hostname` explicitly — the Nix sandbox has no `hostname` command and detection yields `"unknown"`.
-
-## Architecture
-
-Feature-first hexagonal: every feature screams its capability (`system_update`,
-`cli`) and owns its layers (`application` / `ports` / `adapters`). Only the
-domain kernel, non-business helpers and generic infrastructure are shared.
+- **Hexagonal** — dominio puro en el centro; `std::process`, `git`/`nix` solo en adaptadores. El dominio no conoce la herramienta.
+- **Feature-first / vertical slicing** — cada feature es una carpeta autocontenida con `application`, `ports`, `adapters` y tests.
+- **Screaming architecture** — los directorios dicen *qué hace* el sistema, no *qué herramienta usa*.
+- **Clean code** — funciones cortas, un nivel de abstracción por función, nombres que no necesiten comentario.
+- Dependencias hacia dentro: `adapters → ports → domain`. Nunca al revés.
 
 ```
-src/
-├── main.rs              # composition root: parse → wire adapters → run
-├── domain/              # shared kernel (pure): config.rs, error.rs
-├── shared/              # non-business cross-cutting: ansi.rs, osc.rs, test_helpers.rs
-├── infra/               # generic process mechanism (not business, not a port)
-│   ├── command.rs       # CommandRunner (adapter-internal argv seam)
-│   ├── process.rs       # ProcessRunner (std::process)
-│   └── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
-├── system_update/       # feature: the NixOS update workflow
-│   ├── application/     # use cases
-│   │   ├── mod.rs       # pipeline orchestration
-│   │   └── steps/       # pull, flake, stage, rebuild, cleanup, diff
-│   ├── ports/           # the interfaces the feature needs
-│   │   ├── repo.rs      # Repo: is_repo / pull / changes / add_all
-│   │   ├── nix.rs       # Nix: update / rebuild / prune / collect_garbage / diff_closures
-│   │   └── user_io.rs   # UserIo: title/confirm/success/output/config
-│   └── adapters/        # driven implementations for the feature
-│       ├── git.rs       # GitRepo: Repo via the git CLI
-│       ├── nix.rs       # NixCli: Nix via nix / nixos-rebuild
-│       └── terminal.rs  # TerminalIo (stdout/stderr) + config rendering
-├── cli/                 # driving adapter (parsing only)
-│   ├── mod.rs           # Intent
-│   ├── parse.rs         # argument parser
-│   ├── defaults.rs      # default config + tilde expansion
-│   ├── hostname.rs      # hostname resolution
-│   ├── completions.rs   # bash/zsh/fish scripts (static, no generator)
-│   └── help.rs          # help/version banners
+src/main.rs                composición: parse → adaptadores → workflow
+src/domain/                kernel puro: config.rs, error.rs, step.rs
+src/shared/                ansi.rs, osc.rs, test_helpers.rs (cfg(test))
+src/infra/                 command.rs (seam), process.rs, dry_run.rs, argv.rs
+src/system_update/         feature
+├── application/           run + steps/{pull,flake,stage,rebuild,cleanup,diff}.rs
+├── ports/                 repo.rs · nix.rs · user_io.rs (traits)
+└── adapters/              git.rs · nix/{mod,argv}.rs · terminal.rs
+src/cli/                   parse, defaults, hostname, completions, help, entry
+tests/integration.rs       binario real, sin efectos
 ```
 
-- **Feature-first layout**: the business capability owns `application` / `ports` / `adapters`, so a new feature touches one folder. `domain`, `shared` and `infra` stay top-level because they are cross-feature by nature.
-- **Semantic ports**: the use case depends on `Repo`, `Nix`, `UserIo` — never on `git`/`nix` specifics. `system_update::adapters::git` / `::nix` own the argv; workflow tests mock the semantic ports.
-- **`CommandRunner` is not a port**: it is an adapter-internal seam (in `infra`) so `--dry-run` decorates a single implementation instead of every port.
-- **Composition in `main`**: `cli` only parses (`Intent`), `main` selects adapters (dry-run vs process) and wires them. `cli` must not depend on feature adapters.
-- **Single output channel**: user-facing output flows through `UserIo`; parse errors and the single top-level error go to **stderr**, the rest to stdout.
-- **NO_COLOR / non-TTY / `--no-color`**: each stream picks its own `ansi::Palette` from `NO_COLOR` (non-empty) + `is_terminal()`; `--no-color` forces plain.
-- **Exit codes**: `2` invalid args/config, `141` (128 + SIGPIPE) on early stdout close, `128 + N` for signal-terminated children, else `1`.
-- **Error enum**: separate variants per failure mode — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `PasswordFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
-- **No shell**: every external command runs via argv. The closure diff is captured and filtered in Rust (no `tac`/`awk`).
-- **Fail-fast**: every step checks the command exit status; a failure aborts before the next step, so cleanup never runs after a failed rebuild.
-- **Capability-probed rebuild**: `rx` probes the installed `nixos-rebuild` via `CommandRunner::probe` (`nixos-rebuild --elevate=none list-generations`); exit 0 → `-ng` (`--elevate=sudo --no-reexec`), anything else → classic (`sudo … --fast`). Both skip the self-rebuild re-exec.
-- **Validated config**: `Config::validate() -> Result<(), Error>` rejects an empty repo, an explicitly empty hostname, `keep == 0`, or `jobs`/`cores == 0` with `Error::InvalidConfig` (exit code 2). An undetected hostname (`None`) is valid here; the workflow turns it into `Error::HostnameUnknown` before any side effect.
-- **Prompt decline**: declining the initial prompt prints `Aborted.` and exits 0; declining staging aborts before the rebuild (no stale flake). A closed stdin (EOF) is never a "yes": it aborts, so an empty pipe cannot rebuild the system.
-- **Step selection**: `--only pull,flake,stage,rebuild,cleanup,diff` runs an explicit subset; `Config::runs(Step)` owns the decision and a list wins over `--update`/`--diff`. Long flags also accept `--flag=value`.
-- **Single error voice**: steps return `Error`; only `main` reports it (on stderr). The `UserIo` port has no `error()` so a failure can never print twice.
-- **Non-interactive git**: `git pull --ff-only` with `GIT_TERMINAL_PROMPT=0` via `CommandRunner::run_with_env`, so a diverged branch or missing credentials fails instead of hanging.
-- **Repository root required**: `Repo::is_repo` checks that `git rev-parse --show-prefix` is empty, so a subdirectory of another repository is rejected instead of pulling/staging the enclosing repo.
-- **Completions**: `rx --completions <bash|zsh|fish>` prints static scripts; a test asserts every script mentions the binary and the shared flags, so a new flag cannot silently miss them. `rx.1` is the man page and is installed by the flake.
-- **Dry-run honesty**: `DryRunRunner` delegates `probe` to the real runner (read-only, silent), so the preview shows the `nixos-rebuild` flavor actually installed.
-- **Cleanup**: `nix-env --delete-generations +N` then `nix store gc` (no `-d`, so `--keep N` is respected).
-- **Status reports**: `UserIo::progress` writes OSC 7501 (`working`, `blocked:kind=permission` at a confirmation, `blocked:kind=auth` while sudo waits for a password, `done`, `error`) only on a TTY and never on `--dry-run`. A prompt must be followed by `working` once the user answers, or an unfocused tab keeps showing "needs attention" while the workflow runs. `Nix::password_pending` probes `sudo -n true` (silent, read-only) and `Nix::refresh_credentials` then runs `sudo -v`, so the password question is announced while it happens and the command itself runs as `working` (`nixos-rebuild -ng` builds before it elevates). It also starts a background thread that renews the ticket with `sudo -n -v` every 60 s, so a build longer than sudo's timestamp timeout cannot ask again unannounced; the thread ends with the process.
+### Invariantes de rx
 
-## Build / packaging
+- Puertos **semánticos** (`Repo`, `Nix`, `UserIo`); los adaptadores son dueños del argv. `CommandRunner` **no** es un puerto: es un seam interno de adaptador para que `--dry-run` decore una sola implementación.
+- Composición en `main`; `cli` solo parsea (`Intent`) y nunca importa adaptadores del feature.
+- **Un solo canal de salida**: todo lo del usuario va por `UserIo`; los errores de parseo y el único error de nivel superior van a **stderr**.
+- `NO_COLOR` (no vacío) + `is_terminal()` por stream deciden la `Palette`; `--no-color` fuerza plano en ambos.
+- **Exit codes**: `2` args/config inválidos, `141` (128 + SIGPIPE) al cerrar stdout, `128 + N` si el hijo muere por señal, si no `1`.
+- **Error enum**: una variante por modo de fallo — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `PasswordFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
+- **Sin shell**: todo comando externo por argv. El filtrado del diff se hace en Rust.
+- **Fail-fast**: cada paso comprueba el exit status; un fallo aborta antes del siguiente, así el cleanup nunca corre tras un rebuild fallido.
+- **Rebuild probado por capacidad**: probe `nixos-rebuild --elevate=none list-generations`; exit 0 → `-ng` (`--elevate=sudo --no-reexec`), otro → clásico (`sudo … --fast`). Ambos evitan el re-exec.
+- **Config validada** (`Config::validate` → exit 2): repo vacío, hostname explícitamente vacío, `keep == 0`, `jobs`/`cores == 0`. Un hostname no detectado (`None`) es válido aquí; el workflow lo convierte en `HostnameUnknown` antes de cualquier efecto.
+- **Declinar / EOF**: declinar el prompt imprime `Aborted.` y sale 0; un stdin cerrado **nunca** es un sí. Declinar el staging aborta antes del rebuild.
+- **Selección de pasos**: `--only pull,flake,stage,rebuild,cleanup,diff`; la lista gana sobre `--update`/`--diff`. Las flags largas aceptan `--flag=value`.
+- **Una sola voz de error**: `UserIo` no tiene `error()`; solo `main` reporta.
+- **Git no interactivo**: `git pull --ff-only` con `GIT_TERMINAL_PROMPT=0`, así una rama divergida o sin credenciales falla en vez de colgarse.
+- **Raíz del repo obligatoria**: `git rev-parse --show-prefix` vacío; un subdirectorio de otro repo se rechaza.
+- **Hostname**: `/proc/sys/kernel/hostname` → `$HOSTNAME` → `hostname` (cada fuente se recorta; una vacía pasa a la siguiente).
+- **Sudo**: `sudo -n true` (probe silencioso) y `sudo -v` (prompt) antes del comando elevado; un hilo detached renueva el ticket con `sudo -n -v` cada 60 s para que un build largo no vuelva a preguntar sin anunciarlo.
+- **OSC 7501**: `UserIo::progress` reporta `working`, `blocked:kind=permission|auth`, `done` y `error` solo en TTY y nunca en `--dry-run`; tras cada prompt se vuelve a `working` o el tab sin foco se queda en "needs attention".
+- **Completions**: `--completions bash|zsh|fish` imprime scripts estáticos; un test garantiza que mencionan el binario y las flags compartidas. `rx.1` es la página de manual.
+- **Dry-run honesto**: `DryRunRunner` delega `probe` al runner real (silencioso), así el preview muestra el flavor realmente instalado.
+- **Cleanup**: `nix-env --delete-generations +N` y luego `nix store gc` (sin `-d`, para respetar `--keep N`).
 
-- `flake.nix`: `packages.default` / `packages.rx` (with `meta.mainProgram = "rx"`, so `nix run` works); cross builds under `legacyPackages.<system>.cross.<target>.default`; devShell ships `cargo-llvm-cov` + LLVM (`LLVM_COV` / `LLVM_PROFDATA`).
-- `nix build` (default) and `nix develop` must keep working.
-- Release matrix (`.github/workflows/release.yml`): `x86_64-unknown-linux-musl` (tested + built natively), `aarch64-unknown-linux-musl` (via `cross`), `aarch64-apple-darwin` and `x86_64-apple-darwin` (macOS runners, unsigned). Artifacts are uploaded per target, checksummed (`SHA256SUMS`) and published by a separate job.
-- Release notes are a changelog, not `--generate-notes`: `release-changelog-builder-action` (COMMIT mode) groups the conventional subjects between the previous tag and the release into breaking/feat/fix/perf/refactor/test/docs/style/build/ci/chore/revert. `git describe --tags --abbrev=0 HEAD^` fixes the lower bound; `toTag` is the release commit's SHA because the tag only exists once `gh release create` runs, and the publish step appends the tag-to-tag diff link itself. Every `label_extractor` pattern must consume the whole subject (`…:([\s\S]*)`): the action *replaces* the match with the target, so a prefix-only pattern yields a bogus label and nothing is categorized. A new commit type needs a `categories` entry, or its entries render uncategorized.
-- `checks.<system>.default` mirrors the package, so `nix flake check` works; CI evaluates all outputs (`nix flake check --no-build`) and runs `nix build .#default`. The package installs `rx.1` under `share/man/man1`.
-- No CI build cache on purpose: the crate has zero dependencies and every job finishes well under a minute, so a cache adds a third-party action for no measurable win.
-- A `workflow_dispatch` run always builds the matrix but only publishes with the `publish` input enabled and no tag for the version; use it to validate action bumps without a release.
-- CI pins rust 1.99 via `dtolnay/rust-toolchain@1.99`; keep it in sync with `rust-toolchain.toml`.
+## 3. Reglas
 
-## Versioning & releases
+| ⛔ Nunca | ✅ En su lugar |
+|---|---|
+| `unsafe`, punteros raw, `transmute`, `mem::forget`, `ManuallyDrop`, `MaybeUninit`, `Box::leak` | Cero tolerancia, sin excepciones |
+| `Rc`/`RefCell` fuera de tests | Préstamos o propiedad única; tests pueden usar `Rc` para registrar llamadas |
+| `Arc` por reflejo · `clone()` para calmar al borrow checker | Préstamos (`&T`, `&str`, `&[T]`), mover valores, `Box<T>` si el dueño es único |
+| `.unwrap()` en cualquier sitio · `.expect()` en producción | `?`, `match` o fallback explícito. `.expect("motivo")` solo si el fallo es **imposible por construcción** (p. ej. `write!` a un `String`), y el motivo lo dice |
+| Tragarse un error (`let _ =`, `ok()`) · `panic!` para flujo esperado | `Result`; `Display`/`Error` a mano (el crate no tiene dependencias, no `thiserror`). `let _ =` solo en best-effort **documentado**: mensaje final cuando el workflow ya termina, eco de `--dry-run`, `JoinHandle` del keepalive |
+| `pub` en un binario | `pub(crate)` |
+| Mensajes que filtran secretos | Qué falló y con qué input, sin datos sensibles |
+| Estado global mutado en tests (`set_var`, env, CWD) · fixtures sin mensaje | Configuración inyectada (`&dyn` ports, parámetros) y `.expect("contexto")` |
+| Helpers de test que ignoran un `Result` | Que el test falle |
+| Valores hardcodeados (URLs, timeouts, colores) | Constantes, configuración o `Palette`; los textos de UI viven en el step que los imprime |
+| Nombre o versión a mano | `env!("CARGO_PKG_NAME")`, `env!("CARGO_PKG_VERSION")` |
+| Dependencias injustificadas · inputs de flake que sobran | Cero deps salvo justificación fuerte; cada input justifica su mantenimiento |
+| `cargo install`, `nix profile install`, `nix-env -i`, paquetes del sistema | Toda herramienta se declara en `flake.nix` |
+| `--impure`, `builtins.getEnv`, rutas absolutas del host | El resultado depende solo del flake |
+| Optimizar «por si acaso» | Benchmark o perfil primero |
+| Lógica repetida ×2 | Extraer a función, tipo o módulo |
+| Código muerto o comentado · `#[allow]` sin motivo | Borrar; `#[expect(clippy::lint, reason = "…")]` en el ítem |
+| Warnings de `fmt`/`clippy`/`doc` | Cero: `-D warnings` |
 
-- **CalVer, `YY.MM.N`** (`26.11.0`), the scheme memos uses, not SemVer: `rx` has no library API whose breaks a number could announce, and "did this build include the change I read about" is answered better by a date. `N` counts releases within the month (`26.11.1` next). Never a letter suffix (`26.11.0a` reads as a pre-release to semver tooling and sorts before `26.11.0`). Each bump gets its own tag, so the release job stays idempotent.
-- `[package].version` in `Cargo.toml` is the **single source of truth**. The binary embeds it via `env!("CARGO_PKG_VERSION")`, `flake.nix` reads it with `builtins.fromTOML`, and `.github/workflows/release.yml` parses it out of the `[package]` table. There is no `VERSION` file.
-- To release: bump `[package].version` and push to `main`. The workflow then tests, builds a static `x86_64-unknown-linux-musl` binary, tags `v<version>` and attaches `rx-v<version>-x86_64-unknown-linux-musl.tar.gz`.
-- The release job is idempotent: if the tag `v<version>` already exists it publishes nothing, so unrelated pushes stay quiet.
-- Never hardcode the version in code or tests — read `env!("CARGO_PKG_VERSION")` (unit: `cli::help::version()`, integration: `version()` helper).
+- `String::from_utf8_lossy(&buf)`, `.is_ok()`/`.is_err()`/`.is_some()`, `.expect_err("contexto")`, `assert_ne!(x, "")` (clippy 1.99 rechaza `assert!(!x.is_empty())`).
+- `impl Display`/`Error` manuales con `source()`: cero dependencias.
+- Preferir `&mut dyn Write` a `<W: Write>`: las monomorfizaciones dejan regiones sin cubrir.
+
+## 4. Entorno Nix
+
+- `flake.nix` es el **único** sitio donde se declaran herramientas (toolchain de Rust, `clippy`, `rustfmt`, `cargo-llvm-cov`, LLVM).
+- `devShells.default` lleva las herramientas de desarrollo (y exporta `LLVM_COV`/`LLVM_PROFDATA`); `packages.default`/`packages.rx` construyen el binario con `meta.mainProgram = "rx"`. Sin duplicar dependencias entre ambos.
+- Salidas que deben seguir funcionando: `nix build`, `nix develop`, `nix flake check`, y los cross builds en `legacyPackages.<system>.cross.<target>`.
+- `checks.<system>.default` refleja el paquete, así `nix flake check` construye algo real (no re-declara fmt/clippy/test: eso lo corre el CI).
+- El paquete instala `rx.1` y las completions generadas por el propio binario, así no divergen del parser.
+- Uso diario: `nix develop` (o `direnv` + `use flake`). Un comando suelto: `nix develop -c <cmd>`.
+- `flake.lock` se commitea. Actualizar es una decisión explícita (`nix flake update`) revisando el diff de inputs.
+- La versión de Rust la fija `rust-toolchain.toml` dentro del shell; ⛔ `rustup default` global.
+- Si `llvm-profdata` del shell es más viejo que el LLVM de `rustc`, apunta `LLVM_COV`/`LLVM_PROFDATA` a un LLVM igual o más nuevo (el raw profile cambia de versión).
+
+## 5. TDD y cobertura
+
+Cada cambio empieza con un test en **rojo**, cada commit lleva sus tests, y nunca se avanza de feature con tests rojos.
+
+```
+1. RED      → el test falla por la razón correcta
+2. GREEN    → mínimo código para que pase
+3. REFACTOR → limpiar; los tests siguen verdes
+```
+
+```rust
+#[test]
+fn validate_rejects_empty_repo() {
+    let config = Config { repo: String::new(), ..sample() };
+    assert_eq!(
+        config.validate().expect_err("empty repo").to_string(),
+        "repo path cannot be empty"
+    );
+}
+```
+
+- **Cobertura 100 estricta** — regiones, funciones y líneas. Comando único:
+  `cargo llvm-cov --all-targets --no-default-ignore-filename-regex`
+  (sin la flag, cargo-llvm-cov ignora `tests.rs`/`tests/` y el código de test no cuenta).
+- **Los tests cuentan**: no se excluyen. `#[coverage(off)]` no está disponible (toolchain pineado, sin nightly) y sería el último recurso.
+- Preferir **arreglos estructurales** a excluir ramas: extraer funciones, mover el `?`. Una closure se instrumenta por sitio de expresión: comparte una `fn` nombrada para que sus ramas se fusionen entre tests.
+- Cada `?` crea una rama: ambos caminos (Ok, Err) los ejercita algún test.
+- Sin `#[should_panic]` (deja sin cubrir el retorno normal); si hace falta el camino de pánico, `std::panic::catch_unwind` en un test normal.
+- Un test: `<verbo>_<sujeto>_<escenario>_<resultado>()`, un concepto y un `assert` cuando se pueda, determinista (sin red, sin sleeps, sin timestamps reales). Junto al módulo (`#[cfg(test)] mod tests` o `tests.rs` hermano) o en `tests/integration.rs` para el binario.
+- Los helpers de test (p. ej. `ok_ui`) cubren sus dos ramas y fallan con mensaje.
+- **Integración sin efectos**: nunca el workflow real. `--dry-run -y`, declinar por stdin (`n`), o un `--repo` inexistente. Pasa `--hostname` explícito cuando el test llegue al rebuild (el sandbox de Nix no tiene `hostname`).
+- Sin tests de relleno ni overrides de `assert!`/`assert_eq!` para inflar cobertura. Lo no testeable se justifica: `// No test: <motivo>. Cubierto por <integración | manual | N/A>`.
+
+| Testeable ✅ | No testeable ⛔ → aislar en un adaptador fino y cubrir con integración |
+|---|---|
+| Funciones puras, argv builders, parseo, `Display` | TTY real, prompt de sudo, `nixos-rebuild` de verdad |
+| Puertos con fakes, `UserIo`, `CommandRunner` con stub | UI generada por macro, WASM y APIs de plataforma |
+
+## 6. Inyección de dependencias
+
+Todo servicio con efectos (I/O, procesos, tiempo, red) expone un trait; la capa de aplicación depende del trait, nunca de la implementación. `rx` es síncrono y de un solo hilo: **no** hay `async`, `Arc` ni `tokio`.
+
+```rust
+pub(crate) trait Nix {
+    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error>;
+    fn password_pending(&self) -> Result<bool, Error>;
+    fn refresh_credentials(&self) -> Result<(), Error>;
+    // …
+}
+
+pub(crate) struct NixCli<'a> { runner: &'a dyn CommandRunner }
+
+impl Nix for NixCli<'_> {
+    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
+        let status = self.runner.run(&cmd_rebuild(repo, hostname, options))?;
+        ensure_success(status, Error::RebuildFailed)
+    }
+    // …
+}
+```
+
+- El caso de uso recibe `&dyn Repo`, `&dyn Nix`, `&dyn UserIo`; `main` elige los adaptadores (proceso o dry-run).
+- Los fakes viven en `src/system_update/application/tests.rs` (`MockRepo`, `MockNix`, `MockUi`) y se configuran **por constructor** (`Box<dyn Fn …>`), nunca mutando estado global ni env.
+- Los fakes por defecto son funciones nombradas (`ok_str`, `no_password_pending`), para que sus ramas se fusionen entre tests.
+- `CommandRunner` se decora (`ProcessRunner` → `DryRunRunner`) en la composición, no se convierte en puerto.
+
+## 7. Calidad y cierre
+
+Antes de cada commit, dentro del devShell (`nix develop`):
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo doc --no-deps --document-private-items   # sin warnings
+cargo llvm-cov --all-targets --no-default-ignore-filename-regex
+```
+
+- `nix flake check` debe pasar (evalúa el paquete y el man page).
+- CI (`.github/workflows/ci.yml`): `fmt`, `clippy -D warnings`, `test` y `coverage` con `--fail-under-lines/functions/regions 100`. Se queda en verde siempre.
+
+**Terminado** cuando: hay un test que falla sin el cambio y pasa con él · cobertura 100 sin bajar · los cuatro comandos y `nix flake check` en verde · el código respeta las skills de Rust aplicables · no hay `unwrap`, `clone` ni dependencia nuevos sin justificar · README/rustdoc actualizados si cambió el comportamiento público · si cambió `version`, las notas del release las genera el workflow (no hay `CHANGELOG.md`).
+
+## 8. Release y versionado
+
+Un release se dispara por el **cambio de `version` en `Cargo.toml`**, nunca por un archivo aparte ni un tag manual.
+
+- **CalVer `YY.MM.N`** (el esquema de memos, p. ej. `26.11.1`): año y mes del release más un contador para releases del mismo mes. No SemVer: `rx` no tiene API de librería cuyos breaks pueda anunciar. ⛔ Sufijo de letra (`26.11.0a`): semver lo lee como pre-release y ordena *antes*.
+- `[package] version` es la **única fuente de verdad**: el binario la embebe con `env!("CARGO_PKG_VERSION")`, `flake.nix` la lee con `builtins.fromTOML`, y el workflow la parsea de la tabla `[package]`.
+- Workflow (`.github/workflows/release.yml`):
+  - Detecta la versión; si el tag `v<version>` ya existe → no-op en verde. **Idempotente**: re-ejecutar no duplica tags ni releases.
+  - `workflow_dispatch` siempre construye la matriz; solo publica con `publish` y sin tag.
+  - Matriz: `x86_64-unknown-linux-musl` (testeado y compilado nativo), `aarch64-unknown-linux-musl` (cross), `aarch64-apple-darwin` y `x86_64-apple-darwin` (runners macOS, sin firmar). Artefactos por target, `SHA256SUMS`, release en un job aparte.
+  - Verifica antes de publicar (`cargo test --all-targets --locked`), construye, empaqueta `rx-v<version>-<target>.tar.gz` y publica.
+  - Notas: **changelog categorizado**, no `--generate-notes`. `release-changelog-builder-action` en modo `COMMIT` agrupa los subjects convencionales entre el tag anterior y el release (breaking, feat, fix, perf, refactor, test, docs, style, build, ci, chore, revert). `git describe --tags --abbrev=0 HEAD^` fija el límite inferior; `toTag` es el SHA del commit del release porque el tag aún no existe, y el step de publish añade el link de diff tag-a-tag.
+  - Cada `label_extractor` debe consumir el subject **entero** (`…:([\s\S]*)`): la acción *reemplaza* el match por el target, así que un patrón de solo prefijo produce un label basura y nada se categoriza. Un tipo de commit nuevo necesita su `categories`, o sus entradas van a uncategorized.
+  - Sin cache de CI a propósito: cero dependencias y jobs de menos de un minuto; una cache añadiría una acción de terceros sin ganancia medible.
+  - CI pinea rust 1.99 (`dtolnay/rust-toolchain@1.99`); mantenlo en sync con `rust-toolchain.toml`.
+- ⛔ Bump desde el CI o commit de vuelta al repo · ⛔ tag a mano antes de que la versión esté en `Cargo.toml`.
+
+**Commits**: `type(scope): description` (`feat`, `fix`, `test`, `refactor`, `docs`, `chore`, `perf`, `ci`, `build`, `style`, `revert`), en imperativo, un cambio coherente con sus tests, generado desde `git diff --cached`. **Preguntar siempre** antes de `git push`, antes de operaciones destructivas (purge, delete, force-push, rebase) y antes de tocar `name`/`version`. Nunca push sin permiso explícito.
