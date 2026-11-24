@@ -108,6 +108,7 @@
             LLVM_PROFDATA = "${llvm}/bin/llvm-profdata";
 
             packages = with pkgs; [
+              actionlint
               gcc
               gnumake
               clippy
