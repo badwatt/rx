@@ -1,84 +1,41 @@
 <div align="center">
 
-<img src="assets/rx-banner.svg" alt="RX — NixOS Update CLI" width="800"/>
+<img src="assets/rx-banner.svg" alt="rx — NixOS update CLI" width="720"/>
 
-<br/>
+### Pull, stage, rebuild and clean up your NixOS system — in one command.
 
-### A minimal CLI to pull, stage, rebuild, and clean up your NixOS system — in one shot.
-
-[![Rust](https://img.shields.io/badge/rust-2024-edition-000?style=flat-square&logo=rust&logoColor=DEA584)](https://doc.rust-lang.org/edition-guide/rust-2024/)
+[![Release](https://img.shields.io/github/v/release/badwatt/rx?style=flat-square)](https://github.com/badwatt/rx/releases/latest)
 [![CI](https://github.com/badwatt/rx/actions/workflows/ci.yml/badge.svg)](https://github.com/badwatt/rx/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-3FB950?style=flat-square)](./src)
-[![Dependencies](https://img.shields.io/badge/dependencies-zero-58A6FF?style=flat-square)](./Cargo.toml)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-3FB950?style=flat-square)](https://github.com/badwatt/rx/actions/workflows/ci.yml)
+[![Dependencies](https://img.shields.io/badge/dependencies-zero-58A6FF?style=flat-square)](Cargo.toml)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
 
----
+`rx` runs the whole NixOS update cycle from your dotfiles repo: pull, flake
+update, stage, `nixos-rebuild switch`, prune old generations, and show the
+closure diff. It is a small single binary with **zero Rust dependencies**, a prompt before
+anything destructive, and a `--dry-run` that prints every command it would run
+(the released builds are static).
 
-## ✨ What it does
+Built for one person and their laptop. Needs NixOS, `git`, `nix`, and `sudo`.
 
-`rx` automates the full NixOS update cycle:
-
-1. **Git Pull** — pulls latest changes from your dotfiles repo
-2. **Nix Flake Update** — `nix flake update` *(optional)*
-3. **Git Stage** — detects changes (incl. untracked files), asks confirmation, `git add .`
-4. **NixOS Rebuild** — `nixos-rebuild switch --flake ...#{hostname}`. The installed
-   `nixos-rebuild` is probed (`--elevate=none list-generations`): the `-ng`
-   rewrite runs as your user with `--elevate=sudo --no-reexec`, the classic
-   script uses `sudo ... --fast`. Either way the self-rebuild re-exec is skipped.
-5. **Cleanup** — `nix-env --delete-generations +N` then `nix store gc`
-6. **Diff** — shows closure diff between old/new generations *(optional)*
-
-Every step — interactive confirmation, colored ANSI output, clean error handling.
-
----
-
-## 🚀 Quick start
-
-### Build
+## Install
 
 ```bash
-git clone https://github.com/badwatt/rx.git
-cd rx
-cargo build --release
-./target/release/rx
+# straight from the flake
+nix run github:badwatt/rx -- --version
+
+# or build it
+nix build github:badwatt/rx
+./result/bin/rx
+
+# or with cargo (Rust 1.99, the pinned toolchain)
+cargo install --git https://github.com/badwatt/rx
 ```
 
-### Shell completions and man page
-
-```bash
-rx --completions bash | sudo tee /etc/bash_completion.d/rx   # zsh, fish too
-man rx                                                        # installed by nix/cargo packaging
-```
-
-The completion scripts are static (no generator crate) and the man page is
-shipped as `rx.1`; the flake installs it under `share/man/man1`.
-
-### Release binary
-
-Every version bump in `Cargo.toml` on `main` gets published as a GitHub
-release with static binaries for:
-
-| Target                        | Runner        | Notes                     |
-|-------------------------------|---------------|---------------------------|
-| `x86_64-unknown-linux-musl`    | ubuntu-latest | static, no glibc          |
-| `aarch64-unknown-linux-musl`   | ubuntu-latest | cross-built               |
-| `aarch64-apple-darwin`         | macos-latest  | native, unsigned          |
-| `x86_64-apple-darwin`          | macos-latest  | cross-built on arm64 host |
-
-Each release also ships `SHA256SUMS`. The macOS binaries are unsigned, so
-Gatekeeper quarantines them after download; clear it with
-`xattr -d com.apple.quarantine ./rx`.
-
-Release notes are a categorized changelog: the conventional commit subjects
-since the previous release are grouped into breaking changes, features, fixes,
-performance, refactor, tests, docs, style, build, CI, chore and revert, with a
-link to the full diff.
-
-A manual `workflow_dispatch` run always builds the matrix (validating the
-action versions and cross targets) and only publishes when the `publish` input
-is enabled.
+Prebuilt static binaries (Linux x86_64/aarch64 musl, macOS x86_64/aarch64) and
+`SHA256SUMS` are attached to every [release](https://github.com/badwatt/rx/releases/latest):
 
 ```bash
 gh release download v26.11.2 --pattern '*x86_64-unknown-linux-musl*'
@@ -86,229 +43,7 @@ tar -xzf rx-v26.11.2-x86_64-unknown-linux-musl.tar.gz
 ./rx-v26.11.2-x86_64-unknown-linux-musl/rx --version
 ```
 
-### Versioning
-
-CalVer in the [memos](https://github.com/usememos/memos) style, `YY.MM.N`
-(`26.11.0`): the year and month of the release plus a counter for further
-releases in the same month. Not SemVer: `rx` has no library API whose breaks a
-number could announce.
-
-`[package].version` in `Cargo.toml` is the single source of truth. The binary
-embeds it with `env!("CARGO_PKG_VERSION")`, `flake.nix` reads it with
-`builtins.fromTOML`, and the release workflow tags `v<version>` for it. To
-release, bump that version and push; a push that does not change it publishes
-nothing. `cargo install --path .` records the same version.
-
-### Nix
-
-```bash
-nix build                          # default package
-nix build .#default                # explicit attribute
-nix build .#cross.x86_64-linux-musl.default --impure  # cross-compile
-nix develop                        # dev shell
-nix flake check                    # evaluate outputs + build the package
-```
-
----
-
-## ⚙️ Usage
-
-```
-$ rx
-
-*********************
-* RX Configuration  *
-*********************
-
-◉ repo     = ~/.dotfiles
-◉ hostname = mymachine
-◉ keep     = 10
-◉ update   = false
-◉ diff     = false
-
-Proceed? (Y/n)
-```
-
-### Flags
-
-| Flag           | Short | Description                              | Default       |
-|----------------|-------|------------------------------------------|---------------|
-| `--repo`       | `-r`  | Path to dotfiles repo                    | `~/.dotfiles` |
-| `--hostname`   | `-n`  | Hostname for `nixos-rebuild --flake`     | auto-detected |
-| `--keep`       | `-k`  | Generations to keep during cleanup       | `10`          |
-| `--jobs`       | `-j`  | Cap Nix `--max-jobs` for the rebuild     | unset         |
-| `--cores`      | `-c`  | Cap Nix `--cores` for the rebuild        | unset         |
-| `--update`    | `-u`  | Run `nix flake update` before rebuild    | `false`       |
-| `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
-| `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
-| `--only`       |       | Run only these steps (comma separated)   | all           |
-| `--dry-run`    |       | Print commands; only the read-only `nixos-rebuild` probe runs, sudo is never touched | `false`   |
-| `--no-color`   |       | Disable colored output                    | auto          |
-| `--completions`|       | Print shell completions (bash, zsh, fish) | —             |
-| `--help`       | `-h`  | Print help                                | —             |
-| `--version`    | `-v`  | Print version                             | —             |
-
-`--keep` must be at least `1` (up to `255`); `--jobs`/`--cores` go up to `65535`.
-Out-of-range values name the accepted range. If the hostname cannot be
-detected, `rx` stops before touching the repository; pass `--hostname`
-explicitly.
-
-Hostnames resolve in order: `--hostname` flag → `/proc/sys/kernel/hostname` →
-`$HOSTNAME` env → `hostname` command. When every source fails the summary shows
-`<not detected>` and the run aborts with a hint.
-
-Long flags also accept `--flag=value` (`--repo=/path`, `--only=diff`).
-
-### Step selection
-
-`--only` takes a comma-separated list of `pull`, `flake`, `stage`, `rebuild`,
-`cleanup`, `diff` (`update` is accepted as an alias for `flake`):
-
-```bash
-rx --only diff                 # only show the closure diff
-rx -u --only flake            # just update flake inputs
-rx --only stage,rebuild       # no pull, no cleanup
-```
-
-An explicit list wins over `--update`/`--diff`, so the printed summary always
-matches what runs. Declining the staging prompt still aborts the run.
-
----
-
-## 🏗 Architecture
-
-Feature-first hexagonal: every feature screams its capability (`system_update`,
-`cli`) and owns its layers (`application` / `ports` / `adapters`). Only the
-domain kernel, non-business helpers and generic infrastructure are shared.
-
-```
-src/
-├── main.rs              # Composition root: parse → wire adapters → run
-├── domain/              # Shared kernel (pure)
-│   ├── config.rs        # Config + Step + validate() + BuildOptions
-│   └── error.rs         # Error type
-├── shared/              # Non-business cross-cutting
-│   ├── ansi.rs          # ANSI codes, Palette (NO_COLOR/TTY), write_flush
-│   └── test_helpers.rs  # FailingWriter / FailAfterWriter / StubRunner
-├── infra/               # Generic process mechanism (not business, not a port)
-│   ├── command.rs       # CommandRunner (adapter-internal argv seam)
-│   ├── process.rs       # ProcessRunner (std::process)
-│   └── dry_run.rs       # DryRunRunner (echo commands, --dry-run)
-├── system_update/       # Feature: the NixOS update workflow
-│   ├── application/     # Use cases
-│   │   ├── mod.rs       # Pipeline orchestration
-│   │   └── steps/       # pull, flake, stage, rebuild, cleanup, diff
-│   ├── ports/           # Interfaces the feature needs
-│   │   ├── repo.rs      # Repo: is_repo / pull / changes / add_all
-│   │   ├── nix.rs       # Nix: update / rebuild / prune / collect_garbage / diff_closures
-│   │   └── user_io.rs   # UserIo: title / confirm / success / output / config
-│   └── adapters/        # Driven implementations for the feature
-│       ├── git.rs       # GitRepo: Repo via the git CLI
-│       ├── nix.rs       # NixCli: Nix via nix / nixos-rebuild
-│       └── terminal.rs  # TerminalIo (stdout/stderr) + config rendering
-├── cli/                 # Driving adapter
-│   ├── mod.rs           # Intent
-│   ├── parse.rs         # Argument parser
-│   ├── defaults.rs      # Default config + tilde expansion
-│   ├── hostname.rs      # Hostname resolution
-│   └── help.rs          # Help/version banners
-tests/
-└── integration.rs        # End-to-end binary tests
-```
-
-### Design decisions
-
-- **Zero dependencies** — no crates, pure `std`. Compile fast, audit easy.
-- **Semantic ports** — the use case depends on `Repo`, `Nix` and `UserIo`, never on
-  `git`/`nix` specifics. `system_update::adapters::git` / `::nix` own the argv; the
-  workflow tests mock the semantic ports. `--dry-run` decorates a single
-  adapter-internal `CommandRunner` seam, so no per-port dry adapters.
-- **Composition in `main`** — the driving adapter (`cli`) only parses; `main`
-  selects adapters and wires them, so `cli` never depends on feature adapters.
-- **Diagnostics on stderr, once** — parse errors and the single top-level error
-  go to stderr; titles, prompts and status stay on stdout, so `rx | head` keeps
-  errors visible and no failure is printed twice.
-- **NO_COLOR / non-TTY / `--no-color`** — each stream picks its own `Palette`
-  from `NO_COLOR` (when non-empty) and `is_terminal()`; `--no-color` forces
-  plain output. A closed stdin aborts prompts instead of answering "yes".
-- **Exit codes** — `2` for invalid arguments/config, `141` (128 + SIGPIPE) when
-  stdout closes early, `128 + N` for signal-terminated child commands, else `1`.
-- **Parallelism caps** — `-j/--jobs` and `-c/--cores` map to `--max-jobs`/`--cores`,
-  so a heavy build cannot OOM the terminal's systemd scope.
-- **Single output channel** — all user-facing output flows through the `UserIo` port.
-- **No shell** — every external command runs via argv; the closure diff is captured and filtered in Rust (no `tac`/`awk`).
-- **Capability-probed rebuild** — `rx` probes the installed `nixos-rebuild`
-  (`--elevate=none list-generations`, read-only) instead of trusting the OS
-  version; `-ng` gets `--elevate=sudo --no-reexec`, classic gets `sudo --fast`.
-- **Validated config** — `Config::validate()` rejects an empty repo/hostname or
-  `keep == 0` up front with a clear message.
-- **Fail-fast** — every step checks the command exit status; a failed pull,
-  flake update, rebuild or cleanup aborts before the next step (so cleanup never
-  runs after a failed rebuild).
-- **Clippy pedantic** — `#[warn(clippy::pedantic)]` enforced at compile time.
-
----
-
-## 🧪 Testing
-
-### 100% coverage — every branch, every error path
-
-```
-288 tests: 270 unit + 18 integration — all passing ✅
-```
-
-Coverage counts tests too: `--no-default-ignore-filename-regex` disables
-cargo-llvm-cov's built-in exclusion of `tests.rs` / `tests/`.
-
-Unit tests cover:
-- Arg parsing (valid, invalid, edge cases, defaults, `--keep 0` guard)
-- ANSI helpers (color codes, flush behavior, failing writers)
-- Command builders (every `git_*` and `nix_*` function)
-- Process execution (exit codes, signals, capture)
-- User IO (confirm prompt, parse responses, banners, config rendering, error propagation)
-- Config (hostname resolution chain, NixOS release detection, tilde expansion)
-- Update workflow (pull, flake, stage, rebuild, cleanup, diff — with mock ports)
-- Dry-run runner (command echoing)
-- Error type (Display, Error::source, From impl)
-
-Integration tests cover:
-- Help/version flags (short and long)
-- Unknown flags → exit code 2
-- `--keep 0` → exit code 2
-- `--dry-run` prints commands without executing
-- Non-git `--repo` → non-zero exit
-- Piped stdin `n` declines and exits 0
-- Subcommand words (`rx help`, `rx version`)
-
-```bash
-cargo test          # run all tests
-cargo clippy        # lint
-cargo fmt --check   # format check
-cargo llvm-cov --all-targets --no-default-ignore-filename-regex   # 100% (incl. tests)
-```
-
----
-
-## 🔧 Nix flake
-
-```nix
-{
-  inputs.nixpkgs.url = "github:nixos/nixpkgs";
-
-  outputs = { self, nixpkgs, ... }:
-    # Build: nix build        (or nix build .#rx / .#default)
-    # Run:   nix run .#default -- --version
-    # Cross: nix build .#cross.x86_64-linux-musl.default --impure
-    # Dev:   nix develop       (includes cargo-llvm-cov + LLVM tools)
-}
-```
-
-Cross-compilation targets:
-- `x86_64-linux` / `x86_64-linux-musl`
-- `aarch64-linux`
-- `x86_64-darwin` / `aarch64-darwin`
-
-### Add as a flake input
+As a flake input:
 
 ```nix
 {
@@ -317,14 +52,194 @@ Cross-compilation targets:
 ```
 
 ```nix
-{ inputs, pkgs, ... }:
-{
-  home.packages = [ inputs.rx.packages.${pkgs.system}.default ];
+{ inputs, pkgs, ... }: {
+  environment.systemPackages = [ inputs.rx.packages.${pkgs.system}.default ];
 }
 ```
 
----
+The flake also installs the man page (`man rx`) and completions for bash, zsh
+and fish.
 
-## 📜 License
+## Usage
 
-MIT
+```console
+$ rx
+
+********************
+* RX Configuration *
+********************
+
+◉ repo = ~/.dotfiles
+◉ hostname = mymachine
+◉ keep = 10
+◉ update = false
+◉ diff = false
+
+Proceed? (Y/n)
+```
+
+```bash
+rx                   # pull → stage → rebuild → cleanup
+rx -u                # also update the flake inputs first
+rx -d                # also show the closure diff at the end
+rx --only diff       # nothing but the closure diff
+rx --dry-run -y      # print every command, run none
+```
+
+| Flag            | Short | What it does                                      | Default       |
+|-----------------|-------|---------------------------------------------------|---------------|
+| `--repo`        | `-r`  | Path to the dotfiles repository                   | `~/.dotfiles` |
+| `--hostname`    | `-n`  | Flake attribute to rebuild (`repo#hostname`)      | detected      |
+| `--keep`        | `-k`  | Generations kept by the cleanup                   | `10`          |
+| `--jobs`        | `-j`  | Cap `nix --max-jobs` for the rebuild              | unset         |
+| `--cores`       | `-c`  | Cap `nix --cores` for the rebuild                 | unset         |
+| `--update`      | `-u`  | Run `nix flake update` before staging             | `false`       |
+| `--diff`        | `-d`  | Show the closure diff after the rebuild           | `false`       |
+| `--yes`         | `-y`  | Assume yes for every prompt                       | `false`       |
+| `--only`        |       | Run only the listed steps                         | default steps |
+| `--dry-run`     |       | Print commands instead of executing them          | `false`       |
+| `--no-color`    |       | Disable ANSI colours                              | auto          |
+| `--completions` |       | Print a completion script (`bash`/`zsh`/`fish`)   | —             |
+| `--help`        | `-h`  | Print the help banner                             | —             |
+| `--version`     | `-v`  | Print the version                                 | —             |
+
+`--keep` accepts `1–255`, `--jobs`/`--cores` accept `1–65535`; out-of-range
+values name the accepted range. Long flags also take `--flag=value`
+(`--repo=/path`, `--only=diff`).
+
+`--only` takes a comma-separated subset of `pull`, `flake`, `stage`,
+`rebuild`, `cleanup`, `diff` (`update` is an alias for `flake`). The list wins
+over `--update`/`--diff`, so the summary always matches what runs.
+
+## What it runs
+
+| Step | Command | When |
+|------|---------|------|
+| **Pull** | `git -C <repo> pull --ff-only` | default |
+| **Flake** | `nix flake update --flake <repo>` | `--update` / `--only flake` |
+| **Stage** | `git -C <repo> status --porcelain`, then `git add .` after a prompt | default |
+| **Rebuild** | `nixos-rebuild switch --flake <repo>#<host>` | default |
+| **Cleanup** | `nix-env --delete-generations +N`, then `nix store gc` | default |
+| **Diff** | `nix profile diff-closures` | `--diff` / `--only diff` |
+
+The installed `nixos-rebuild` is probed with a read-only call
+(`--elevate=none list-generations`): the `-ng` rewrite runs as your user with
+`--elevate=sudo --no-reexec`, the classic script as `sudo … --fast`. Either way
+the self-rebuild re-exec is skipped.
+
+## Behaviour worth knowing
+
+- **Prompts are real prompts.** Declining the first one prints `Aborted.` and
+  exits `0`. Declining the staging prompt aborts before the rebuild, so a stale
+  flake is never built. A closed stdin (`rx </dev/null`) aborts; it is never a
+  yes.
+- **Exit codes.** `2` for bad arguments or config, `141` (128 + SIGPIPE) when
+  stdout closes early, `128 + N` when a child dies from signal `N`, else `1`.
+- **Hostname** resolves as `--hostname` → `/proc/sys/kernel/hostname` →
+  `$HOSTNAME` → `hostname`, trimming each source. If every source fails the
+  summary shows `<not detected>` and the run stops before touching the repo.
+- **sudo is asked once, up front.** `rx` checks whether a password is needed,
+  runs `sudo -v` while the tab says *blocked*, and keeps the ticket alive during
+  the build so a long rebuild does not stop halfway asking again.
+- **Terminal status.** On a TTY, `rx` emits OSC 7501 reports (`working`,
+  `blocked`, `done`, `error`, `idle`), so supporting terminals badge the tab
+  while the update runs.
+- **The repo must be the work-tree root.** A subdirectory of another
+  repository is rejected, so `pull`/`add` never touch the enclosing repo.
+- **`NO_COLOR`, non-TTY and `--no-color`** each disable colour per stream.
+
+> [!TIP]
+> `--dry-run` executes nothing except the read-only `nixos-rebuild` probe. It
+> never calls `sudo`, so a preview cannot ask for a password or refresh a ticket.
+
+## Completions and man page
+
+```bash
+rx --completions bash | sudo tee /etc/bash_completion.d/rx   # also zsh, fish
+```
+
+The scripts are static, so there is no generator crate and no build step. The
+flake installs them together with `rx.1` under `share/`; `cargo install`
+installs only the binary.
+
+## Development
+
+```bash
+nix develop        # toolchain, clippy, rustfmt, cargo-llvm-cov, LLVM, actionlint
+nix build          # packages.default (same as packages.rx)
+nix flake check    # build the package and evaluate the outputs
+```
+
+Before a commit — and what CI enforces:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items
+cargo llvm-cov --all-targets --no-default-ignore-filename-regex   # 100 %, tests included
+```
+
+`--no-default-ignore-filename-regex` matters: without it cargo-llvm-cov
+silently skips `tests.rs` and `tests/`, so test code would not count.
+
+Tests are 380 unit + 27 integration; the integration suite drives the real
+binary with `--dry-run`, a declined prompt or a nonexistent repo, so it never
+touches your system. `nix flake check` gates the flake; `actionlint` (in the
+devShell) checks the workflows before a push.
+
+## Releasing
+
+[CalVer](https://calver.org) in the [memos](https://github.com/usememos/memos)
+style — `YY.MM.N`, e.g. `26.11.2`: the release month plus a counter for further
+releases in that month.
+
+`[package].version` in `Cargo.toml` is the single source of truth. The binary
+embeds it with `env!("CARGO_PKG_VERSION")`, the flake reads it with
+`builtins.fromTOML`, and the release workflow tags `v<version>`. Bump that
+version and push; a push that does not change it publishes nothing, and a tag
+that already exists is a green no-op.
+
+Targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` and both
+Apple Darwin targets.
+
+Release notes are a categorized changelog built from the conventional commit
+subjects since the previous tag (breaking, feat, fix, perf, refactor, test,
+docs, style, build, ci, chore, revert) with a tag-to-tag diff link.
+
+> [!WARNING]
+> The macOS binaries are unsigned, so Gatekeeper quarantines them. After
+> downloading: `xattr -d com.apple.quarantine ./rx`.
+
+## Architecture
+
+Feature-first hexagonal: the update workflow owns its layers, the domain kernel
+stays pure, and nothing knows about `git`/`nix` outside the adapters.
+
+```
+src/main.rs              composition: parse → wire adapters → run
+src/domain/              pure kernel: config, error, step
+src/shared/              ansi (palette), osc (OSC 7501), test helpers
+src/infra/               process runner + dry-run decorator + argv helpers
+src/system_update/
+├── application/         the workflow and its steps
+├── ports/               Repo · Nix · UserIo (traits)
+└── adapters/            git · nix (argv) · terminal
+src/cli/                 parser, defaults, hostname, completions, help
+tests/integration.rs     the real binary, side-effect free
+```
+
+- **Zero dependencies.** Pure `std`: fast builds, no supply chain, manual
+  `Display`/`Error` impls.
+- **Semantic ports.** The workflow depends on `Repo`, `Nix` and `UserIo`, never
+  on `git`/`nix` details; `--dry-run` decorates one adapter-internal command
+  seam instead of every port.
+- **Composition in `main`.** `cli` only parses; `main` picks adapters, so the
+  parser never depends on a feature adapter.
+- **One error voice.** User output goes through `UserIo` on stdout; parse errors
+  and the single top-level error go to stderr, printed once.
+- **Fail-fast.** Every step checks its exit status; a failed rebuild never runs
+  the cleanup.
+- **No shell.** Every command runs via argv; the diff is filtered in Rust.
+
+MIT licensed — see [LICENSE](LICENSE).
