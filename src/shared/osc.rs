@@ -13,6 +13,8 @@ use crate::shared::ansi;
 /// The program states `rx` reports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum State {
+    /// At rest: the run stopped before doing anything (the user aborted).
+    Idle,
     Working,
     BlockedPermission,
     /// Blocked on a credential: sudo is asking for a password.
@@ -25,6 +27,7 @@ impl State {
     /// Name the protocol uses for this state.
     fn name(self) -> &'static str {
         match self {
+            Self::Idle => "idle",
             Self::Working => "working",
             Self::BlockedPermission | Self::BlockedAuth => "blocked",
             Self::Done => "done",
@@ -37,7 +40,7 @@ impl State {
         match self {
             Self::BlockedPermission => Some("permission"),
             Self::BlockedAuth => Some("auth"),
-            Self::Working | Self::Done | Self::Failed => None,
+            Self::Idle | Self::Working | Self::Done | Self::Failed => None,
         }
     }
 }
@@ -111,6 +114,13 @@ mod tests {
         let mut buf = Vec::new();
         assert!(report(&mut buf, State::BlockedAuth, "").is_ok());
         assert_eq!(buf, b"\x1b]7501;state=blocked:kind=auth:app=rx:msg=\x1b\\");
+    }
+
+    #[test]
+    fn report_idle_writes_the_exact_sequence() {
+        let mut buf = Vec::new();
+        assert!(report(&mut buf, State::Idle, "ok").is_ok());
+        assert_eq!(buf, b"\x1b]7501;state=idle:app=rx:msg=b2s=\x1b\\");
     }
 
     #[test]

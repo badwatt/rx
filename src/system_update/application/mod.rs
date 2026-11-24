@@ -13,6 +13,15 @@ use crate::system_update::ports::nix::Nix;
 use crate::system_update::ports::repo::Repo;
 use crate::system_update::ports::user_io::UserIo;
 
+/// How a run ended.
+#[derive(Debug, PartialEq, Eq)]
+enum Outcome {
+    /// Every selected step ran.
+    Finished,
+    /// The user declined a prompt; nothing after it ran.
+    Aborted,
+}
+
 /// Run the full NixOS update workflow, bracketed by OSC 7501 status reports.
 pub(crate) fn run(
     config: &Config,
@@ -20,10 +29,17 @@ pub(crate) fn run(
     nix: &dyn Nix,
     ui: &dyn UserIo,
 ) -> Result<(), Error> {
+    // Validate before claiming a state: a bad config must not flash `working`.
+    config.validate()?;
     ui.progress(State::Working, "Starting the system update")?;
     match execute(config, repo, nix, ui) {
-        Ok(()) => {
+        Ok(Outcome::Finished) => {
             ui.progress(State::Done, "System update finished")?;
+            Ok(())
+        }
+        Ok(Outcome::Aborted) => {
+            // Nothing ran: claiming `done` would fake a finished update.
+            ui.progress(State::Idle, "Nothing ran: the update was aborted")?;
             Ok(())
         }
         Err(error) => {
@@ -35,9 +51,12 @@ pub(crate) fn run(
 }
 
 /// The pipeline proper; [`run`] adds the state reports around it.
-fn execute(config: &Config, repo: &dyn Repo, nix: &dyn Nix, ui: &dyn UserIo) -> Result<(), Error> {
-    config.validate()?;
-
+fn execute(
+    config: &Config,
+    repo: &dyn Repo,
+    nix: &dyn Nix,
+    ui: &dyn UserIo,
+) -> Result<Outcome, Error> {
     // Resolve the hostname before any side effect (pull, flake update,
     // staging): an undetected hostname must abort, not fail halfway through.
     // Only the rebuild needs it, so a run without that step does not care.
@@ -51,7 +70,7 @@ fn execute(config: &Config, repo: &dyn Repo, nix: &dyn Nix, ui: &dyn UserIo) -> 
         if !ui.confirm(true, None)? {
             // Best-effort: the workflow is ending anyway.
             let _ = ui.output("Aborted.\n");
-            return Ok(());
+            return Ok(Outcome::Aborted);
         }
         // The user answered, so the tab is working again.
         ui.progress(State::Working, "Starting the system update")?;
@@ -66,7 +85,7 @@ fn execute(config: &Config, repo: &dyn Repo, nix: &dyn Nix, ui: &dyn UserIo) -> 
     }
 
     if config.runs(Step::Stage) && !steps::stage::run(&config.repo, config.yes, repo, ui)? {
-        return Ok(());
+        return Ok(Outcome::Aborted);
     }
 
     if let Some(hostname) = hostname {
@@ -81,7 +100,7 @@ fn execute(config: &Config, repo: &dyn Repo, nix: &dyn Nix, ui: &dyn UserIo) -> 
         steps::diff::run(nix, ui)?;
     }
 
-    Ok(())
+    Ok(Outcome::Finished)
 }
 
 /// Hostname for the rebuild, or `None` when the rebuild is not selected.

@@ -323,6 +323,41 @@ fn run_confirm_false_returns_early_ok() {
 }
 
 #[test]
+fn run_reports_idle_when_the_prompt_is_declined() {
+    let log = Log::default();
+    let ui = MockUi {
+        confirm: Box::new(|_, _| Ok(false)),
+        ..ok_ui(&log)
+    };
+    assert!(run_ok(&default_config(), &ui).is_ok());
+    assert!(log.contains("Idle"));
+    assert!(!log.contains("Done"));
+}
+
+#[test]
+fn run_reports_idle_when_staging_is_declined() {
+    let log = Log::default();
+    let ui = MockUi {
+        confirm: Box::new(|_, msg| if msg.is_some() { Ok(false) } else { Ok(true) }),
+        ..ok_ui(&log)
+    };
+    assert!(run(&default_config(), &repo_with_changes(), &MockNix::default(), &ui).is_ok());
+    assert!(log.contains("Idle"));
+}
+
+#[test]
+fn run_invalid_config_claims_no_state() {
+    let log = Log::default();
+    let config = Config {
+        repo: String::new(),
+        ..default_config()
+    };
+    assert!(run_ok(&config, &ok_ui(&log)).is_err());
+    assert!(!log.contains("Working"));
+    assert!(!log.contains("Failed"));
+}
+
+#[test]
 fn run_yes_true_skips_top_confirmation() {
     let log = Log::default();
     let config = Config {
