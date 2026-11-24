@@ -302,6 +302,14 @@ fn repo_with_changes() -> MockRepo {
     }
 }
 
+fn pending_errs() -> Result<bool, Error> {
+    Err(Error::PasswordFailed)
+}
+
+fn refresh_errs() -> Result<(), Error> {
+    Err(Error::PasswordFailed)
+}
+
 /// Run with the default (all-ok) ports.
 fn run_ok(config: &Config, ui: &dyn UserIo) -> Result<(), Error> {
     run(config, &MockRepo::default(), &MockNix::default(), ui)
@@ -341,7 +349,15 @@ fn run_reports_idle_when_staging_is_declined() {
         confirm: Box::new(|_, msg| if msg.is_some() { Ok(false) } else { Ok(true) }),
         ..ok_ui(&log)
     };
-    assert!(run(&default_config(), &repo_with_changes(), &MockNix::default(), &ui).is_ok());
+    assert!(
+        run(
+            &default_config(),
+            &repo_with_changes(),
+            &MockNix::default(),
+            &ui
+        )
+        .is_ok()
+    );
     assert!(log.contains("Idle"));
 }
 
@@ -711,6 +727,22 @@ fn run_clears_blocked_auth_after_the_password() {
 }
 
 #[test]
+fn run_idle_progress_error_propagates() {
+    let ui = MockUi {
+        confirm: Box::new(|_, _| Ok(false)),
+        progress: Box::new(|state, _| {
+            if state == State::Idle {
+                Err(Error::GitPullFailed)
+            } else {
+                Ok(())
+            }
+        }),
+        ..ok_ui(&Log::default())
+    };
+    assert!(run_ok(&default_config(), &ui).is_err());
+}
+
+#[test]
 fn run_post_prompt_progress_error_propagates() {
     let calls = Rc::new(std::cell::Cell::new(0usize));
     let counter = Rc::clone(&calls);
@@ -765,7 +797,7 @@ fn run_stage_working_progress_error_propagates() {
 fn run_credentials_error_propagates() {
     let nix = MockNix {
         password_pending: Box::new(|| Ok(true)),
-        refresh_credentials: Box::new(|| Err(Error::PasswordFailed)),
+        refresh_credentials: Box::new(refresh_errs),
         ..MockNix::default()
     };
     let err = run(
@@ -786,8 +818,8 @@ fn run_dry_run_never_probes_or_refreshes_sudo() {
     };
     let nix = MockNix {
         // Any probe or refresh would fail the run.
-        password_pending: Box::new(|| Err(Error::PasswordFailed)),
-        refresh_credentials: Box::new(|| Err(Error::PasswordFailed)),
+        password_pending: Box::new(pending_errs),
+        refresh_credentials: Box::new(refresh_errs),
         ..MockNix::default()
     };
     assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&Log::default())).is_ok());
@@ -796,7 +828,7 @@ fn run_dry_run_never_probes_or_refreshes_sudo() {
 #[test]
 fn run_password_pending_error_propagates() {
     let nix = MockNix {
-        password_pending: Box::new(|| Err(Error::RebuildFailed)),
+        password_pending: Box::new(pending_errs),
         ..MockNix::default()
     };
     assert!(

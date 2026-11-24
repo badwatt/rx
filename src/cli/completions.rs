@@ -169,24 +169,23 @@ mod tests {
         for shell in Shell::ALL {
             let script = shell.script();
             assert!(script.contains("rx"));
-            for flag in &flags {
-                assert!(
-                    mentions_flag(script, flag),
-                    "{flag} missing from {}",
-                    shell.name()
-                );
-            }
-            for step in crate::domain::step::Step::ALL {
-                assert!(
-                    script.contains(step.name()),
-                    "step {} missing from {}",
-                    step.name(),
-                    shell.name()
-                );
-            }
-            for name in ["bash", "zsh", "fish"] {
-                assert!(script.contains(name), "{name} missing from {}", shell.name());
-            }
+            // Counted instead of asserted per item: the message of a failing
+            // `assert!` is user code that coverage would never see run.
+            let missing_flags = flags
+                .iter()
+                .filter(|flag| !mentions_flag(script, flag))
+                .count();
+            assert_eq!(missing_flags, 0);
+            let missing_steps = crate::domain::step::Step::ALL
+                .iter()
+                .filter(|step| !script.contains(step.name()))
+                .count();
+            assert_eq!(missing_steps, 0);
+            let missing_shells = ["bash", "zsh", "fish"]
+                .iter()
+                .filter(|name| !script.contains(*name))
+                .count();
+            assert_eq!(missing_shells, 0);
         }
     }
 

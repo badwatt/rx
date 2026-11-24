@@ -57,7 +57,11 @@ fn sanitize(msg: &str) -> String {
         if out.len() >= MSG_LIMIT {
             break;
         }
-        out.push(if character.is_control() { ' ' } else { character });
+        out.push(if character.is_control() {
+            ' '
+        } else {
+            character
+        });
     }
     out
 }
