@@ -90,6 +90,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@1.99
+        with:
+          components: clippy, rustfmt
 
       # `rust-toolchain.toml` overrides the default toolchain, so add the
       # target to *that* one: the action's `targets:` input installs it on
@@ -101,8 +103,16 @@ jobs:
       - uses: taiki-e/install-action@cross
         if: matrix.tool == 'cross'
 
-      # Gate the released binaries on a green test suite: never ship what CI
-      # would reject. One job is enough, the sources are the same.
+      # Gate the released binaries on a green suite: never ship what CI would
+      # reject. One job is enough, the sources are the same.
+      - name: Format
+        if: matrix.test
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        if: matrix.test
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Test
         if: matrix.test
         run: cargo test --all-targets --locked
