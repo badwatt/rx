@@ -153,7 +153,7 @@ jobs:
           mode: "COMMIT"
           configurationJson: |
             {
-              "template": "#{{CHANGELOG}}\n\n#{{UNCATEGORIZED}}\n\n**Full changelog**: #{{RELEASE_DIFF}}",
+              "template": "#{{CHANGELOG}}\n\n#{{UNCATEGORIZED}}",
               "commit_template": "- #{{TITLE}}",
               "categories": [
                 {
@@ -207,12 +207,12 @@ jobs:
               ],
               "label_extractor": [
                 {
-                  "pattern": "^[a-z]+(\\([^)]*\\))?!:",
+                  "pattern": "^[a-z]+(\\([^)]*\\))?!:[\\s\\S]*",
                   "target": "breaking",
                   "on_property": "title"
                 },
                 {
-                  "pattern": "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\\([^)]*\\))?!?:",
+                  "pattern": "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\\([^)]*\\))?!?:[\\s\\S]*",
                   "target": "$1",
                   "on_property": "title"
                 }
@@ -233,11 +233,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.check.outputs.version }}
+          PREV: ${{ steps.prev.outputs.tag }}
           CHANGELOG: ${{ steps.changelog.outputs.changelog }}
         run: |
+          # The release tag only exists after this call, so the diff link
+          # names it instead of the SHA the changelog was built from.
+          notes="$CHANGELOG"
+          if [ -n "$PREV" ]; then
+            notes="$notes"$'\n\n'"**Full changelog**: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREV...v$VERSION"
+          fi
           # Name the repository explicitly so `gh` does not depend on a remote.
           gh release create "v$VERSION" ./dist/*.tar.gz ./dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --title "v$VERSION" \
-            --notes "$CHANGELOG" \
+            --notes "$notes" \
             --target "$GITHUB_SHA"
