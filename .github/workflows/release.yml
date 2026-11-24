@@ -246,9 +246,9 @@ jobs:
           PREV: ${{ steps.prev.outputs.tag }}
           CHANGELOG: ${{ steps.changelog.outputs.changelog }}
         run: |
-          # The release tag only exists after this call, so the diff link
-          # names it instead of the SHA the changelog was built from.
-          notes="$CHANGELOG"
+          # The template leaves blank lines behind when nothing is
+          # uncategorized; trim them, then link the tag-to-tag diff.
+          notes="${CHANGELOG%"${CHANGELOG##*[![:space:]]}"}"
           if [ -n "$PREV" ]; then
             notes="$notes"$'\n\n'"**Full changelog**: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREV...v$VERSION"
           fi
