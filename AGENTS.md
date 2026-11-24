@@ -14,12 +14,12 @@
 
 | Dato | Dónde vive | Cómo se lee |
 |---|---|---|
-| Nombre | `[package] name` (`rx`) | `env!("CARGO_PKG_NAME")` |
-| Versión | `[package] version`, CalVer `YY.MM.N` | `env!("CARGO_PKG_VERSION")` |
+| Nombre | `[package] name` (`rx`) · en workspace, el del crate del binario | `env!("CARGO_PKG_NAME")` |
+| Versión | `[package] version`, CalVer `YY.MM.N` · en workspace, `[workspace.package] version` + `version.workspace = true` | `env!("CARGO_PKG_VERSION")` |
 | Edición | `[package] edition` (`2024`) | `Cargo.toml`, y el CI lo compila |
 | MSRV | `rust-toolchain.toml` (1.99, pineado) | el devShell del flake |
-| Tipo | binario (`src/main.rs`, `pub(crate)` en todo) | lo que exista en el repo |
-| Toolchain y herramientas | `flake.nix` + `rust-toolchain.toml` | el devShell del flake |
+| Tipo | binario (`src/main.rs`, todo `pub(crate)`); sin deps de framework | lo que exista en el repo |
+| Entorno | `flake.nix` · `mise.toml` · `devcontainer.json` | el primero que exista (rx: `flake.nix`) |
 | Cobertura mínima | `.github/workflows/ci.yml` | **100** regiones/funciones/líneas |
 
 - No hay campo `rust-version`: el toolchain pineado **es** el soportado; no se declara un MSRV sin verificar.
@@ -81,25 +81,32 @@ tests/integration.rs       binario real, sin efectos
 | `unsafe`, punteros raw, `transmute`, `mem::forget`, `ManuallyDrop`, `MaybeUninit`, `Box::leak` | Cero tolerancia, sin excepciones |
 | `Rc`/`RefCell` fuera de tests | Préstamos o propiedad única; tests pueden usar `Rc` para registrar llamadas |
 | `Arc` por reflejo · `clone()` para calmar al borrow checker | Préstamos (`&T`, `&str`, `&[T]`), mover valores, `Box<T>` si el dueño es único |
+| `String` donde basta `&str` · `Cow` sin necesidad | Préstamo por defecto; `Cow<'_, str>` solo si el ownership es condicional |
+| Struct con más de 5 parámetros o campos públicos por comodidad | Struct de config o builder, campos privados con accesores. Un record de datos (`Config`) o un fake de test sin invariantes no cuenta |
 | `.unwrap()` en cualquier sitio · `.expect()` en producción | `?`, `match` o fallback explícito. `.expect("motivo")` solo si el fallo es **imposible por construcción** (p. ej. `write!` a un `String`), y el motivo lo dice |
 | Tragarse un error (`let _ =`, `ok()`) · `panic!` para flujo esperado | `Result`; `Display`/`Error` a mano (el crate no tiene dependencias, no `thiserror`). `let _ =` solo en best-effort **documentado**: mensaje final cuando el workflow ya termina, eco de `--dry-run`, `JoinHandle` del keepalive |
 | `pub` en un binario | `pub(crate)` |
 | Mensajes que filtran secretos | Qué falló y con qué input, sin datos sensibles |
+| Secretos, tokens o PII en el código o en los logs | Fuera de git y nunca en un log; rx no maneja secretos hoy |
 | Estado global mutado en tests (`set_var`, env, CWD) · fixtures sin mensaje | Configuración inyectada (`&dyn` ports, parámetros) y `.expect("contexto")` |
 | Helpers de test que ignoran un `Result` | Que el test falle |
 | Valores hardcodeados (URLs, timeouts, colores) | Constantes, configuración o `Palette`; los textos de UI viven en el step que los imprime |
 | Nombre o versión a mano | `env!("CARGO_PKG_NAME")`, `env!("CARGO_PKG_VERSION")` |
+| `_` como catch-all en un `match` sobre un enum propio | Brazos exhaustivos: una variante nueva debe romper la compilación |
+| `println!`/`dbg!` en el código entregado | La salida del usuario va por `UserIo`/`ansi`; el diagnóstico por el único error de nivel superior (sin `tracing`: cero deps) |
 | Dependencias injustificadas · inputs de flake que sobran | Cero deps salvo justificación fuerte; cada input justifica su mantenimiento |
 | `cargo install`, `nix profile install`, `nix-env -i`, paquetes del sistema | Toda herramienta se declara en `flake.nix` |
 | `--impure`, `builtins.getEnv`, rutas absolutas del host | El resultado depende solo del flake |
-| Optimizar «por si acaso» | Benchmark o perfil primero |
+| Optimizar «por si acaso» · afinar el benchmark para cumplir el requisito | Benchmark o perfil primero, y medición honesta |
 | Lógica repetida ×2 | Extraer a función, tipo o módulo |
 | Código muerto o comentado · `#[allow]` sin motivo | Borrar; `#[expect(clippy::lint, reason = "…")]` en el ítem |
-| Warnings de `fmt`/`clippy`/`doc` | Cero: `-D warnings` |
+| Warnings de `fmt`/`clippy`/`doc` · `#![deny(warnings)]` en el código | Cero: `-D warnings` en el CI |
+| API pública sin documentar | rustdoc en lo no obvio y `# Errors` si devuelve `Result` (rx no expone API pública: todo es `pub(crate)`) |
 
 - `String::from_utf8_lossy(&buf)`, `.is_ok()`/`.is_err()`/`.is_some()`, `.expect_err("contexto")`, `assert_ne!(x, "")` (clippy 1.99 rechaza `assert!(!x.is_empty())`).
 - `impl Display`/`Error` manuales con `source()`: cero dependencias.
 - Preferir `&mut dyn Write` a `<W: Write>`: las monomorfizaciones dejan regiones sin cubrir.
+- rx es **síncrono y mono-hilo**: `async`, `spawn_blocking`, `Arc` compartido y `Send + Sync` no aplican.
 
 ## 4. Entorno Nix
 
@@ -134,14 +141,14 @@ fn validate_rejects_empty_repo() {
 }
 ```
 
-- **Cobertura 100 estricta** — regiones, funciones y líneas. Comando único:
+- **Cobertura 100 estricta** — toda línea y rama nueva o modificada (diff) y el total: el CI exige 100 en ambos, no hay margen del 90 %. Regiones, funciones y líneas. Comando único:
   `cargo llvm-cov --all-targets --no-default-ignore-filename-regex`
   (sin la flag, cargo-llvm-cov ignora `tests.rs`/`tests/` y el código de test no cuenta).
 - **Los tests cuentan**: no se excluyen. `#[coverage(off)]` no está disponible (toolchain pineado, sin nightly) y sería el último recurso.
 - Preferir **arreglos estructurales** a excluir ramas: extraer funciones, mover el `?`. Una closure se instrumenta por sitio de expresión: comparte una `fn` nombrada para que sus ramas se fusionen entre tests.
 - Cada `?` crea una rama: ambos caminos (Ok, Err) los ejercita algún test.
 - Sin `#[should_panic]` (deja sin cubrir el retorno normal); si hace falta el camino de pánico, `std::panic::catch_unwind` en un test normal.
-- Un test: `<verbo>_<sujeto>_<escenario>_<resultado>()`, un concepto y un `assert` cuando se pueda, determinista (sin red, sin sleeps, sin timestamps reales). Junto al módulo (`#[cfg(test)] mod tests` o `tests.rs` hermano) o en `tests/integration.rs` para el binario.
+- Un test: `<verbo>_<sujeto>_<escenario>_<resultado>()`, un concepto y un `assert` cuando se pueda, estructura Arrange-Act-Assert, determinista (sin red, sin sleeps, sin timestamps reales). Junto al módulo (`#[cfg(test)] mod tests` o `tests.rs` hermano) o en `tests/integration.rs` para el binario.
 - Los helpers de test (p. ej. `ok_ui`) cubren sus dos ramas y fallan con mensaje.
 - **Integración sin efectos**: nunca el workflow real. `--dry-run -y`, declinar por stdin (`n`), o un `--repo` inexistente. Pasa `--hostname` explícito cuando el test llegue al rebuild (el sandbox de Nix no tiene `hostname`).
 - Sin tests de relleno ni overrides de `assert!`/`assert_eq!` para inflar cobertura. Lo no testeable se justifica: `// No test: <motivo>. Cubierto por <integración | manual | N/A>`.
@@ -192,9 +199,10 @@ cargo llvm-cov --all-targets --no-default-ignore-filename-regex
 ```
 
 - `nix flake check` debe pasar (evalúa el paquete y el man page).
+- Un workflow modificado se valida con `actionlint` (devShell) antes del push; para ejecutarlo entero hace falta `act` y Docker.
 - CI (`.github/workflows/ci.yml`): `fmt`, `clippy -D warnings`, `test`, `doc` con `RUSTDOCFLAGS=-D warnings` y `coverage` con `--fail-under-lines/functions/regions 100`. Se queda en verde siempre.
 
-**Terminado** cuando: hay un test que falla sin el cambio y pasa con él · cobertura 100 sin bajar · los cuatro comandos y `nix flake check` en verde · el código respeta las skills de Rust aplicables · no hay `unwrap`, `clone` ni dependencia nuevos sin justificar · README/rustdoc actualizados si cambió el comportamiento público · si cambió `version`, las notas del release las genera el workflow (no hay `CHANGELOG.md`).
+**Terminado** cuando: hay un test que falla sin el cambio y pasa con él · cobertura 100 sin bajar · los comandos de arriba y `nix flake check` en verde · el código respeta las skills de Rust aplicables · no hay `unwrap`, `clone` ni dependencia nuevos sin justificar · README/rustdoc actualizados si cambió el comportamiento público · si cambió `version`, las notas del release las genera el workflow (no hay `CHANGELOG.md`).
 
 ## 8. Release y versionado
 
@@ -206,7 +214,7 @@ Un release se dispara por el **cambio de `version` en `Cargo.toml`**, nunca por 
   - Detecta la versión; si el tag `v<version>` ya existe → no-op en verde. **Idempotente**: re-ejecutar no duplica tags ni releases.
   - `workflow_dispatch` siempre construye la matriz; solo publica con `publish` y sin tag.
   - Matriz: `x86_64-unknown-linux-musl` (testeado y compilado nativo), `aarch64-unknown-linux-musl` (cross), `aarch64-apple-darwin` y `x86_64-apple-darwin` (runners macOS, sin firmar). Artefactos por target, `SHA256SUMS`, release en un job aparte.
-  - Verifica antes de publicar (`cargo test --all-targets --locked`), construye, empaqueta `rx-v<version>-<target>.tar.gz` y publica.
+  - Verifica antes de publicar (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets --locked`), construye, empaqueta `rx-v<version>-<target>.tar.gz` y publica.
   - Notas: **changelog categorizado**, no `--generate-notes`. `release-changelog-builder-action` en modo `COMMIT` agrupa los subjects convencionales entre el tag anterior y el release (breaking, feat, fix, perf, refactor, test, docs, style, build, ci, chore, revert). `git describe --tags --abbrev=0 HEAD^` fija el límite inferior; `toTag` es el SHA del commit del release porque el tag aún no existe, y el step de publish añade el link de diff tag-a-tag.
   - Cada `label_extractor` debe consumir el subject **entero** (`…:([\s\S]*)`): la acción *reemplaza* el match por el target, así que un patrón de solo prefijo produce un label basura y nada se categoriza. Un tipo de commit nuevo necesita su `categories`, o sus entradas van a uncategorized.
   - Sin cache de CI a propósito: cero dependencias y jobs de menos de un minuto; una cache añadiría una acción de terceros sin ganancia medible.
