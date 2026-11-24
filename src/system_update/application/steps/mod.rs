@@ -19,13 +19,16 @@ pub(crate) mod stage;
 /// password question instead of the whole command: `nixos-rebuild -ng` builds
 /// for minutes before its activation elevates. A build longer than sudo's
 /// timestamp timeout can still ask again, and that prompt is not announced.
+///
+/// A dry run never touches sudo: no probe, no `sudo -v`, no keep-alive thread.
 pub(super) fn run_elevated(
     nix: &dyn Nix,
     ui: &dyn UserIo,
+    dry_run: bool,
     working: &str,
     command: &mut dyn FnMut() -> Result<(), Error>,
 ) -> Result<(), Error> {
-    if nix.password_pending()? {
+    if !dry_run && nix.password_pending()? {
         ui.progress(State::BlockedAuth, "Waiting for your sudo password")?;
         nix.refresh_credentials()?;
     }

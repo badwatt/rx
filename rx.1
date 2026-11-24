@@ -53,7 +53,8 @@ as an alias for \fBflake\fR. The list wins over \fB\-\-update\fR and
 .B \-\-dry\-run
 Print each command instead of executing it. The read-only capability probe of
 \fBnixos\-rebuild\fR still runs, so the preview shows the flavour actually
-installed.
+installed. Nothing else is executed: \fBsudo\fR is never invoked and no
+credentials are cached.
 .TP
 .B \-\-no\-color
 Disable ANSI colours. Colours are also disabled when \fBNO_COLOR\fR is set or

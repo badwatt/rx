@@ -68,10 +68,10 @@ tests/integration.rs       binario real, sin efectos
 - **Git no interactivo**: `git pull --ff-only` con `GIT_TERMINAL_PROMPT=0`, así una rama divergida o sin credenciales falla en vez de colgarse.
 - **Raíz del repo obligatoria**: `git rev-parse --show-prefix` vacío; un subdirectorio de otro repo se rechaza.
 - **Hostname**: `/proc/sys/kernel/hostname` → `$HOSTNAME` → `hostname` (cada fuente se recorta; una vacía pasa a la siguiente).
-- **Sudo**: `sudo -n true` (probe silencioso) y `sudo -v` (prompt) antes del comando elevado; un hilo detached renueva el ticket con `sudo -n -v` cada 60 s para que un build largo no vuelva a preguntar sin anunciarlo.
+- **Sudo**: `sudo -n true` (probe silencioso) y `sudo -v` (prompt) antes del comando elevado, nunca en `--dry-run`; un hilo detached renueva el ticket con `sudo -n -v` cada 60 s para que un build largo no vuelva a preguntar sin anunciarlo.
 - **OSC 7501**: `UserIo::progress` reporta `working`, `blocked:kind=permission|auth`, `done` y `error` solo en TTY y nunca en `--dry-run`; tras cada prompt se vuelve a `working` o el tab sin foco se queda en "needs attention".
 - **Completions**: `--completions bash|zsh|fish` imprime scripts estáticos; un test garantiza que mencionan el binario y las flags compartidas. `rx.1` es la página de manual.
-- **Dry-run honesto**: `DryRunRunner` delega `probe` al runner real (silencioso), así el preview muestra el flavor realmente instalado.
+- **Dry-run honesto**: `DryRunRunner` delega `probe` al runner real (silencioso), así el preview muestra el flavor realmente instalado; el resto no se ejecuta y sudo no se toca.
 - **Cleanup**: `nix-env --delete-generations +N` y luego `nix store gc` (sin `-d`, para respetar `--keep N`).
 
 ## 3. Reglas

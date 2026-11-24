@@ -744,6 +744,21 @@ fn run_credentials_error_propagates() {
 }
 
 #[test]
+fn run_dry_run_never_probes_or_refreshes_sudo() {
+    let config = Config {
+        dry_run: true,
+        ..default_config()
+    };
+    let nix = MockNix {
+        // Any probe or refresh would fail the run.
+        password_pending: Box::new(|| Err(Error::PasswordFailed)),
+        refresh_credentials: Box::new(|| Err(Error::PasswordFailed)),
+        ..MockNix::default()
+    };
+    assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&Log::default())).is_ok());
+}
+
+#[test]
 fn run_password_pending_error_propagates() {
     let nix = MockNix {
         password_pending: Box::new(|| Err(Error::RebuildFailed)),

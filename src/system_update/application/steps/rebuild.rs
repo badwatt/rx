@@ -12,7 +12,7 @@ pub(crate) fn run(
     ui: &dyn UserIo,
 ) -> Result<(), Error> {
     ui.title("NixOS Rebuild")?;
-    run_elevated(nix, ui, "Rebuilding the system", &mut || {
+    run_elevated(nix, ui, config.dry_run, "Rebuilding the system", &mut || {
         nix.rebuild(&config.repo, hostname, config.build_options())
     })
 }

@@ -142,7 +142,7 @@ Proceed? (Y/n)
 | `--diff`       | `-d`  | Show closure diff after rebuild           | `false`       |
 | `--yes`        | `-y`  | Assume yes for all prompts                | `false`       |
 | `--only`       |       | Run only these steps (comma separated)   | all           |
-| `--dry-run`    |       | Print commands; only the read-only probe runs | `false`   |
+| `--dry-run`    |       | Print commands; only the read-only `nixos-rebuild` probe runs, sudo is never touched | `false`   |
 | `--no-color`   |       | Disable colored output                    | auto          |
 | `--completions`|       | Print shell completions (bash, zsh, fish) | —             |
 | `--help`       | `-h`  | Print help                                | —             |
