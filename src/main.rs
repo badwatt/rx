@@ -25,7 +25,17 @@ use system_update::adapters::nix::NixCli;
 use system_update::adapters::terminal::TerminalIo;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let Ok(args) = utf8_args(env::args_os().collect()) else {
+        let (_, err_palette) = palettes(false);
+        // Best effort: exiting anyway.
+        let _ = writeln!(
+            stderr(),
+            "{}Error: arguments must be valid UTF-8{}",
+            err_palette.red,
+            err_palette.reset
+        );
+        std::process::exit(exit_code_for(&Error::InvalidArgs));
+    };
     let mut out = stdout();
     let mut err = stderr();
     let no_color = args.iter().any(|arg| arg == "--no-color");
@@ -34,6 +44,16 @@ fn main() {
         report_error(&mut err, err_palette, &e);
         std::process::exit(exit_code_for(&e));
     }
+}
+
+/// Convert the process arguments, rejecting non-UTF-8 instead of panicking.
+///
+/// `env::args()` panics on an argument that is not valid UTF-8; a CLI must
+/// report that as invalid input instead.
+fn utf8_args(args: Vec<std::ffi::OsString>) -> Result<Vec<String>, std::ffi::OsString> {
+    args.into_iter()
+        .map(std::ffi::OsString::into_string)
+        .collect()
 }
 
 /// Parse the arguments and dispatch to help/version or the update workflow.
@@ -86,6 +106,22 @@ mod tests {
         assert_eq!(String::from_utf8_lossy(&out), "");
         assert!(String::from_utf8_lossy(&err).contains("Unknown flag"));
     }
+    #[test]
+    fn utf8_args_keeps_valid_arguments() {
+        let args = utf8_args(vec![std::ffi::OsString::from("rx")]).expect("valid args");
+        assert_eq!(args, vec![String::from("rx")]);
+    }
+
+    #[test]
+    fn utf8_args_rejects_a_non_utf8_argument() {
+        use std::os::unix::ffi::OsStringExt;
+        let args = vec![
+            std::ffi::OsString::from("rx"),
+            std::ffi::OsString::from_vec(vec![0xff]),
+        ];
+        assert!(utf8_args(args).is_err());
+    }
+
     #[test]
     fn run_help_routes_to_help() {
         let mut buf = Vec::new();

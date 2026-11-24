@@ -53,6 +53,18 @@ fn version_word_prints_version() {
     assert!(stdout_of(&run(&["version"])).contains("RX version"));
 }
 
+#[cfg(unix)]
+#[test]
+fn non_utf8_argument_exits_two() {
+    use std::os::unix::ffi::OsStrExt;
+    let output = Command::new(RX)
+        .arg(std::ffi::OsStr::from_bytes(b"--repo=\xff"))
+        .output()
+        .expect("run rx");
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("valid UTF-8"));
+}
+
 #[test]
 fn unknown_flag_exits_nonzero() {
     let output = run(&["-x"]);
