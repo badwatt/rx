@@ -45,10 +45,6 @@ impl Step {
 
     /// Comma-separated CLI names, for error messages.
     pub(crate) fn names() -> String {
-        Step::ALL
-            .iter()
-            .map(|step| step.name())
-            .collect::<Vec<_>>()
-            .join(",")
+        Step::ALL.map(Step::name).join(",")
     }
 }

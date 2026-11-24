@@ -21,10 +21,6 @@ fn print_config(writer: &mut dyn Write, config: &Config) -> Result<(), Error> {
     super::print_config(writer, config, Palette::COLOR)
 }
 
-fn print_config_line(writer: &mut dyn Write, label: &str, value: &str) -> Result<(), Error> {
-    super::print_config_line(writer, label, value, Palette::COLOR)
-}
-
 fn terminal() -> TerminalIo {
     TerminalIo::new(Palette::COLOR, false)
 }
@@ -98,6 +94,11 @@ fn parse_confirm_empty_with_true_default_returns_true() {
 #[test]
 fn parse_confirm_empty_with_false_default_returns_false() {
     assert!(!parse_confirm_response("", false));
+}
+
+#[test]
+fn parse_confirm_mixed_case_with_padding_returns_true() {
+    assert!(parse_confirm_response("  YeS  ", false));
 }
 
 #[test]
@@ -212,17 +213,6 @@ fn confirm_error_from_reader_read_line() {
 // ------------------------------------------------------------------
 
 #[test]
-fn print_config_fails_when_only_the_step_line_cannot_be_written() {
-    let config = Config {
-        pipeline: Pipeline::Only(vec![Step::Pull]),
-        ..test_config()
-    };
-    // repo, hostname, keep, update, diff succeed; the step list fails.
-    let mut writer = crate::shared::test_helpers::FailAfterWriter::new(5);
-    assert!(print_config(&mut writer, &config).is_err());
-}
-
-#[test]
 fn fail_after_writer_succeeds_until_the_budget_runs_out() {
     use crate::shared::test_helpers::FailAfterWriter;
     let mut writer = FailAfterWriter::new(1);
@@ -311,19 +301,6 @@ fn print_config_omits_dry_run_when_disabled() {
 }
 
 #[test]
-fn print_config_dry_run_line_error_propagation() {
-    let mut writer = CountingWriter {
-        fail_after: 6,
-        count: 0,
-    };
-    let config = Config {
-        dry_run: true,
-        ..test_config()
-    };
-    assert!(print_config(&mut writer, &config).is_err());
-}
-
-#[test]
 fn print_config_shows_parallelism_caps() {
     let mut buf = Vec::new();
     let config = Config {
@@ -347,29 +324,23 @@ fn print_config_omits_parallelism_caps_when_unset() {
 }
 
 #[test]
-fn print_config_jobs_line_error_propagation() {
+fn print_config_error_propagation() {
+    // fail_after 1: the single write fails.
     let mut writer = CountingWriter {
-        fail_after: 6,
+        fail_after: 1,
         count: 0,
     };
-    let config = Config {
-        jobs: Some(2),
-        ..test_config()
-    };
-    assert!(print_config(&mut writer, &config).is_err());
+    assert!(print_config(&mut writer, &test_config()).is_err());
 }
 
 #[test]
-fn print_config_cores_line_error_propagation() {
+fn print_config_writes_the_summary_in_one_write() {
+    // fail_after 2: the first write succeeds, a second one would fail.
     let mut writer = CountingWriter {
-        fail_after: 6,
+        fail_after: 2,
         count: 0,
     };
-    let config = Config {
-        cores: Some(4),
-        ..test_config()
-    };
-    assert!(print_config(&mut writer, &config).is_err());
+    assert!(print_config(&mut writer, &test_config()).is_ok());
 }
 
 #[test]
@@ -400,57 +371,6 @@ impl Write for CountingWriter {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
-}
-
-#[test]
-fn print_config_error_propagation_line_1() {
-    let mut writer = CountingWriter {
-        fail_after: 1,
-        count: 0,
-    };
-    assert!(print_config(&mut writer, &test_config()).is_err());
-}
-
-#[test]
-fn print_config_error_propagation_line_2() {
-    let mut writer = CountingWriter {
-        fail_after: 2,
-        count: 0,
-    };
-    assert!(print_config(&mut writer, &test_config()).is_err());
-}
-
-#[test]
-fn print_config_error_propagation_line_3() {
-    let mut writer = CountingWriter {
-        fail_after: 3,
-        count: 0,
-    };
-    assert!(print_config(&mut writer, &test_config()).is_err());
-}
-
-#[test]
-fn print_config_error_propagation_line_4() {
-    let mut writer = CountingWriter {
-        fail_after: 4,
-        count: 0,
-    };
-    assert!(print_config(&mut writer, &test_config()).is_err());
-}
-
-#[test]
-fn print_config_error_propagation_line_5() {
-    let mut writer = CountingWriter {
-        fail_after: 5,
-        count: 0,
-    };
-    assert!(print_config(&mut writer, &test_config()).is_err());
-}
-
-#[test]
-fn print_config_line_error_propagation() {
-    let mut writer = crate::shared::test_helpers::FailingWriter;
-    assert!(print_config_line(&mut writer, "k", "v").is_err());
 }
 
 // ------------------------------------------------------------------

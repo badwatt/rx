@@ -37,11 +37,7 @@ impl Shell {
 
     /// Comma-separated shell names, for error messages.
     pub(crate) fn names() -> String {
-        Shell::ALL
-            .iter()
-            .map(|shell| shell.name())
-            .collect::<Vec<_>>()
-            .join(",")
+        Shell::ALL.map(Shell::name).join(",")
     }
 
     /// The completion script for this shell.

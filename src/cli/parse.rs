@@ -83,9 +83,9 @@ fn parse_flags(args: &[String], writer: &mut dyn Write) -> Intent {
 /// Parse a `--long` flag (or `--long=value`) at `args[i]`.
 ///
 /// Returns the number of extra arguments consumed, or the terminal intent.
-fn parse_long(
-    arg: &str,
-    args: &[String],
+fn parse_long<'a>(
+    arg: &'a str,
+    args: &'a [String],
     i: usize,
     config: &mut Config,
     writer: &mut dyn Write,
@@ -98,52 +98,53 @@ fn parse_long(
     match name {
         "--completions" => {
             let (value, _) = long_value(name, inline, args, i, writer)?;
-            let Some(shell) = Shell::from_name(&value) else {
+            let Some(shell) = Shell::from_name(value) else {
                 write_parse_error(
                     writer,
                     &format!("Unknown shell \"{value}\" (valid: {})", Shell::names()),
                 );
                 return Err(Intent::Invalid);
             };
-            Err(Intent::Completions(shell))
+            return Err(Intent::Completions(shell));
         }
         "--only" => {
             let (value, consumed) = long_value(name, inline, args, i, writer)?;
-            config.set_only(parse_steps(&value, writer)?);
-            Ok(consumed)
+            config.set_only(parse_steps(value, writer)?);
+            return Ok(consumed);
         }
-        "--repo" | "--hostname" | "--keep" | "--jobs" | "--cores" => {
-            let (value, consumed) = long_value(name, inline, args, i, writer)?;
-            set_value(long_value_key(name), value, name, config, writer)?;
-            Ok(consumed)
+        _ => {}
+    }
+    if let Some(key) = long_value_key(name) {
+        let (value, consumed) = long_value(name, inline, args, i, writer)?;
+        set_value(key, value, name, config, writer)?;
+        return Ok(consumed);
+    }
+    // Everything else is a switch: it takes neither an inline nor a separate
+    // value.
+    if inline.is_some() {
+        write_parse_error(writer, &format!("\"{name}\" flag does not take a value"));
+        return Err(Intent::Invalid);
+    }
+    match name {
+        "--help" => Err(Intent::Help),
+        "--version" => Err(Intent::Version),
+        "--update" => {
+            config.set_update(true);
+            Ok(0)
         }
-        "--help" | "--version" | "--update" | "--diff" | "--yes" | "--dry-run" | "--no-color" => {
-            if inline.is_some() {
-                write_parse_error(writer, &format!("\"{name}\" flag does not take a value"));
-                return Err(Intent::Invalid);
-            }
-            match name {
-                "--help" => Err(Intent::Help),
-                "--version" => Err(Intent::Version),
-                "--update" => {
-                    config.set_update(true);
-                    Ok(0)
-                }
-                "--diff" => {
-                    config.set_diff(true);
-                    Ok(0)
-                }
-                "--yes" => {
-                    config.yes = true;
-                    Ok(0)
-                }
-                "--dry-run" => {
-                    config.dry_run = true;
-                    Ok(0)
-                }
-                _ => Ok(0),
-            }
+        "--diff" => {
+            config.set_diff(true);
+            Ok(0)
         }
+        "--yes" => {
+            config.yes = true;
+            Ok(0)
+        }
+        "--dry-run" => {
+            config.dry_run = true;
+            Ok(0)
+        }
+        "--no-color" => Ok(0),
         _ => {
             write_parse_error(writer, &format!("Unknown flag \"{name}\""));
             Err(Intent::Invalid)
@@ -151,14 +152,15 @@ fn parse_long(
     }
 }
 
-/// Map a long value-flag name to its [`ValueKey`].
-fn long_value_key(arg: &str) -> ValueKey {
+/// Map a long value-flag name to its [`ValueKey`], or `None` for other flags.
+fn long_value_key(arg: &str) -> Option<ValueKey> {
     match arg {
-        "--repo" => ValueKey::Repo,
-        "--hostname" => ValueKey::Hostname,
-        "--keep" => ValueKey::Keep,
-        "--jobs" => ValueKey::Jobs,
-        _ => ValueKey::Cores,
+        "--repo" => Some(ValueKey::Repo),
+        "--hostname" => Some(ValueKey::Hostname),
+        "--keep" => Some(ValueKey::Keep),
+        "--jobs" => Some(ValueKey::Jobs),
+        "--cores" => Some(ValueKey::Cores),
+        _ => None,
     }
 }
 
@@ -166,19 +168,19 @@ fn long_value_key(arg: &str) -> ValueKey {
 ///
 /// `--flag=value` carries its value inline; plain `--flag value` consumes the
 /// next argv entry.
-fn long_value(
+fn long_value<'a>(
     name: &str,
-    inline: Option<&str>,
-    args: &[String],
+    inline: Option<&'a str>,
+    args: &'a [String],
     i: usize,
     writer: &mut dyn Write,
-) -> Result<(String, usize), Intent> {
+) -> Result<(&'a str, usize), Intent> {
     match inline {
         Some("") => {
             write_parse_error(writer, &format!("\"{name}\" flag requires an argument"));
             Err(Intent::Invalid)
         }
-        Some(value) => Ok((String::from(value), 0)),
+        Some(value) => Ok((value, 0)),
         None => Ok((take_value(args, i, name, writer)?, 1)),
     }
 }
@@ -238,12 +240,12 @@ fn value_key(flag: char) -> ValueKey {
 }
 
 /// Read the argument following a value flag, or report a missing value.
-fn take_value(
-    args: &[String],
+fn take_value<'a>(
+    args: &'a [String],
     i: usize,
     label: &str,
     writer: &mut dyn Write,
-) -> Result<String, Intent> {
+) -> Result<&'a str, Intent> {
     let Some(next) = args.get(i + 1) else {
         write_parse_error(writer, &format!("\"{label}\" flag requires an argument"));
         return Err(Intent::Invalid);
@@ -253,26 +255,26 @@ fn take_value(
         write_parse_error(writer, &format!("\"{label}\" flag requires an argument"));
         return Err(Intent::Invalid);
     }
-    Ok(next.clone())
+    Ok(next.as_str())
 }
 
 /// Assign `value` to the field selected by `key`.
 fn set_value(
     key: ValueKey,
-    value: String,
+    value: &str,
     label: &str,
     config: &mut Config,
     writer: &mut dyn Write,
 ) -> Result<(), Intent> {
     match key {
-        ValueKey::Repo => config.repo = expand_tilde(&value),
-        ValueKey::Hostname => config.hostname = Some(value),
-        ValueKey::Keep => config.keep = parse_bounded(&value, label, 1u8, u8::MAX, writer)?,
+        ValueKey::Repo => config.repo = expand_tilde(value),
+        ValueKey::Hostname => config.hostname = Some(value.to_owned()),
+        ValueKey::Keep => config.keep = parse_bounded(value, label, 1u8, u8::MAX, writer)?,
         ValueKey::Jobs => {
-            config.jobs = Some(parse_bounded(&value, label, 1u16, u16::MAX, writer)?);
+            config.jobs = Some(parse_bounded(value, label, 1u16, u16::MAX, writer)?);
         }
         ValueKey::Cores => {
-            config.cores = Some(parse_bounded(&value, label, 1u16, u16::MAX, writer)?);
+            config.cores = Some(parse_bounded(value, label, 1u16, u16::MAX, writer)?);
         }
     }
     Ok(())

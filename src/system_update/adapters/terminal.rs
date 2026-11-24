@@ -152,57 +152,54 @@ fn write_confirm_prompt(
 /// Returns `default` for empty input, `true` for "y"/"yes", `false` for
 /// "n"/"no" or any other input.
 pub(crate) fn parse_confirm_response(line: &str, default: bool) -> bool {
-    match line.trim().to_lowercase().as_str() {
-        "y" | "yes" => true,
-        "" => default,
-        _ => false,
+    let answer = line.trim();
+    if answer.is_empty() {
+        return default;
     }
+    answer.eq_ignore_ascii_case("y") || answer.eq_ignore_ascii_case("yes")
 }
 
-/// Print all `config` fields with colored labels, each terminated by a newline.
+/// Print all `config` fields, each terminated by a newline, in one write.
 pub(crate) fn print_config(
     writer: &mut dyn Write,
     config: &Config,
     palette: Palette,
 ) -> Result<(), Error> {
-    print_config_line(writer, "repo", &config.repo, palette)?;
+    let mut text = String::new();
+    push_config_line(&mut text, "repo", &config.repo, palette);
     let hostname = config.hostname.as_deref().unwrap_or("<not detected>");
-    print_config_line(writer, "hostname", hostname, palette)?;
-    print_config_line(writer, "keep", &config.keep.to_string(), palette)?;
-    print_config_line(writer, "update", &config.update().to_string(), palette)?;
-    print_config_line(writer, "diff", &config.diff().to_string(), palette)?;
+    push_config_line(&mut text, "hostname", hostname, palette);
+    push_config_line(&mut text, "keep", &config.keep.to_string(), palette);
+    push_config_line(&mut text, "update", &config.update().to_string(), palette);
+    push_config_line(&mut text, "diff", &config.diff().to_string(), palette);
     if let Some(jobs) = config.jobs {
-        print_config_line(writer, "jobs", &jobs.to_string(), palette)?;
+        push_config_line(&mut text, "jobs", &jobs.to_string(), palette);
     }
     if let Some(cores) = config.cores {
-        print_config_line(writer, "cores", &cores.to_string(), palette)?;
+        push_config_line(&mut text, "cores", &cores.to_string(), palette);
     }
     // Shown only when set, so the summary never lies about the pipeline.
     if let Some(steps) = config.only() {
         let names: Vec<&str> = steps.iter().map(|step| step.name()).collect();
-        print_config_line(writer, "only", &names.join(","), palette)?;
+        push_config_line(&mut text, "only", &names.join(","), palette);
     }
     // Shown only when set, so a dry run is never mistaken for a real one.
     if config.dry_run {
-        print_config_line(writer, "dry-run", &config.dry_run.to_string(), palette)?;
+        push_config_line(&mut text, "dry-run", &config.dry_run.to_string(), palette);
     }
-    Ok(())
+    write_raw(writer, &text)
 }
 
-fn print_config_line(
-    writer: &mut dyn Write,
-    label: &str,
-    value: &str,
-    palette: Palette,
-) -> Result<(), Error> {
-    ansi::write_flush(
-        writer,
-        &format!(
-            "{}◉ {}{}{} = {}{}{}\n",
-            palette.cyan, palette.red, label, palette.reset, palette.cyan, value, palette.reset
-        ),
-    )?;
-    Ok(())
+/// Append one `◉ label = value` line to `out`.
+fn push_config_line(out: &mut String, label: &str, value: &str, palette: Palette) {
+    use std::fmt::Write as _;
+    // Formatting into a `String` cannot fail.
+    writeln!(
+        out,
+        "{}◉ {}{}{} = {}{}{}",
+        palette.cyan, palette.red, label, palette.reset, palette.cyan, value, palette.reset
+    )
+    .expect("writing to a String cannot fail");
 }
 
 #[cfg(test)]
