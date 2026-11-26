@@ -122,6 +122,7 @@ tests/integration.rs       binario real, sin efectos
 - `flake.lock` se commitea. Actualizar es una decisión explícita (`nix flake update`) revisando el diff de inputs.
 - La versión de Rust la fija `rust-toolchain.toml` dentro del shell; ⛔ `rustup default` global.
 - El shell exporta `LLVM_COV`/`LLVM_PROFDATA` desde el componente `llvm-tools` del propio toolchain, así que casan siempre con `rustc` (un LLVM más viejo no puede leer el raw profile).
+- `.cargo/config.toml` fija un **cooldown de dependencias** (`[registry] global-min-publish-age = "7 days"`, Cargo 1.100): con cero deps es una guarda para el día que entre la primera.
 
 ## 5. TDD y cobertura
 

@@ -1,0 +1,5 @@
+# Dependency cooldown (Cargo 1.100+): never resolve a version published in the
+# last week, so a compromised release is normally reported before it can land.
+# rx has no dependencies today; this guards the day one arrives.
+[registry]
+global-min-publish-age = "7 days"
