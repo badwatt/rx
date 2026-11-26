@@ -8,7 +8,7 @@
 //! fresh report arrives. The bar must vanish whenever the user has to
 //! intervene.
 
-use std::io::{self, Write};
+use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -22,7 +22,7 @@ const RUNNING: &str = "\x1b]9;4;3;0\x1b\\";
 const CLEAR: &str = "\x1b]9;4;0;0\x1b\\";
 /// Ten reports a second: enough for the terminal's pulse and for it never to
 /// consider the report stale.
-pub(crate) const INTERVAL: Duration = Duration::from_millis(100);
+const INTERVAL: Duration = Duration::from_millis(100);
 
 /// The tab progress bar of one run.
 ///
@@ -30,17 +30,15 @@ pub(crate) const INTERVAL: Duration = Duration::from_millis(100);
 /// a terminal that ignores OSC 9;4 simply shows nothing.
 pub(crate) struct Progress {
     enabled: bool,
-    interval: Duration,
     active: AtomicBool,
     stop: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl Progress {
-    pub(crate) fn new(enabled: bool, interval: Duration) -> Self {
+    pub(crate) fn new(enabled: bool) -> Self {
         Self {
             enabled,
-            interval,
             active: AtomicBool::new(false),
             stop: Arc::new(AtomicBool::new(false)),
             thread: Mutex::new(None),
@@ -55,8 +53,7 @@ impl Progress {
         self.stop.store(false, Ordering::Release);
         emit(RUNNING);
         let stop = Arc::clone(&self.stop);
-        let interval = self.interval;
-        let handle = thread::spawn(move || keep_alive(interval, &stop, usize::MAX));
+        let handle = thread::spawn(move || keep_alive(INTERVAL, &stop, usize::MAX));
         *lock(&self.thread) = Some(handle);
     }
 
@@ -82,6 +79,9 @@ fn lock(slot: &Mutex<Option<JoinHandle<()>>>) -> std::sync::MutexGuard<'_, Optio
 }
 
 /// Re-emit the bar while it is up.
+///
+/// `writes_left` bounds the loop so a test can run it without a thread;
+/// production uses `usize::MAX` and relies on `stop`.
 fn keep_alive(interval: Duration, stop: &AtomicBool, writes_left: usize) {
     let mut writes = 0;
     while writes < writes_left && refresh(stop) {
@@ -102,13 +102,8 @@ fn refresh(stop: &AtomicBool) -> bool {
 /// Write a sequence to stdout, best-effort.
 fn emit(sequence: &str) {
     let mut out = io::stdout();
-    write_sequence(&mut out, sequence);
-}
-
-/// Write a sequence, ignoring a closed or broken stdout.
-fn write_sequence(writer: &mut dyn Write, sequence: &str) {
     // Best effort: decorative, a dead terminal must not fail the update.
-    let _ = ansi::write_flush(writer, sequence);
+    let _ = ansi::write_flush(&mut out, sequence);
 }
 
 #[cfg(test)]
@@ -117,21 +112,17 @@ mod tests {
 
     #[test]
     fn running_sequence_is_indeterminate_progress() {
-        let mut buf = Vec::new();
-        write_sequence(&mut buf, RUNNING);
-        assert_eq!(buf, b"\x1b]9;4;3;0\x1b\\");
+        assert_eq!(RUNNING, "\x1b]9;4;3;0\x1b\\");
     }
 
     #[test]
     fn clear_sequence_removes_the_bar() {
-        let mut buf = Vec::new();
-        write_sequence(&mut buf, CLEAR);
-        assert_eq!(buf, b"\x1b]9;4;0;0\x1b\\");
+        assert_eq!(CLEAR, "\x1b]9;4;0;0\x1b\\");
     }
 
     #[test]
     fn show_and_hide_drive_the_bar() {
-        let bar = Progress::new(true, Duration::from_millis(1));
+        let bar = Progress::new(true);
         bar.hide(); // nothing to hide yet
         bar.show();
         bar.show(); // already up
@@ -141,7 +132,7 @@ mod tests {
 
     #[test]
     fn disabled_bar_ignores_every_call() {
-        let bar = Progress::new(false, Duration::from_millis(1));
+        let bar = Progress::new(false);
         bar.show();
         bar.hide();
     }

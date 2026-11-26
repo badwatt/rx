@@ -4,7 +4,7 @@ use crate::domain::config::Config;
 use crate::domain::error::Error;
 use crate::shared::ansi::{self, Palette};
 use crate::shared::osc::{self, State};
-use crate::shared::progress::{self, Progress};
+use crate::shared::progress::Progress;
 use crate::system_update::ports::user_io::UserIo;
 
 /// Production [`UserIo`]: prompts and status on stdout.
@@ -32,7 +32,7 @@ impl TerminalIo {
         Self {
             out,
             osc,
-            bar: Progress::new(osc, progress::INTERVAL),
+            bar: Progress::new(osc),
         }
     }
 }
