@@ -30,7 +30,7 @@ nix run github:badwatt/rx -- --version
 nix build github:badwatt/rx
 ./result/bin/rx
 
-# or with cargo (Rust 1.99, the pinned toolchain)
+# or with cargo (Rust 1.100, the pinned toolchain)
 cargo install --git https://github.com/badwatt/rx
 ```
 
@@ -168,7 +168,7 @@ installs only the binary.
 ## Development
 
 ```bash
-nix develop        # toolchain, clippy, rustfmt, cargo-llvm-cov, LLVM, actionlint
+nix develop        # the pinned toolchain (rust-toolchain.toml), cargo-llvm-cov, actionlint
 nix build          # packages.default (same as packages.rx)
 nix flake check    # build the package and evaluate the outputs
 ```

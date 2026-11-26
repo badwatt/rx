@@ -3,10 +3,18 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs";
+
+    # nixpkgs lags a stable release, and the project pins its toolchain in
+    # rust-toolchain.toml: this overlay turns that file into the toolchain
+    # used by the shell and by the package.
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    { self, nixpkgs, ... }:
+    { self, nixpkgs, rust-overlay, ... }:
     let
       lib = nixpkgs.lib;
 
@@ -20,14 +28,22 @@
         "i686-linux"
       ];
 
-      pkgsFor = system: import nixpkgs { inherit system; };
+      pkgsFor =
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        };
       forAllSystems = lib.genAttrs allSystems;
 
       version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 
+      # The toolchain `rust-toolchain.toml` pins, for the shell and the package.
+      rustFor = pkgs: pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+
       mkRx =
-        pkgs:
-        pkgs.rustPlatform.buildRustPackage {
+        pkgs: rustPlatform:
+        rustPlatform.buildRustPackage {
           pname = "rx";
           inherit version;
           src = ./.;
@@ -58,7 +74,9 @@
       packages = forAllSystems (
         system:
         let
-          rx = mkRx (pkgsFor system);
+          pkgs = pkgsFor system;
+          rust = rustFor pkgs;
+          rx = mkRx pkgs (pkgs.makeRustPlatform { cargo = rust; rustc = rust; });
         in
         {
           # e.g. nix build .#rx  (or plain: nix build)
@@ -80,12 +98,14 @@
         system:
         {
           cross = lib.genAttrs (lib.filter (target: target != system) allSystems) (target: {
-            default = mkRx (
-              import nixpkgs {
-                inherit system;
-                crossSystem = target;
-              }
-            );
+            default =
+              let
+                crossPkgs = import nixpkgs {
+                  inherit system;
+                  crossSystem = target;
+                };
+              in
+              mkRx crossPkgs crossPkgs.rustPlatform;
           });
         }
       );
@@ -94,7 +114,7 @@
         system:
         let
           pkgs = pkgsFor system;
-          llvm = pkgs.llvmPackages.llvm;
+          rust = rustFor pkgs;
         in
         {
           default = pkgs.mkShell {
@@ -103,22 +123,19 @@
             # For cross compilation
             NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM = 1;
 
-            # Let cargo-llvm-cov find the LLVM tools.
-            LLVM_COV = "${llvm}/bin/llvm-cov";
-            LLVM_PROFDATA = "${llvm}/bin/llvm-profdata";
+            # cargo-llvm-cov needs the LLVM that matches the compiler: take it
+            # from the toolchain (llvm-tools component) instead of nixpkgs.
+            LLVM_COV = "${rust}/lib/rustlib/${pkgs.stdenv.hostPlatform.rust.rustcTarget}/bin/llvm-cov";
+            LLVM_PROFDATA = "${rust}/lib/rustlib/${pkgs.stdenv.hostPlatform.rust.rustcTarget}/bin/llvm-profdata";
 
             packages = with pkgs; [
               actionlint
+              rust
+              cargo-llvm-cov
               gcc
               gnumake
-              clippy
-              rustc
-              cargo
-              rustfmt
-              rust-analyzer
-              cargo-llvm-cov
-              llvm
               pkg-config
+              rust-analyzer
             ];
           };
         }

@@ -17,7 +17,7 @@
 | Nombre | `[package] name` (`rx`) · en workspace, el del crate del binario | `env!("CARGO_PKG_NAME")` |
 | Versión | `[package] version`, CalVer `YY.MM.N` · en workspace, `[workspace.package] version` + `version.workspace = true` | `env!("CARGO_PKG_VERSION")` |
 | Edición | `[package] edition` (`2024`) | `Cargo.toml`, y el CI lo compila |
-| MSRV | `rust-toolchain.toml` (1.99, pineado) | el devShell del flake |
+| MSRV | `rust-toolchain.toml` (1.100, pineado) | el devShell del flake |
 | Tipo | binario (`src/main.rs`, todo `pub(crate)`); sin deps de framework | lo que exista en el repo |
 | Entorno | `flake.nix` · `mise.toml` · `devcontainer.json` | el primero que exista (rx: `flake.nix`) |
 | Cobertura mínima | `.github/workflows/ci.yml` | **100** regiones/funciones/líneas |
@@ -104,7 +104,7 @@ tests/integration.rs       binario real, sin efectos
 | Warnings de `fmt`/`clippy`/`doc` · `#![deny(warnings)]` en el código | Cero: `-D warnings` en el CI |
 | API pública sin documentar | rustdoc en lo no obvio y `# Errors` si devuelve `Result` (rx no expone API pública: todo es `pub(crate)`) |
 
-- `String::from_utf8_lossy(&buf)`, `.is_ok()`/`.is_err()`/`.is_some()`, `.expect_err("contexto")`, `assert_ne!(x, "")` (clippy 1.99 rechaza `assert!(!x.is_empty())`).
+- `String::from_utf8_lossy(&buf)`, `.is_ok()`/`.is_err()`/`.is_some()`, `.expect_err("contexto")`, `assert_ne!(x, "")` (clippy rechaza `assert!(!x.is_empty())`).
 - `impl Display`/`Error` manuales con `source()`: cero dependencias.
 - Preferir `&mut dyn Write` a `<W: Write>`: las monomorfizaciones dejan regiones sin cubrir.
 - `[lints]` del crate: `unsafe_code = "forbid"` y `clippy::unwrap_used = "deny"`; el compilador hace cumplir dos reglas de la tabla, sin `#[allow]`.
@@ -114,13 +114,14 @@ tests/integration.rs       binario real, sin efectos
 
 - `flake.nix` es el **único** sitio donde se declaran herramientas (toolchain de Rust, `clippy`, `rustfmt`, `cargo-llvm-cov`, LLVM).
 - `devShells.default` lleva las herramientas de desarrollo (y exporta `LLVM_COV`/`LLVM_PROFDATA`); `packages.default`/`packages.rx` construyen el binario con `meta.mainProgram = "rx"`. Sin duplicar dependencias entre ambos.
+- La versión de Rust sale de `rust-toolchain.toml` vía `rust-overlay` (`rust-bin.fromRustupToolchainFile`), para el shell **y** para el paquete; nixpkgs va por detrás de un release estable.
 - Salidas que deben seguir funcionando: `nix build`, `nix develop`, `nix flake check`, y los cross builds en `legacyPackages.<system>.cross.<target>`.
 - `checks.<system>.default` refleja el paquete, así `nix flake check` construye algo real (no re-declara fmt/clippy/test: eso lo corre el CI).
 - El paquete instala `rx.1` y las completions generadas por el propio binario, así no divergen del parser.
 - Uso diario: `nix develop` (o `direnv` + `use flake`). Un comando suelto: `nix develop -c <cmd>`.
 - `flake.lock` se commitea. Actualizar es una decisión explícita (`nix flake update`) revisando el diff de inputs.
 - La versión de Rust la fija `rust-toolchain.toml` dentro del shell; ⛔ `rustup default` global.
-- Si `llvm-profdata` del shell es más viejo que el LLVM de `rustc`, apunta `LLVM_COV`/`LLVM_PROFDATA` a un LLVM igual o más nuevo (el raw profile cambia de versión).
+- El shell exporta `LLVM_COV`/`LLVM_PROFDATA` desde el componente `llvm-tools` del propio toolchain, así que casan siempre con `rustc` (un LLVM más viejo no puede leer el raw profile).
 
 ## 5. TDD y cobertura
 
@@ -201,6 +202,7 @@ cargo llvm-cov --all-targets --no-default-ignore-filename-regex
 ```
 
 - `nix flake check` debe pasar (evalúa el paquete y el man page).
+- Un `RUSTC_WRAPPER` de caché (kache y similares) puede mezclar artefactos de compilaciones distintas: si coverage sale raro, `RUSTC_WRAPPER= cargo llvm-cov …` o borra `target/`.
 - Un workflow modificado se valida con `actionlint` (devShell) antes del push; para ejecutarlo entero hace falta `act` y Docker.
 - CI (`.github/workflows/ci.yml`): `fmt`, `clippy -D warnings`, `test`, `doc` con `RUSTDOCFLAGS=-D warnings` y `coverage` con `--fail-under-lines/functions/regions 100`. Se queda en verde siempre.
 
@@ -220,7 +222,7 @@ Un release se dispara por el **cambio de `version` en `Cargo.toml`**, nunca por 
   - Notas: **changelog categorizado**, no `--generate-notes`. `release-changelog-builder-action` en modo `COMMIT` agrupa los subjects convencionales entre el tag anterior y el release (breaking, feat, fix, perf, refactor, test, docs, style, build, ci, chore, revert). `git describe --tags --abbrev=0 HEAD^` fija el límite inferior; `toTag` es el SHA del commit del release porque el tag aún no existe, y el step de publish recorta las líneas en blanco que deja la plantilla y añade el link de diff tag-a-tag.
   - Cada `label_extractor` debe consumir el subject **entero** (`…:([\s\S]*)`): la acción *reemplaza* el match por el target, así que un patrón de solo prefijo produce un label basura y nada se categoriza. Un tipo de commit nuevo necesita su `categories`, o sus entradas van a uncategorized.
   - Sin cache de CI a propósito: cero dependencias y jobs de menos de un minuto; una cache añadiría una acción de terceros sin ganancia medible.
-  - CI pinea rust 1.99 (`dtolnay/rust-toolchain@1.99`); mantenlo en sync con `rust-toolchain.toml`.
+  - CI pinea rust 1.100 (`dtolnay/rust-toolchain@1.100`); mantenlo en sync con `rust-toolchain.toml`.
 - ⛔ Bump desde el CI o commit de vuelta al repo · ⛔ tag a mano antes de que la versión esté en `Cargo.toml`.
 
 **Commits**: `type(scope): description` (`feat`, `fix`, `test`, `refactor`, `docs`, `chore`, `perf`, `ci`, `build`, `style`, `revert`), en imperativo, un cambio coherente con sus tests, generado desde `git diff --cached`. **Preguntar siempre** antes de `git push`, antes de operaciones destructivas (purge, delete, force-push, rebase) y antes de tocar `name`/`version`. Nunca push sin permiso explícito.
