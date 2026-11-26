@@ -40,7 +40,8 @@
 ```
 src/main.rs                composición: parse → adaptadores → workflow
 src/domain/                kernel puro: config.rs, error.rs, step.rs
-src/shared/                ansi.rs, osc.rs, progress.rs, test_helpers.rs (cfg(test))
+src/terminal/              ansi.rs (palette), osc.rs (7501), progress.rs (9;4)
+src/test_support.rs        test doubles and failing writers (cfg(test))
 src/infra/                 command.rs (seam), process.rs, dry_run.rs, argv.rs
 src/system_update/         feature
 ├── application/           run + steps/{pull,flake,stage,rebuild,cleanup,diff}.rs

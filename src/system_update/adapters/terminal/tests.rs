@@ -146,7 +146,7 @@ fn confirm_closed_stdin_never_takes_the_default_yes() {
 
 #[test]
 fn failing_writer_flush_is_ok() {
-    let mut writer = crate::shared::test_helpers::FailingWriter;
+    let mut writer = crate::test_support::FailingWriter;
     assert!(io::Write::flush(&mut writer).is_ok());
 }
 
@@ -180,14 +180,14 @@ fn failing_reader_consume_is_noop() {
 
 #[test]
 fn print_title_error_propagation() {
-    let mut writer = crate::shared::test_helpers::FailingWriter;
+    let mut writer = crate::test_support::FailingWriter;
     assert!(print_title(&mut writer, "Test").is_err());
 }
 
 #[test]
 fn confirm_error_from_writer() {
     let mut reader = io::BufReader::new(b"y\n".as_slice());
-    let mut writer = crate::shared::test_helpers::FailingWriter;
+    let mut writer = crate::test_support::FailingWriter;
     let result = confirm(&mut reader, &mut writer, false, None);
     assert!(result.is_err());
 }
@@ -195,7 +195,7 @@ fn confirm_error_from_writer() {
 #[test]
 fn confirm_error_from_writer_with_message() {
     let mut reader = io::BufReader::new(b"y\n".as_slice());
-    let mut writer = crate::shared::test_helpers::FailingWriter;
+    let mut writer = crate::test_support::FailingWriter;
     let result = confirm(&mut reader, &mut writer, false, Some("Sure"));
     assert!(result.is_err());
 }
@@ -214,7 +214,7 @@ fn confirm_error_from_reader_read_line() {
 
 #[test]
 fn fail_after_writer_succeeds_until_the_budget_runs_out() {
-    use crate::shared::test_helpers::FailAfterWriter;
+    use crate::test_support::FailAfterWriter;
     let mut writer = FailAfterWriter::new(1);
     assert!(io::Write::write(&mut writer, b"a").is_ok());
     assert!(io::Write::write(&mut writer, b"b").is_err());
@@ -455,7 +455,7 @@ fn write_line_writes_text_with_newline() {
 
 #[test]
 fn write_line_error_propagation() {
-    let mut writer = crate::shared::test_helpers::FailingWriter;
+    let mut writer = crate::test_support::FailingWriter;
     assert!(write_line(&mut writer, "plain").is_err());
 }
 
@@ -468,6 +468,6 @@ fn write_raw_writes_text_verbatim() {
 
 #[test]
 fn write_raw_error_propagation() {
-    let mut writer = crate::shared::test_helpers::FailingWriter;
+    let mut writer = crate::test_support::FailingWriter;
     assert!(write_raw(&mut writer, "raw").is_err());
 }

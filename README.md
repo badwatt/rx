@@ -222,7 +222,8 @@ stays pure, and nothing knows about `git`/`nix` outside the adapters.
 ```
 src/main.rs              composition: parse → wire adapters → run
 src/domain/              pure kernel: config, error, step
-src/shared/              ansi (palette), osc (7501), progress (9;4), test helpers
+src/terminal/            ansi (palette), osc (7501), progress (9;4)
+src/test_support.rs      test doubles, cfg(test)
 src/infra/               process runner + dry-run decorator + argv helpers
 src/system_update/
 ├── application/         the workflow and its steps

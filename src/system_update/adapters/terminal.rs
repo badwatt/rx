@@ -2,10 +2,10 @@ use std::io::{self, BufRead, IsTerminal, Write};
 
 use crate::domain::config::Config;
 use crate::domain::error::Error;
-use crate::shared::ansi::{self, Palette};
-use crate::shared::osc::{self, State};
-use crate::shared::progress::Progress;
 use crate::system_update::ports::user_io::UserIo;
+use crate::terminal::ansi::{self, Palette};
+use crate::terminal::osc::{self, State};
+use crate::terminal::progress::Progress;
 
 /// Production [`UserIo`]: prompts and status on stdout.
 ///

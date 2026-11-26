@@ -89,13 +89,13 @@ mod tests {
 
     #[test]
     fn failing_writer_flush_is_err() {
-        let mut w = crate::shared::test_helpers::FailingFlushWriter;
+        let mut w = crate::test_support::FailingFlushWriter;
         assert!(std::io::Write::flush(&mut w).is_err());
     }
 
     #[test]
     fn failing_writer_write_is_err() {
-        let mut w = crate::shared::test_helpers::FailingFlushWriter;
+        let mut w = crate::test_support::FailingFlushWriter;
         assert!(w.write(b"x").is_err());
     }
 
@@ -108,14 +108,14 @@ mod tests {
 
     #[test]
     fn write_flush_propagates_write_error() {
-        let mut writer = crate::shared::test_helpers::FailingWriter;
+        let mut writer = crate::test_support::FailingWriter;
         assert!(write_flush(&mut writer, "x").is_err());
     }
 
     #[test]
     fn write_flush_propagates_flush_error_on_empty_write() {
         // Write succeeds but flush fails
-        let mut writer = crate::shared::test_helpers::FlushFailingWriter;
+        let mut writer = crate::test_support::FlushFailingWriter;
         assert!(write_flush(&mut writer, "x").is_err());
     }
 

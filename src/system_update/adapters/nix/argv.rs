@@ -113,9 +113,9 @@ pub(super) fn cmd_diff_closures() -> Vec<String> {
 mod tests {
     use super::*;
     use crate::domain::error::Error;
-    use crate::shared::test_helpers::StubRunner;
     use crate::system_update::adapters::nix::{NixCli, refresh_sudo_ticket, spawn_keep_alive};
     use crate::system_update::ports::nix::Nix as _;
+    use crate::test_support::StubRunner;
     use std::cell::RefCell;
     use std::rc::Rc;
 

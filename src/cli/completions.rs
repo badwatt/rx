@@ -7,7 +7,7 @@ use std::fmt;
 use std::io::Write;
 
 use crate::domain::error::Error;
-use crate::shared::ansi;
+use crate::terminal::ansi;
 
 /// Shell flavours we can emit completions for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn print_propagates_write_errors() {
-        let mut writer = crate::shared::test_helpers::FailingWriter;
+        let mut writer = crate::test_support::FailingWriter;
         assert!(print(&mut writer, Shell::Fish).is_err());
     }
 }

@@ -1,7 +1,7 @@
 use crate::domain::error::Error;
-use crate::shared::osc::State;
 use crate::system_update::ports::repo::Repo;
 use crate::system_update::ports::user_io::UserIo;
+use crate::terminal::osc::State;
 
 /// Detect changes (including untracked files) and, if confirmed, stage them.
 ///

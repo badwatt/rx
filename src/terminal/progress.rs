@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crate::shared::ansi;
+use crate::terminal::ansi;
 
 /// Indeterminate progress: state `3`, no percentage to give.
 const RUNNING: &str = "\x1b]9;4;3;0\x1b\\";

@@ -4,7 +4,7 @@ use crate::cli::Intent;
 use crate::cli::completions::Shell;
 use crate::cli::defaults::{default_config, expand_tilde};
 use crate::domain::config::{Config, Step};
-use crate::shared::ansi;
+use crate::terminal::ansi;
 
 /// Which [`Config`] field a value flag targets.
 #[derive(Clone, Copy)]

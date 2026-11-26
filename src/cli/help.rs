@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::domain::error::Error;
-use crate::shared::ansi::{self, Palette};
+use crate::terminal::ansi::{self, Palette};
 
 /// Project version, embedded from `[package].version` in `Cargo.toml` — the
 /// single source of truth.
@@ -58,13 +58,13 @@ mod tests {
 
     #[test]
     fn print_help_error_propagation() {
-        let mut writer = crate::shared::test_helpers::FailingWriter;
+        let mut writer = crate::test_support::FailingWriter;
         assert!(print_help(&mut writer).is_err());
     }
 
     #[test]
     fn print_version_error_propagation() {
-        let mut writer = crate::shared::test_helpers::FailingWriter;
+        let mut writer = crate::test_support::FailingWriter;
         assert!(print_version(&mut writer, Palette::COLOR).is_err());
     }
 }

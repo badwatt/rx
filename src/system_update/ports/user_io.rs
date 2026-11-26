@@ -1,6 +1,6 @@
 use crate::domain::config::Config;
 use crate::domain::error::Error;
-use crate::shared::osc::State;
+use crate::terminal::osc::State;
 
 /// Driven port: user-facing presentation and interaction.
 ///

@@ -8,10 +8,10 @@ pub(crate) mod steps;
 
 use crate::domain::config::{Config, Step};
 use crate::domain::error::Error;
-use crate::shared::osc::State;
 use crate::system_update::ports::nix::Nix;
 use crate::system_update::ports::repo::Repo;
 use crate::system_update::ports::user_io::UserIo;
+use crate::terminal::osc::State;
 
 /// How a run ended.
 #[derive(Debug, PartialEq, Eq)]

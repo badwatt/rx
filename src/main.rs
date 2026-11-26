@@ -7,8 +7,11 @@
 mod cli;
 mod domain;
 mod infra;
-mod shared;
 mod system_update;
+mod terminal;
+
+#[cfg(test)]
+mod test_support;
 
 use cli::Intent;
 use cli::entry::{exit_code_for, palettes, report_error};
@@ -17,12 +20,12 @@ use domain::error::Error;
 use infra::command::CommandRunner;
 use infra::dry_run::DryRunRunner;
 use infra::process::ProcessRunner;
-use shared::ansi::Palette;
 use std::env;
 use std::io::{Write, stderr, stdout};
 use system_update::adapters::git::GitRepo;
 use system_update::adapters::nix::NixCli;
 use system_update::adapters::terminal::TerminalIo;
+use terminal::ansi::Palette;
 
 fn main() {
     let Ok(args) = utf8_args(env::args_os().collect()) else {

@@ -8,7 +8,7 @@
 use std::io::Write;
 
 use crate::domain::error::Error;
-use crate::shared::ansi;
+use crate::terminal::ansi;
 
 /// The program states `rx` reports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,7 +108,7 @@ fn base64(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shared::test_helpers::FailingWriter;
+    use crate::test_support::FailingWriter;
 
     #[test]
     fn report_working_writes_the_exact_sequence() {

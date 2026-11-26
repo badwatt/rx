@@ -8,7 +8,7 @@ use std::io::Write;
 
 use crate::domain::error::Error;
 use crate::infra::command::CommandRunner;
-use crate::shared::ansi;
+use crate::terminal::ansi;
 
 /// Adapter that echoes each command instead of running it.
 pub(crate) struct DryRunRunner<'a> {
@@ -116,7 +116,7 @@ fn print_command_env(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shared::test_helpers::StubRunner;
+    use crate::test_support::StubRunner;
 
     #[test]
     fn print_command_writes_joined_argv() {
@@ -134,13 +134,13 @@ mod tests {
 
     #[test]
     fn print_command_error_propagation() {
-        let mut writer = crate::shared::test_helpers::FailingWriter;
+        let mut writer = crate::test_support::FailingWriter;
         assert!(print_command(&mut writer, &["git".into()]).is_err());
     }
 
     #[test]
     fn print_command_env_error_propagation() {
-        let mut writer = crate::shared::test_helpers::FailingWriter;
+        let mut writer = crate::test_support::FailingWriter;
         assert!(print_command_env(&mut writer, &["git".into()], "K", "v").is_err());
     }
 

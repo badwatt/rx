@@ -94,7 +94,7 @@ fn add(repo: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shared::test_helpers::StubRunner;
+    use crate::test_support::StubRunner;
     use std::cell::RefCell;
     use std::rc::Rc;
 

@@ -4,7 +4,7 @@
 use std::io::Write;
 
 use crate::domain::error::Error;
-use crate::shared::ansi::Palette;
+use crate::terminal::ansi::Palette;
 
 pub(crate) fn exit_code_for(error: &Error) -> i32 {
     match error {

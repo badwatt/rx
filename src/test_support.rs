@@ -1,6 +1,6 @@
 //! Shared test utilities across modules.
 //!
-//! Included via main.rs & available as `crate::shared::test_helpers`.
+//! Included via main.rs & available as `crate::test_support`.
 
 use std::io::{self, Write};
 
