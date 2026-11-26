@@ -195,7 +195,7 @@ fn parse_short(
     config: &mut Config,
     writer: &mut dyn Write,
 ) -> Result<usize, Intent> {
-    let flags = arg.strip_prefix('-').unwrap_or(arg);
+    let flags = arg.trim_prefix('-');
     let mut rest = flags.chars().peekable();
     while let Some(flag) = rest.next() {
         match flag {
