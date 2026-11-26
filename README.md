@@ -141,9 +141,12 @@ the self-rebuild re-exec is skipped.
 - **sudo is asked once, up front.** `rx` checks whether a password is needed,
   runs `sudo -v` while the tab says *blocked*, and keeps the ticket alive during
   the build so a long rebuild does not stop halfway asking again.
-- **Terminal status.** On a TTY, `rx` emits OSC 7501 reports (`working`,
-  `blocked`, `done`, `error`, `idle`), so supporting terminals badge the tab
-  while the update runs.
+- **Terminal status.** On a TTY, `rx` shows the terminal's OSC 9;4 progress pulse
+  in the tab while it works (re-reported ten times a second, so it keeps moving
+  and never goes stale) and hides it whenever a prompt needs you; it also emits
+  OSC 7501 reports
+  (`working`, `blocked`, `done`, `error`, `idle`), so supporting terminals can
+  badge the tab too. `TERM=dumb` turns both off.
 - **The repo must be the work-tree root.** A subdirectory of another
   repository is rejected, so `pull`/`add` never touch the enclosing repo.
 - **`NO_COLOR`, non-TTY and `--no-color`** each disable colour per stream.
@@ -219,7 +222,7 @@ stays pure, and nothing knows about `git`/`nix` outside the adapters.
 ```
 src/main.rs              composition: parse → wire adapters → run
 src/domain/              pure kernel: config, error, step
-src/shared/              ansi (palette), osc (OSC 7501), test helpers
+src/shared/              ansi (palette), osc (7501), progress (9;4), test helpers
 src/infra/               process runner + dry-run decorator + argv helpers
 src/system_update/
 ├── application/         the workflow and its steps

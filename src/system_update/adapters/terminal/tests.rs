@@ -399,9 +399,27 @@ fn terminal_io_output_does_not_panic() {
 
 #[test]
 fn terminal_io_progress_writes_on_a_tty() {
-    terminal_with_osc()
-        .progress(State::Working, "Working")
-        .expect("progress");
+    let io = terminal_with_osc();
+    io.progress(State::Working, "Working").expect("progress");
+    // Stop the bar so the keep-alive thread joins before the test ends.
+    io.progress(State::Done, "Done").expect("progress");
+}
+
+#[test]
+fn terminal_io_progress_drives_the_bar_for_every_state() {
+    let io = terminal_with_osc();
+    for state in [
+        State::Working,
+        State::BlockedPermission,
+        State::Working,
+        State::BlockedAuth,
+        State::Working,
+        State::Done,
+        State::Failed,
+        State::Idle,
+    ] {
+        io.progress(state, "state").expect("progress");
+    }
 }
 
 #[test]
@@ -420,10 +438,12 @@ fn terminal_io_progress_is_silent_on_a_tty_dry_run() {
 
 #[test]
 fn osc_enabled_requires_a_tty_and_no_dry_run() {
-    assert!(osc_enabled(true, false));
-    assert!(!osc_enabled(false, false));
-    assert!(!osc_enabled(true, true));
-    assert!(!osc_enabled(false, true));
+    assert!(osc_enabled(true, false, None));
+    assert!(!osc_enabled(false, false, None));
+    assert!(!osc_enabled(true, true, None));
+    assert!(!osc_enabled(false, true, None));
+    assert!(!osc_enabled(true, false, Some("dumb")));
+    assert!(osc_enabled(true, false, Some("xterm-256color")));
 }
 
 #[test]

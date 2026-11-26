@@ -4,6 +4,7 @@ use crate::domain::config::Config;
 use crate::domain::error::Error;
 use crate::shared::ansi::{self, Palette};
 use crate::shared::osc::{self, State};
+use crate::shared::progress::{self, Progress};
 use crate::system_update::ports::user_io::UserIo;
 
 /// Production [`UserIo`]: prompts and status on stdout.
@@ -12,9 +13,11 @@ use crate::system_update::ports::user_io::UserIo;
 /// `main` on stderr, so a failing step never prints twice.
 pub(crate) struct TerminalIo {
     out: Palette,
-    /// Whether OSC 7501 reports may be written: an interactive terminal and
-    /// not a dry run.
+    /// Whether OSC 7501 reports and the OSC 9;4 bar may be written: an
+    /// interactive terminal that is not a dry run.
     osc: bool,
+    /// The tab progress bar, driven by the same state reports.
+    bar: Progress,
 }
 
 impl TerminalIo {
@@ -24,17 +27,20 @@ impl TerminalIo {
 
     /// Constructor with the TTY gate pinned, so tests cover both sides.
     fn detect(out: Palette, is_tty: bool, dry_run: bool) -> Self {
+        let term = std::env::var("TERM").ok();
+        let osc = osc_enabled(is_tty, dry_run, term.as_deref());
         Self {
             out,
-            osc: osc_enabled(is_tty, dry_run),
+            osc,
+            bar: Progress::new(osc, progress::INTERVAL),
         }
     }
 }
 
-/// A status report only makes sense for a real terminal, and a dry run must
-/// not claim the workflow is running.
-pub(crate) fn osc_enabled(is_tty: bool, dry_run: bool) -> bool {
-    is_tty && !dry_run
+/// A status report only makes sense for a real terminal that is not `dumb`,
+/// and a dry run must not claim the workflow is running.
+pub(crate) fn osc_enabled(is_tty: bool, dry_run: bool, term: Option<&str>) -> bool {
+    is_tty && !dry_run && term != Some("dumb")
 }
 
 impl UserIo for TerminalIo {
@@ -46,6 +52,18 @@ impl UserIo for TerminalIo {
     fn progress(&self, state: State, msg: &str) -> Result<(), Error> {
         if !self.osc {
             return Ok(());
+        }
+        // The bar follows the state: working shows it, every moment that needs
+        // the user hides it again, and the end clears it.
+        match state {
+            State::Working => self.bar.show(),
+            State::BlockedPermission
+            | State::BlockedAuth
+            | State::Done
+            | State::Failed
+            | State::Idle => {
+                self.bar.hide();
+            }
         }
         let mut out = io::stdout();
         osc::report(&mut out, state, msg)

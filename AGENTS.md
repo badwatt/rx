@@ -40,7 +40,7 @@
 ```
 src/main.rs                composición: parse → adaptadores → workflow
 src/domain/                kernel puro: config.rs, error.rs, step.rs
-src/shared/                ansi.rs, osc.rs, test_helpers.rs (cfg(test))
+src/shared/                ansi.rs, osc.rs, progress.rs, test_helpers.rs (cfg(test))
 src/infra/                 command.rs (seam), process.rs, dry_run.rs, argv.rs
 src/system_update/         feature
 ├── application/           run + steps/{pull,flake,stage,rebuild,cleanup,diff}.rs
@@ -69,7 +69,7 @@ tests/integration.rs       binario real, sin efectos
 - **Raíz del repo obligatoria**: `git rev-parse --show-prefix` vacío; un subdirectorio de otro repo se rechaza.
 - **Hostname**: `/proc/sys/kernel/hostname` → `$HOSTNAME` → `hostname` (cada fuente se recorta; una vacía pasa a la siguiente).
 - **Sudo**: `sudo -n true` (probe silencioso) y `sudo -v` (prompt) antes del comando elevado, nunca en `--dry-run`; un hilo detached renueva el ticket con `sudo -n -v` cada 60 s para que un build largo no vuelva a preguntar sin anunciarlo.
-- **OSC 7501**: `UserIo::progress` reporta `working`, `blocked:kind=permission|auth`, `done`, `error` y `idle` (abortar o declinar no finge un `done`) solo en TTY y nunca en `--dry-run`; `msg` sanea caracteres de control (el terminal descartaría el report entero) y se capa a 512 bytes; se valida la config antes de reportar y tras cada prompt se vuelve a `working`, o el tab sin foco se queda en "needs attention".
+- **OSC 7501 + 9;4**: `UserIo::progress` reporta `working`, `blocked:kind=permission|auth`, `done`, `error` y `idle` (abortar o declinar no finge un `done`) solo en TTY (nunca con `TERM=dumb` ni en `--dry-run`); `msg` sanea caracteres de control (el terminal descartaría el report entero) y se capa a 512 bytes; se valida la config antes de reportar y tras cada prompt se vuelve a `working`, o el tab sin foco se queda en "needs attention". El mismo estado mueve una barra **OSC 9;4** con el state 3 (indeterminate) re-emitido cada 100 ms en un hilo: el terminal dibuja su pulse y así no lo da por viejo ni se queda quieto; `9;4;0;0` en cuanto hace falta el usuario (prompt, sudo) o al acabar, así que el loading desaparece, nunca se congela; el hilo se despierta con unpark y se une en `hide`.
 - **Completions**: `--completions bash|zsh|fish` imprime scripts estáticos; un test garantiza que mencionan el binario y las flags compartidas. `rx.1` es la página de manual.
 - **Dry-run honesto**: `DryRunRunner` delega `probe` al runner real (silencioso), así el preview muestra el flavor realmente instalado; el resto no se ejecuta y sudo no se toca.
 - **Cleanup**: `nix-env --delete-generations +N` y luego `nix store gc` (sin `-d`, para respetar `--keep N`).

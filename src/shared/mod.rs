@@ -2,6 +2,7 @@
 
 pub(crate) mod ansi;
 pub(crate) mod osc;
+pub(crate) mod progress;
 
 #[cfg(test)]
 pub(crate) mod test_helpers;
