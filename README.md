@@ -186,9 +186,9 @@ cargo llvm-cov --all-targets --no-default-ignore-filename-regex   # 100 %, tests
 `--no-default-ignore-filename-regex` matters: without it cargo-llvm-cov
 silently skips `tests.rs` and `tests/`, so test code would not count.
 
-Tests are 380 unit + 27 integration; the integration suite drives the real
-binary with `--dry-run`, a declined prompt or a nonexistent repo, so it never
-touches your system. `nix flake check` gates the flake; `actionlint` (in the
+Tests are unit tests next to the code plus an integration suite that drives the
+real binary with `--dry-run`, a declined prompt or a nonexistent repo, so it
+never touches your system. `nix flake check` gates the flake; `actionlint` (in the
 devShell) checks the workflows before a push.
 
 ## Releasing

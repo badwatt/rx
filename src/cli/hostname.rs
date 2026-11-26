@@ -16,14 +16,15 @@ fn from_cmd() -> Option<String> {
     from_cmd_inner(std::process::Command::new("hostname").output().ok())
 }
 
-/// Inner logic extracted for testability.
+/// Inner logic extracted for testability. Returns the raw output; the caller
+/// normalizes it.
 fn from_cmd_inner(output: Option<std::process::Output>) -> Option<String> {
     let out = output?;
     // A failing `hostname` is no answer, whatever it printed.
     if !out.status.success() {
         return None;
     }
-    clean(String::from_utf8(out.stdout).ok())
+    String::from_utf8(out.stdout).ok()
 }
 
 /// Trim a source's answer; a blank one is no answer, so the next source runs.
@@ -121,7 +122,7 @@ mod tests {
             stdout: b"myhost\n".to_vec(),
             stderr: Vec::new(),
         });
-        assert_eq!(from_cmd_inner(output), Some(String::from("myhost")));
+        assert_eq!(from_cmd_inner(output), Some(String::from("myhost\n")));
     }
 
     #[test]

@@ -13,9 +13,9 @@ use crate::terminal::progress::Progress;
 /// `main` on stderr, so a failing step never prints twice.
 pub(crate) struct TerminalIo {
     out: Palette,
-    /// Whether OSC 7501 reports and the OSC 9;4 bar may be written: an
+    /// Whether the OSC 7501 reports and the OSC 9;4 bar may be written: an
     /// interactive terminal that is not a dry run.
-    osc: bool,
+    status: bool,
     /// The tab progress bar, driven by the same state reports.
     bar: Progress,
 }
@@ -28,18 +28,18 @@ impl TerminalIo {
     /// Constructor with the TTY gate pinned, so tests cover both sides.
     fn detect(out: Palette, is_tty: bool, dry_run: bool) -> Self {
         let term = std::env::var("TERM").ok();
-        let osc = osc_enabled(is_tty, dry_run, term.as_deref());
+        let status = status_enabled(is_tty, dry_run, term.as_deref());
         Self {
             out,
-            osc,
-            bar: Progress::new(osc),
+            status,
+            bar: Progress::new(status),
         }
     }
 }
 
 /// A status report only makes sense for a real terminal that is not `dumb`,
 /// and a dry run must not claim the workflow is running.
-pub(crate) fn osc_enabled(is_tty: bool, dry_run: bool, term: Option<&str>) -> bool {
+pub(crate) fn status_enabled(is_tty: bool, dry_run: bool, term: Option<&str>) -> bool {
     is_tty && !dry_run && term != Some("dumb")
 }
 
@@ -50,7 +50,7 @@ impl UserIo for TerminalIo {
     }
 
     fn progress(&self, state: State, msg: &str) -> Result<(), Error> {
-        if !self.osc {
+        if !self.status {
             return Ok(());
         }
         // The bar follows the state: working shows it, every moment that needs

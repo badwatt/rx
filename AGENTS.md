@@ -107,6 +107,7 @@ tests/integration.rs       binario real, sin efectos
 - `String::from_utf8_lossy(&buf)`, `.is_ok()`/`.is_err()`/`.is_some()`, `.expect_err("contexto")`, `assert_ne!(x, "")` (clippy 1.99 rechaza `assert!(!x.is_empty())`).
 - `impl Display`/`Error` manuales con `source()`: cero dependencias.
 - Preferir `&mut dyn Write` a `<W: Write>`: las monomorfizaciones dejan regiones sin cubrir.
+- `[lints]` del crate: `unsafe_code = "forbid"` y `clippy::unwrap_used = "deny"`; el compilador hace cumplir dos reglas de la tabla, sin `#[allow]`.
 - rx es **síncrono y mono-hilo**: `async`, `spawn_blocking`, `Arc` compartido y `Send + Sync` no aplican.
 
 ## 4. Entorno Nix

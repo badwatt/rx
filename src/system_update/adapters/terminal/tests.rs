@@ -437,13 +437,13 @@ fn terminal_io_progress_is_silent_on_a_tty_dry_run() {
 }
 
 #[test]
-fn osc_enabled_requires_a_tty_and_no_dry_run() {
-    assert!(osc_enabled(true, false, None));
-    assert!(!osc_enabled(false, false, None));
-    assert!(!osc_enabled(true, true, None));
-    assert!(!osc_enabled(false, true, None));
-    assert!(!osc_enabled(true, false, Some("dumb")));
-    assert!(osc_enabled(true, false, Some("xterm-256color")));
+fn status_enabled_requires_a_tty_and_no_dry_run() {
+    assert!(status_enabled(true, false, None));
+    assert!(!status_enabled(false, false, None));
+    assert!(!status_enabled(true, true, None));
+    assert!(!status_enabled(false, true, None));
+    assert!(!status_enabled(true, false, Some("dumb")));
+    assert!(status_enabled(true, false, Some("xterm-256color")));
 }
 
 #[test]

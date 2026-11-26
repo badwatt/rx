@@ -204,7 +204,11 @@ fn parse_short(
             'd' => config.set_diff(true),
             'u' => config.set_update(true),
             'y' => config.yes = true,
-            'r' | 'n' | 'k' | 'j' | 'c' => {
+            _ => {
+                let Some(key) = value_key(flag) else {
+                    write_parse_error(writer, &format!("Unknown flag \"-{flag}\""));
+                    return Err(Intent::Invalid);
+                };
                 let label = format!("-{flag}");
                 // A value flag consumes the next argv, so anything after it in
                 // the same cluster would be silently dropped. Reject instead.
@@ -216,26 +220,24 @@ fn parse_short(
                     return Err(Intent::Invalid);
                 }
                 let value = take_value(args, i, &label, writer)?;
-                set_value(value_key(flag), value, &label, config, writer)?;
+                set_value(key, value, &label, config, writer)?;
                 return Ok(1);
-            }
-            _ => {
-                write_parse_error(writer, &format!("Unknown flag \"-{flag}\""));
-                return Err(Intent::Invalid);
             }
         }
     }
     Ok(0)
 }
 
-/// Map a short value-flag character to its [`ValueKey`].
-fn value_key(flag: char) -> ValueKey {
+/// Map a short value-flag character to its [`ValueKey`], or `None` for a
+/// switch (or an unknown flag).
+fn value_key(flag: char) -> Option<ValueKey> {
     match flag {
-        'r' => ValueKey::Repo,
-        'n' => ValueKey::Hostname,
-        'k' => ValueKey::Keep,
-        'j' => ValueKey::Jobs,
-        _ => ValueKey::Cores,
+        'r' => Some(ValueKey::Repo),
+        'n' => Some(ValueKey::Hostname),
+        'k' => Some(ValueKey::Keep),
+        'j' => Some(ValueKey::Jobs),
+        'c' => Some(ValueKey::Cores),
+        _ => None,
     }
 }
 
