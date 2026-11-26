@@ -1,6 +1,7 @@
 use std::process::{Command, Stdio};
 
 use crate::domain::error::Error;
+use crate::infra::command::CommandRunner;
 use crate::infra::exit::exit_code;
 
 /// Return the program name, or an error when `cmd` is empty.
@@ -12,7 +13,7 @@ fn program(cmd: &[String]) -> Result<&str, Error> {
         ))
     })
 }
-use crate::infra::command::CommandRunner;
+
 /// Production [`CommandRunner`] backed by `std::process`.
 pub(crate) struct ProcessRunner;
 

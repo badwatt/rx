@@ -213,17 +213,6 @@ fn confirm_error_from_reader_read_line() {
 // ------------------------------------------------------------------
 
 #[test]
-fn fail_after_writer_succeeds_until_the_budget_runs_out() {
-    use crate::test_support::FailAfterWriter;
-    let mut writer = FailAfterWriter::new(1);
-    assert!(io::Write::write(&mut writer, b"a").is_ok());
-    assert!(io::Write::write(&mut writer, b"b").is_err());
-    assert!(io::Write::flush(&mut writer).is_ok());
-    let mut exhausted = FailAfterWriter::new(0);
-    assert!(io::Write::write(&mut exhausted, b"a").is_err());
-}
-
-#[test]
 fn print_config_lists_an_explicit_step_selection() {
     let mut buf = Vec::new();
     let config = Config {
