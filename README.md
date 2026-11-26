@@ -224,9 +224,9 @@ src/main.rs              composition: parse → wire adapters → run
 src/domain/              pure kernel: config, error, step
 src/terminal/            ansi (palette), osc (7501), progress (9;4)
 src/test_support.rs      test doubles, cfg(test)
-src/infra/               process runner + dry-run decorator + argv helpers
+src/infra/               process runner, dry-run decorator, exit helpers
 src/system_update/
-├── application/         the workflow and its steps
+├── application/         the workflow, the elevated helper, the steps
 ├── ports/               Repo · Nix · UserIo (traits)
 └── adapters/            git · nix (argv) · terminal
 src/cli/                 parser, defaults, hostname, completions, help

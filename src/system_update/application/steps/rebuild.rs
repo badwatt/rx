@@ -1,6 +1,6 @@
-use super::run_elevated;
 use crate::domain::config::Config;
 use crate::domain::error::Error;
+use crate::system_update::application::elevated::run_elevated;
 use crate::system_update::ports::nix::Nix;
 use crate::system_update::ports::user_io::UserIo;
 

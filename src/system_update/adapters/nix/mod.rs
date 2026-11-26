@@ -2,8 +2,8 @@ use crate::domain::config::BuildOptions;
 use crate::domain::error::Error;
 use std::time::Duration;
 
-use crate::infra::argv::ensure_success;
 use crate::infra::command::CommandRunner;
+use crate::infra::exit::ensure_success;
 use crate::infra::process::ProcessRunner;
 
 mod argv;

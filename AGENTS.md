@@ -42,9 +42,9 @@ src/main.rs                composición: parse → adaptadores → workflow
 src/domain/                kernel puro: config.rs, error.rs, step.rs
 src/terminal/              ansi.rs (palette), osc.rs (7501), progress.rs (9;4)
 src/test_support.rs        test doubles and failing writers (cfg(test))
-src/infra/                 command.rs (seam), process.rs, dry_run.rs, argv.rs
+src/infra/                 command.rs (seam), process.rs, dry_run.rs, exit.rs
 src/system_update/         feature
-├── application/           run + steps/{pull,flake,stage,rebuild,cleanup,diff}.rs
+├── application/           run, elevated + steps/{pull,flake,stage,rebuild,cleanup,diff}.rs
 ├── ports/                 repo.rs · nix.rs · user_io.rs (traits)
 └── adapters/              git.rs · nix/{mod,argv}.rs · terminal.rs
 src/cli/                   parse, defaults, hostname, completions, help, entry

@@ -1,7 +1,17 @@
 use std::process::{Command, Stdio};
 
 use crate::domain::error::Error;
-pub(crate) use crate::infra::argv::{exit_code, program};
+use crate::infra::exit::exit_code;
+
+/// Return the program name, or an error when `cmd` is empty.
+fn program(cmd: &[String]) -> Result<&str, Error> {
+    cmd.first().map(String::as_str).ok_or_else(|| {
+        Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "empty command",
+        ))
+    })
+}
 use crate::infra::command::CommandRunner;
 /// Production [`CommandRunner`] backed by `std::process`.
 pub(crate) struct ProcessRunner;
@@ -160,31 +170,6 @@ mod tests {
     #[test]
     fn probe_cmd_empty_returns_error() {
         assert!(probe_cmd(&[]).is_err());
-    }
-
-    #[test]
-    fn exit_code_maps_signal_to_128_plus_n() {
-        let status = Command::new("sh")
-            .arg("-c")
-            .arg("kill -9 $$")
-            .status()
-            .expect("spawn kill");
-        assert_eq!(exit_code(status), 137);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn exit_code_unknown_termination_is_one() {
-        use std::os::unix::process::ExitStatusExt;
-        // A stopped child has neither an exit code nor a terminating signal.
-        let stopped = std::process::ExitStatus::from_raw(0x7f | (20 << 8));
-        assert_eq!(exit_code(stopped), 1);
-    }
-
-    #[test]
-    fn exit_code_returns_code_for_normal_exit() {
-        let status = Command::new("false").status().expect("spawn false");
-        assert_eq!(exit_code(status), 1);
     }
 
     #[test]

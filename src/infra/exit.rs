@@ -1,16 +1,6 @@
-//! Pure helpers for building a command line and reading its exit status.
+//! Command result helpers: exit codes and the success check.
 
 use crate::domain::error::Error;
-
-/// Return the program name, or an error when `cmd` is empty.
-pub(crate) fn program(cmd: &[String]) -> Result<&str, Error> {
-    cmd.first().map(String::as_str).ok_or_else(|| {
-        Error::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "empty command",
-        ))
-    })
-}
 
 /// `Ok(())` when `status` is a success, else `error`.
 ///
@@ -35,6 +25,7 @@ pub(crate) fn exit_code(status: std::process::ExitStatus) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
 
     #[test]
     fn ensure_success_accepts_zero() {
@@ -45,5 +36,30 @@ mod tests {
     fn ensure_success_maps_a_nonzero_status_to_the_given_error() {
         let error = ensure_success(1, Error::GitPullFailed).expect_err("nonzero status");
         assert_eq!(error.to_string(), "Failed to pull changes");
+    }
+
+    #[test]
+    fn exit_code_maps_signal_to_128_plus_n() {
+        let status = Command::new("sh")
+            .arg("-c")
+            .arg("kill -9 $$")
+            .status()
+            .expect("spawn kill");
+        assert_eq!(exit_code(status), 137);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exit_code_unknown_termination_is_one() {
+        use std::os::unix::process::ExitStatusExt;
+        // A stopped child has neither an exit code nor a terminating signal.
+        let stopped = std::process::ExitStatus::from_raw(0x7f | (20 << 8));
+        assert_eq!(exit_code(stopped), 1);
+    }
+
+    #[test]
+    fn exit_code_returns_code_for_normal_exit() {
+        let status = Command::new("false").status().expect("spawn false");
+        assert_eq!(exit_code(status), 1);
     }
 }

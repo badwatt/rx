@@ -1,6 +1,6 @@
 use crate::domain::error::Error;
-use crate::infra::argv::ensure_success;
 use crate::infra::command::CommandRunner;
+use crate::infra::exit::ensure_success;
 use crate::system_update::ports::repo::Repo;
 
 /// [`Repo`] adapter backed by the `git` CLI.

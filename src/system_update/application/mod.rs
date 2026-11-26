@@ -4,6 +4,7 @@
 //! cleanup → diff) through the [`Repo`], [`Nix`] and [`UserIo`] ports. Contains
 //! no I/O and no knowledge of the underlying tools.
 
+pub(crate) mod elevated;
 pub(crate) mod steps;
 
 use crate::domain::config::{Config, Step};
