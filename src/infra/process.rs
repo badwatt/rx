@@ -1,3 +1,4 @@
+use std::io;
 use std::process::{Command, Stdio};
 
 use crate::domain::error::Error;
@@ -24,6 +25,10 @@ impl CommandRunner for ProcessRunner {
 
     fn run_in(&self, dir: &str, cmd: &[String]) -> Result<i32, Error> {
         run_cmd_in(dir, cmd)
+    }
+
+    fn run_through(&self, cmd: &[String], consumer: &[String]) -> Result<i32, Error> {
+        run_through_cmd(cmd, consumer)
     }
 
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
@@ -71,6 +76,50 @@ fn run_impl(cmd: &[String], dir: Option<&str>, env: Option<(&str, &str)>) -> Res
         command.env(var, value);
     }
     let status = command.status().map_err(Error::Io)?;
+    Ok(exit_code(status))
+}
+
+/// Run `cmd` with its stderr piped through `consumer`'s stdin.
+///
+/// The command keeps stdin and stdout, so a prompt still works and ordinary
+/// output is untouched; the build log (stderr) is what the monitor renders.
+/// The returned status is the command's, not the monitor's.
+pub(crate) fn run_through_cmd(cmd: &[String], consumer: &[String]) -> Result<i32, Error> {
+    let mut child = Command::new(program(cmd)?)
+        .args(&cmd[1..])
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(Error::Io)?;
+    let stderr = child
+        .stderr
+        .take()
+        .expect("the child stderr is piped above");
+    let mut sink = match Command::new(program(consumer)?)
+        .args(&consumer[1..])
+        .stdin(Stdio::from(stderr))
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+    {
+        Ok(sink) => sink,
+        Err(error) => {
+            // No reader would drain the log: stop the command instead of
+            // letting it fill a pipe nobody reads.
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(Error::Io(io::Error::new(
+                error.kind(),
+                format!("output monitor: {error}"),
+            )));
+        }
+    };
+    let status = child
+        .wait()
+        .expect("a wait on a child we just spawned only fails on a broken kernel");
+    // Best effort: the monitor's own status is not the build's.
+    let _ = sink.wait();
     Ok(exit_code(status))
 }
 
@@ -153,6 +202,50 @@ mod tests {
         let result = run_cmd(&["sh".into(), "-c".into(), "kill -9 $$".into()]);
         assert!(result.is_ok());
         assert_eq!(result.expect("run cmd signal"), 137);
+    }
+
+    #[test]
+    fn run_through_keeps_the_command_status() {
+        assert_eq!(
+            run_through_cmd(&["true".into()], &["cat".into()]).expect("through cat"),
+            0
+        );
+        assert_eq!(
+            run_through_cmd(&["false".into()], &["cat".into()]).expect("through cat"),
+            1
+        );
+    }
+
+    #[test]
+    fn run_through_empty_command_returns_error() {
+        assert!(run_through_cmd(&[], &["cat".into()]).is_err());
+    }
+
+    #[test]
+    fn run_through_empty_consumer_returns_error() {
+        assert!(run_through_cmd(&["true".into()], &[]).is_err());
+    }
+
+    #[test]
+    fn run_through_missing_command_returns_io_error() {
+        assert!(run_through_cmd(&["nonexistent_cmd_zxy".into()], &["cat".into()]).is_err());
+    }
+
+    #[test]
+    fn run_through_missing_consumer_returns_io_error() {
+        let error = run_through_cmd(&["true".into()], &["nonexistent_monitor_zxy".into()])
+            .expect_err("missing monitor");
+        assert!(error.to_string().contains("output monitor"));
+    }
+
+    #[test]
+    fn process_runner_run_through_returns_zero() {
+        assert_eq!(
+            ProcessRunner
+                .run_through(&["true".into()], &["cat".into()])
+                .expect("through cat"),
+            0
+        );
     }
 
     #[test]

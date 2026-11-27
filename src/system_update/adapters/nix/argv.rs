@@ -25,6 +25,16 @@ pub(super) fn sudo_validate() -> Vec<String> {
     vec!["sudo".into(), "-v".into()]
 }
 
+/// `nom`: the monitor the rebuild's log is piped through.
+pub(super) fn cmd_nom() -> Vec<String> {
+    vec!["nom".into()]
+}
+
+/// `nom --version`: succeeds only when `nom` is installed.
+pub(super) fn cmd_nom_probe() -> Vec<String> {
+    vec!["nom".into(), "--version".into()]
+}
+
 /// `sudo -n -v`: renew the cached credentials only when no prompt is needed.
 pub(super) fn sudo_keep_alive() -> Vec<String> {
     vec!["sudo".into(), "-n".into(), "-v".into()]
@@ -130,6 +140,12 @@ mod tests {
     #[test]
     fn sudo_probe_argv() {
         assert_eq!(sudo_probe(), vec!["sudo", "-n", "true"]);
+    }
+
+    #[test]
+    fn cmd_nom_argv() {
+        assert_eq!(cmd_nom(), vec!["nom"]);
+        assert_eq!(cmd_nom_probe(), vec!["nom", "--version"]);
     }
 
     #[test]
@@ -370,7 +386,7 @@ mod tests {
         let runner = StubRunner::new();
         assert!(
             NixCli::new(&runner)
-                .rebuild("/repo", "host", BuildOptions::default())
+                .rebuild("/repo", "host", BuildOptions::default(), Some(false))
                 .is_ok()
         );
     }
@@ -385,7 +401,7 @@ mod tests {
         });
         assert!(
             NixCli::new(&runner)
-                .rebuild("/repo", "host", BuildOptions::default())
+                .rebuild("/repo", "host", BuildOptions::default(), Some(false))
                 .is_ok()
         );
         let joined = seen.borrow().join(" ");
@@ -405,7 +421,7 @@ mod tests {
             });
         assert!(
             NixCli::new(&runner)
-                .rebuild("/repo", "host", BuildOptions::default())
+                .rebuild("/repo", "host", BuildOptions::default(), Some(false))
                 .is_ok()
         );
         let joined = seen.borrow().join(" ");
@@ -418,16 +434,102 @@ mod tests {
         let runner = StubRunner::new().with_probe(|_| Err(Error::Io(std::io::Error::other("x"))));
         assert!(
             NixCli::new(&runner)
-                .rebuild("/repo", "host", BuildOptions::default())
+                .rebuild("/repo", "host", BuildOptions::default(), Some(false))
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn rebuild_pipes_through_nom_when_asked() {
+        let seen = Rc::new(RefCell::new(vec![String::new()]));
+        let recorder = Rc::clone(&seen);
+        let runner = StubRunner::new().with_run_through(move |cmd, consumer| {
+            recorder.borrow_mut().extend_from_slice(cmd);
+            recorder.borrow_mut().push("|".to_owned());
+            recorder.borrow_mut().extend_from_slice(consumer);
+            Ok(0)
+        });
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default(), Some(true))
+                .is_ok()
+        );
+        let joined = seen.borrow().join(" ");
+        assert!(joined.contains("nixos-rebuild"));
+        assert!(joined.ends_with("| nom"));
+    }
+
+    #[test]
+    fn rebuild_nom_errs_on_nonzero() {
+        let runner = StubRunner::new().with_run_through(|_, _| Ok(1));
+        let err = NixCli::new(&runner)
+            .rebuild("/repo", "host", BuildOptions::default(), Some(true))
+            .expect_err("rebuild failure");
+        assert_eq!(err.to_string(), "NixOS rebuild failed");
+    }
+
+    #[test]
+    fn rebuild_forced_nom_missing_returns_the_hint() {
+        let runner = StubRunner::new().with_probe(|_| {
+            Err(Error::Io(std::io::Error::from(
+                std::io::ErrorKind::NotFound,
+            )))
+        });
+        let err = NixCli::new(&runner)
+            .rebuild("/repo", "host", BuildOptions::default(), Some(true))
+            .expect_err("missing monitor");
+        assert!(err.to_string().contains("--nom=false"));
+    }
+
+    #[test]
+    fn rebuild_uses_nom_when_it_is_installed() {
+        let seen = Rc::new(std::cell::Cell::new(false));
+        let recorder = Rc::clone(&seen);
+        let runner = StubRunner::new().with_run_through(move |_, _| {
+            recorder.set(true);
+            Ok(0)
+        });
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default(), None)
+                .is_ok()
+        );
+        assert!(seen.get());
+    }
+
+    #[test]
+    fn rebuild_skips_nom_when_it_is_missing() {
+        let seen = Rc::new(std::cell::Cell::new(false));
+        let recorder = Rc::clone(&seen);
+        let runner = StubRunner::new()
+            .with_probe(|_| Err(Error::Io(std::io::Error::other("missing"))))
+            .with_run(move |_| {
+                recorder.set(true);
+                Ok(0)
+            });
+        assert!(
+            NixCli::new(&runner)
+                .rebuild("/repo", "host", BuildOptions::default(), None)
+                .is_ok()
+        );
+        assert!(seen.get());
+    }
+
+    #[test]
+    fn rebuild_nom_propagates_the_run_error() {
+        let runner =
+            StubRunner::new().with_run_through(|_, _| Err(Error::Io(std::io::Error::other("x"))));
+        let err = NixCli::new(&runner)
+            .rebuild("/repo", "host", BuildOptions::default(), Some(true))
+            .expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
     fn rebuild_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
         let err = NixCli::new(&runner)
-            .rebuild("/repo", "host", BuildOptions::default())
+            .rebuild("/repo", "host", BuildOptions::default(), Some(false))
             .expect_err("rebuild failure");
         assert_eq!(err.to_string(), "NixOS rebuild failed");
     }
@@ -436,7 +538,7 @@ mod tests {
     fn rebuild_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
         let err = NixCli::new(&runner)
-            .rebuild("/repo", "host", BuildOptions::default())
+            .rebuild("/repo", "host", BuildOptions::default(), Some(false))
             .expect_err("run error");
         assert!(err.to_string().contains("IO error"));
     }

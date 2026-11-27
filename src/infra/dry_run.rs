@@ -32,6 +32,11 @@ impl CommandRunner for DryRunRunner<'_> {
         Ok(0)
     }
 
+    fn run_through(&self, cmd: &[String], consumer: &[String]) -> Result<i32, Error> {
+        echo_through(cmd, consumer);
+        Ok(0)
+    }
+
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
         echo(cmd, Some((var, value)));
         Ok(0)
@@ -45,6 +50,12 @@ impl CommandRunner for DryRunRunner<'_> {
     fn probe(&self, cmd: &[String]) -> Result<i32, Error> {
         self.probe_runner.probe(cmd)
     }
+}
+
+/// Print a command whose log goes through `consumer`, best-effort.
+fn echo_through(cmd: &[String], consumer: &[String]) {
+    let mut out = std::io::stdout();
+    let _ = print_command_through(&mut out, cmd, consumer);
 }
 
 /// Print the command a real run would execute in `dir`, best-effort.
@@ -111,6 +122,20 @@ fn print_command(writer: &mut dyn Write, cmd: &[String]) -> Result<(), Error> {
     Ok(())
 }
 
+/// Print a command whose log goes through `consumer`, as
+/// `$ prog arg1 arg2 … 2>&1 | consumer`.
+fn print_command_through(
+    writer: &mut dyn Write,
+    cmd: &[String],
+    consumer: &[String],
+) -> Result<(), Error> {
+    ansi::write_flush(
+        writer,
+        &format!("$ {} 2>&1 | {}\n", render(cmd), render(consumer)),
+    )?;
+    Ok(())
+}
+
 /// Print a command that runs in `dir`, as `$ (cd dir && prog arg1 arg2 …)`.
 fn print_command_in(writer: &mut dyn Write, dir: &str, cmd: &[String]) -> Result<(), Error> {
     ansi::write_flush(
@@ -150,6 +175,34 @@ mod tests {
         let mut buf = Vec::new();
         assert!(print_command_env(&mut buf, &["git".into(), "pull".into()], "K", "v").is_ok());
         assert_eq!(buf, b"$ K=v git pull\n");
+    }
+
+    #[test]
+    fn print_command_through_writes_the_pipe() {
+        let mut buf = Vec::new();
+        let cmd = vec![String::from("nixos-rebuild"), String::from("switch")];
+        let consumer = vec![String::from("nom")];
+        assert!(print_command_through(&mut buf, &cmd, &consumer).is_ok());
+        assert_eq!(buf, b"$ nixos-rebuild switch 2>&1 | nom\n");
+    }
+
+    #[test]
+    fn print_command_through_error_propagation() {
+        let mut writer = crate::test_support::FailingWriter;
+        let cmd = vec![String::from("nixos-rebuild")];
+        let consumer = vec![String::from("nom")];
+        assert!(print_command_through(&mut writer, &cmd, &consumer).is_err());
+    }
+
+    #[test]
+    fn dry_run_runner_run_through_does_not_panic() {
+        let probes = StubRunner::new();
+        assert_eq!(
+            DryRunRunner::new(&probes)
+                .run_through(&["nixos-rebuild".into()], &["nom".into()])
+                .expect("run through"),
+            0
+        );
     }
 
     #[test]

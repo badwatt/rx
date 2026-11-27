@@ -41,6 +41,7 @@ fn test_config() -> Config {
         keep: 1,
         yes: false,
         dry_run: false,
+        nom: None,
         jobs: None,
         cores: None,
         update_command: None,
@@ -251,6 +252,7 @@ fn print_config_renders_all_fields() {
         keep: 10,
         yes: false,
         dry_run: false,
+        nom: None,
         jobs: None,
         cores: None,
         update_command: None,
@@ -282,6 +284,30 @@ fn print_config_shows_dry_run_when_enabled() {
     };
     assert!(print_config(&mut buf, &config).is_ok());
     assert!(String::from_utf8_lossy(&buf).contains("dry-run"));
+}
+
+#[test]
+fn print_config_reports_automatic_nom() {
+    let mut buf = Vec::new();
+    assert!(print_config(&mut buf, &test_config()).is_ok());
+    let rendered = String::from_utf8_lossy(&buf);
+    assert!(rendered.contains("nom"));
+    assert!(rendered.contains("auto"));
+}
+
+#[test]
+fn print_config_reports_a_forced_nom() {
+    for (nom, expected) in [(Some(true), "true"), (Some(false), "false")] {
+        let mut buf = Vec::new();
+        let config = Config {
+            nom,
+            ..test_config()
+        };
+        assert!(print_config(&mut buf, &config).is_ok());
+        let rendered = String::from_utf8_lossy(&buf);
+        assert!(rendered.contains("nom"));
+        assert!(rendered.contains(expected));
+    }
 }
 
 #[test]

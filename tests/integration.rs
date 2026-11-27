@@ -196,8 +196,24 @@ fn dry_run_summary_shows_dry_run() {
 }
 
 #[test]
-fn no_color_version_has_no_ansi() {
-    let output = run(&["--no-color", "--version"]);
+fn color_true_forces_ansi_when_piped() {
+    let output = run(&["--color=true", "--version"]);
+    assert!(stdout_of(&output).contains("\x1b["));
+}
+
+#[test]
+fn color_env_forces_ansi_when_piped() {
+    let output = Command::new(RX)
+        .args(["--version"])
+        .env("COLOR", "true")
+        .output()
+        .expect("run rx");
+    assert!(String::from_utf8_lossy(&output.stdout).contains("\x1b["));
+}
+
+#[test]
+fn color_false_version_has_no_ansi() {
+    let output = run(&["--color=false", "--version"]);
     assert!(output.status.success());
     assert!(!stdout_of(&output).contains('\u{1b}'));
 }
@@ -209,9 +225,9 @@ fn help_mentions_only() {
 }
 
 #[test]
-fn help_mentions_no_color() {
+fn help_mentions_color() {
     let output = run(&["--help"]);
-    assert!(stdout_of(&output).contains("--no-color"));
+    assert!(stdout_of(&output).contains("--color"));
 }
 
 #[test]

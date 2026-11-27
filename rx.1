@@ -62,9 +62,18 @@ Print each command instead of executing it. The read-only capability probe of
 installed. Nothing else is executed: \fBsudo\fR is never invoked and no
 credentials are cached.
 .TP
-.B \-\-no\-color
-Disable ANSI colours. Colours are also disabled when \fBNO_COLOR\fR is set or
-the stream is not a terminal.
+.BI \-\-nom= \fITRUE\fR|\fIFALSE\fR
+Pipe the rebuild's log through \fBnom\fR (nix\-output\-monitor) when it is
+installed, which is the default. \fBtrue\fR insists on it.
+The command keeps its stdin and stdout, so prompts still work; only the build
+log (stderr) goes through the monitor. Pass \fBfalse\fR to run the rebuild with
+its own output untouched. The flake package ships \fBnom\fR; other installs need
+it on the \fBPATH\fR.
+.TP
+.BI \-\-color= \fITRUE\fR|\fIFALSE\fR
+Force ANSI colours (\fBtrue\fR) or plain output (\fBfalse\fR) on both streams.
+The \fBCOLOR\fR environment variable takes the same values; without either, a
+stream is coloured only when it is a terminal.
 .TP
 .BI \-\-completions " " \fISHELL\fR
 Print the completion script for \fBbash\fR, \fBzsh\fR or \fBfish\fR and exit.

@@ -43,7 +43,7 @@ fn ok_update(_: &str, _: Option<&[String]>) -> Result<(), Error> {
     clippy::unnecessary_wraps,
     reason = "mock must match the port trait signature"
 )]
-fn ok_rebuild(_: &str, _: &str, _: BuildOptions) -> Result<(), Error> {
+fn ok_rebuild(_: &str, _: &str, _: BuildOptions, _: Option<bool>) -> Result<(), Error> {
     Ok(())
 }
 
@@ -83,7 +83,7 @@ fn pull_errs(_: &str) -> Result<(), Error> {
     Err(Error::GitPullFailed)
 }
 
-fn rebuild_errs(_: &str, _: &str, _: BuildOptions) -> Result<(), Error> {
+fn rebuild_errs(_: &str, _: &str, _: BuildOptions, _: Option<bool>) -> Result<(), Error> {
     Err(Error::RebuildFailed)
 }
 
@@ -129,7 +129,7 @@ impl Default for MockRepo {
     }
 }
 
-type RebuildFn = Box<dyn Fn(&str, &str, BuildOptions) -> Result<(), Error>>;
+type RebuildFn = Box<dyn Fn(&str, &str, BuildOptions, Option<bool>) -> Result<(), Error>>;
 type PendingFn = Box<dyn Fn() -> Result<bool, Error>>;
 type RefreshFn = Box<dyn Fn() -> Result<(), Error>>;
 type PruneFn = Box<dyn Fn(u8) -> Result<(), Error>>;
@@ -150,8 +150,14 @@ impl Nix for MockNix {
     fn update(&self, repo: &str, command: Option<&[String]>) -> Result<(), Error> {
         (self.update)(repo, command)
     }
-    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
-        (self.rebuild)(repo, hostname, options)
+    fn rebuild(
+        &self,
+        repo: &str,
+        hostname: &str,
+        options: BuildOptions,
+        nom: Option<bool>,
+    ) -> Result<(), Error> {
+        (self.rebuild)(repo, hostname, options, nom)
     }
     fn password_pending(&self) -> Result<bool, Error> {
         (self.password_pending)()
@@ -253,6 +259,7 @@ fn default_config() -> Config {
         keep: 1,
         yes: false,
         dry_run: false,
+        nom: None,
         jobs: None,
         cores: None,
         update_command: None,
@@ -634,6 +641,25 @@ fn run_yes_skips_blocked_permission() {
     };
     assert!(run_ok(&config, &ok_ui(&log)).is_ok());
     assert!(!log.contains("BlockedPermission"));
+}
+
+#[test]
+fn run_rebuild_pipes_through_nom_when_configured() {
+    let seen = Rc::new(std::cell::Cell::new(None));
+    let recorder = Rc::clone(&seen);
+    let config = Config {
+        nom: Some(true),
+        ..default_config()
+    };
+    let nix = MockNix {
+        rebuild: Box::new(move |_, _, _, nom| {
+            recorder.set(nom);
+            Ok(())
+        }),
+        ..MockNix::default()
+    };
+    assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&Log::default())).is_ok());
+    assert_eq!(seen.get(), Some(true));
 }
 
 #[test]

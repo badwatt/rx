@@ -208,6 +208,12 @@ pub(crate) fn print_config(
     if config.dry_run {
         push_config_line(&mut text, "dry-run", &config.dry_run.to_string(), palette);
     }
+    let nom = match config.nom {
+        None => "auto",
+        Some(true) => "true",
+        Some(false) => "false",
+    };
+    push_config_line(&mut text, "nom", nom, palette);
     write_raw(writer, &text)
 }
 

@@ -12,6 +12,8 @@ pub(crate) enum Error {
     NotAGitRepo,
     FlakeUpdateFailed,
     RebuildFailed,
+    /// `nix-output-monitor` is not on `PATH` while the rebuild wants it.
+    NomMissing,
     /// `sudo -v` failed: the user refused or could not enter the password.
     PasswordFailed,
     HostnameUnknown,
@@ -31,6 +33,10 @@ impl fmt::Display for Error {
             Error::NotAGitRepo => write!(f, "Repository is not a git working tree"),
             Error::FlakeUpdateFailed => write!(f, "Failed to update flake inputs"),
             Error::RebuildFailed => write!(f, "NixOS rebuild failed"),
+            Error::NomMissing => write!(
+                f,
+                "nix-output-monitor (nom) is not installed; install it or pass --nom=false"
+            ),
             Error::PasswordFailed => write!(f, "Failed to obtain sudo credentials"),
             Error::HostnameUnknown => {
                 write!(f, "Could not determine hostname; pass --hostname")
@@ -53,6 +59,7 @@ impl std::error::Error for Error {
             | Error::NotAGitRepo
             | Error::FlakeUpdateFailed
             | Error::RebuildFailed
+            | Error::NomMissing
             | Error::PasswordFailed
             | Error::HostnameUnknown
             | Error::CleanupFailed
@@ -115,6 +122,11 @@ mod tests {
             Error::FlakeUpdateFailed.to_string(),
             "Failed to update flake inputs"
         );
+    }
+
+    #[test]
+    fn display_nom_missing_points_at_the_flag() {
+        assert!(Error::NomMissing.to_string().contains("--nom=false"));
     }
 
     #[test]

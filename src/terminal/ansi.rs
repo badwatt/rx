@@ -49,22 +49,28 @@ impl Palette {
     }
 
     fn detect(is_tty: bool) -> Self {
-        Self::from(no_color(std::env::var_os("NO_COLOR").as_deref()), is_tty)
+        Self::from(color_env(std::env::var("COLOR").ok().as_deref()), is_tty)
     }
 
-    /// Pure decision over the environment.
-    pub(crate) fn from(no_color: bool, is_tty: bool) -> Self {
-        if no_color || !is_tty {
-            Self::PLAIN
-        } else {
-            Self::COLOR
+    /// Pure decision: `Some(true)` forces colour, `Some(false)` plain, and
+    /// `None` follows the stream's TTY.
+    pub(crate) fn from(color: Option<bool>, is_tty: bool) -> Self {
+        match color {
+            Some(true) => Self::COLOR,
+            None if is_tty => Self::COLOR,
+            Some(false) | None => Self::PLAIN,
         }
     }
 }
 
-/// `NO_COLOR` disables color only when set to a non-empty value.
-fn no_color(value: Option<&std::ffi::OsStr>) -> bool {
-    value.is_some_and(|v| !v.is_empty())
+/// `COLOR=true` forces colour and `COLOR=false` forces plain output; anything
+/// else (or unset) leaves the decision to the stream.
+fn color_env(value: Option<&str>) -> Option<bool> {
+    match value {
+        Some("true") => Some(true),
+        Some("false") => Some(false),
+        _ => None,
+    }
 }
 
 /// Write `msg` to `writer` and flush immediately.
@@ -120,18 +126,19 @@ mod tests {
     }
 
     #[test]
-    fn palette_from_disables_color_for_no_color() {
-        assert_eq!(Palette::from(true, true), Palette::PLAIN);
+    fn palette_from_false_forces_plain_even_on_a_tty() {
+        assert_eq!(Palette::from(Some(false), true), Palette::PLAIN);
     }
 
     #[test]
-    fn palette_from_disables_color_for_non_tty() {
-        assert_eq!(Palette::from(false, false), Palette::PLAIN);
+    fn palette_from_true_forces_color_even_off_a_tty() {
+        assert_eq!(Palette::from(Some(true), false), Palette::COLOR);
     }
 
     #[test]
-    fn palette_from_keeps_color_for_tty() {
-        assert_eq!(Palette::from(false, true), Palette::COLOR);
+    fn palette_from_none_follows_the_tty() {
+        assert_eq!(Palette::from(None, false), Palette::PLAIN);
+        assert_eq!(Palette::from(None, true), Palette::COLOR);
     }
 
     #[test]
@@ -141,10 +148,10 @@ mod tests {
     }
 
     #[test]
-    fn no_color_requires_a_non_empty_value() {
-        use std::ffi::OsStr;
-        assert!(!no_color(None));
-        assert!(!no_color(Some(OsStr::new(""))));
-        assert!(no_color(Some(OsStr::new("1"))));
+    fn color_env_accepts_only_true_and_false() {
+        assert_eq!(color_env(Some("true")), Some(true));
+        assert_eq!(color_env(Some("false")), Some(false));
+        assert_eq!(color_env(Some("1")), None);
+        assert_eq!(color_env(None), None);
     }
 }

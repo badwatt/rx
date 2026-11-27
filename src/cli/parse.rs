@@ -119,6 +119,18 @@ fn parse_long<'a>(
             config.set_update(true);
             return Ok(consumed);
         }
+        "--nom" => {
+            let (value, consumed) = long_value(name, inline, args, i, writer)?;
+            config.nom = Some(parse_bool(value, name, writer)?);
+            return Ok(consumed);
+        }
+        "--color" => {
+            let (value, consumed) = long_value(name, inline, args, i, writer)?;
+            // The palettes were chosen from the raw arguments already; this
+            // only validates the value.
+            parse_bool(value, name, writer)?;
+            return Ok(consumed);
+        }
         _ => {}
     }
     if let Some(key) = long_value_key(name) {
@@ -151,7 +163,6 @@ fn parse_long<'a>(
             config.dry_run = true;
             Ok(0)
         }
-        "--no-color" => Ok(0),
         _ => {
             write_parse_error(writer, &format!("Unknown flag \"{name}\""));
             Err(Intent::Invalid)
@@ -287,6 +298,54 @@ fn set_value(
         }
     }
     Ok(())
+}
+
+/// The colour override, read from the raw arguments before parsing.
+///
+/// The palettes are picked before the parser runs (so a parse error is
+/// coloured correctly too), which is why `--color=<bool>` is scanned here as
+/// well as parsed. The last occurrence wins; an unknown value leaves the
+/// decision to the terminal (the parser reports it).
+pub(crate) fn color_arg(args: &[String]) -> Option<bool> {
+    let mut color = None;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].strip_prefix("--color=") {
+            Some(value) => color = bool_arg(value),
+            None if args[i] == "--color" => {
+                if let Some(value) = args.get(i + 1) {
+                    color = bool_arg(value);
+                }
+            }
+            None => {}
+        }
+        i += 1;
+    }
+    color
+}
+
+/// A `true`/`false` argument, or `None`.
+fn bool_arg(value: &str) -> Option<bool> {
+    match value {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
+/// Parse a required `true`/`false` flag value, or report the accepted set.
+fn parse_bool(value: &str, label: &str, writer: &mut dyn Write) -> Result<bool, Intent> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => {
+            write_parse_error(
+                writer,
+                &format!("Value of \"{label}\" flag must be true or false."),
+            );
+            Err(Intent::Invalid)
+        }
+    }
 }
 
 /// Split a whitespace-separated command line, or report an empty one.

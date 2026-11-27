@@ -15,6 +15,7 @@ pub(crate) fn default_config() -> Config {
         keep: DEFAULT_KEEP,
         yes: false,
         dry_run: false,
+        nom: None,
         jobs: None,
         cores: None,
         update_command: None,

@@ -29,7 +29,7 @@ use terminal::ansi::Palette;
 
 fn main() {
     let Ok(args) = utf8_args(env::args_os().collect()) else {
-        let (_, err_palette) = palettes(false);
+        let (_, err_palette) = palettes(None);
         // Best effort: exiting anyway.
         let _ = writeln!(
             stderr(),
@@ -41,8 +41,8 @@ fn main() {
     };
     let mut out = stdout();
     let mut err = stderr();
-    let no_color = args.iter().any(|arg| arg == "--no-color");
-    let (out_palette, err_palette) = palettes(no_color);
+    let color = cli::parse::color_arg(&args);
+    let (out_palette, err_palette) = palettes(color);
     if let Err(e) = run(&args, &mut out, &mut err, out_palette) {
         report_error(&mut err, err_palette, &e);
         std::process::exit(exit_code_for(&e));

@@ -9,8 +9,8 @@ use crate::infra::process::ProcessRunner;
 mod argv;
 
 use self::argv::{
-    cmd_collect_garbage, cmd_diff_closures, cmd_prune, cmd_rebuild, cmd_update, rebuild_probe,
-    sudo_keep_alive, sudo_probe, sudo_validate,
+    cmd_collect_garbage, cmd_diff_closures, cmd_nom, cmd_nom_probe, cmd_prune, cmd_rebuild,
+    cmd_update, rebuild_probe, sudo_keep_alive, sudo_probe, sudo_validate,
 };
 use crate::system_update::ports::nix::Nix;
 
@@ -72,6 +72,11 @@ impl<'a> NixCli<'a> {
             RebuildFlavor::Classic
         }
     }
+
+    /// Whether `nom` can be run; a failed probe means it is not installed.
+    fn nom_available(&self) -> bool {
+        self.runner.probe(&cmd_nom_probe()).is_ok()
+    }
 }
 
 impl Nix for NixCli<'_> {
@@ -83,11 +88,26 @@ impl Nix for NixCli<'_> {
         ensure_success(status, Error::FlakeUpdateFailed)
     }
 
-    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
+    fn rebuild(
+        &self,
+        repo: &str,
+        hostname: &str,
+        options: BuildOptions,
+        nom: Option<bool>,
+    ) -> Result<(), Error> {
         let flavor = self.detect_flavor();
-        let status = self
-            .runner
-            .run(&cmd_rebuild(repo, hostname, flavor, options))?;
+        let command = cmd_rebuild(repo, hostname, flavor, options);
+        let use_nom = match nom {
+            Some(false) => false,
+            Some(true) if !self.nom_available() => return Err(Error::NomMissing),
+            Some(true) => true,
+            None => self.nom_available(),
+        };
+        let status = if use_nom {
+            self.runner.run_through(&command, &cmd_nom())?
+        } else {
+            self.runner.run(&command)?
+        };
         ensure_success(status, Error::RebuildFailed)
     }
 

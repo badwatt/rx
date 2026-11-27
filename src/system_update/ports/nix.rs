@@ -9,7 +9,16 @@ pub(crate) trait Nix {
     /// configured one; it runs at the repo root.
     fn update(&self, repo: &str, command: Option<&[String]>) -> Result<(), Error>;
     /// Rebuild and switch the system for `hostname`.
-    fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error>;
+    ///
+    /// `nom` pipes the rebuild's log through `nix-output-monitor`: `None`
+    /// when it is installed, `Some(true)` to insist, `Some(false)` to never.
+    fn rebuild(
+        &self,
+        repo: &str,
+        hostname: &str,
+        options: BuildOptions,
+        nom: Option<bool>,
+    ) -> Result<(), Error>;
     /// Whether the next elevated command will ask for a sudo password.
     fn password_pending(&self) -> Result<bool, Error>;
     /// Prompt for and cache the sudo credentials now, so a later elevated

@@ -366,11 +366,62 @@ fn parse_dry_run_long_sets_dry_run() {
 }
 
 #[test]
-fn parse_no_color_flag_is_accepted() {
+fn parse_color_false_is_accepted() {
     let mut buf = Vec::new();
     assert_eq!(
-        parse(&args(&["rx", "--no-color"]), &mut buf),
+        parse(&args(&["rx", "--color=false"]), &mut buf),
         Intent::Run(default_config())
+    );
+}
+
+#[test]
+fn parse_color_rejects_other_values() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--color=always"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("true or false"));
+}
+
+#[test]
+fn parse_color_without_a_value_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--color"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
+fn color_is_automatic_by_default() {
+    assert_eq!(color_arg(&args(&["rx"])), None);
+}
+
+#[test]
+fn color_false_is_read_in_both_forms() {
+    assert_eq!(color_arg(&args(&["rx", "--color=false"])), Some(false));
+    assert_eq!(color_arg(&args(&["rx", "--color", "false"])), Some(false));
+}
+
+#[test]
+fn color_true_forces_it() {
+    assert_eq!(color_arg(&args(&["rx", "--color=true", "run"])), Some(true));
+    assert_eq!(color_arg(&args(&["rx", "--color"])), None);
+}
+
+#[test]
+fn color_arg_ignores_unknown_values() {
+    assert_eq!(color_arg(&args(&["rx", "--color=maybe"])), None);
+}
+
+#[test]
+fn the_last_color_flag_wins() {
+    assert_eq!(
+        color_arg(&args(&["rx", "--color=false", "--color=true"])),
+        Some(true)
+    );
+    assert_eq!(
+        color_arg(&args(&["rx", "--color=true", "--color=false"])),
+        Some(false)
     );
 }
 
@@ -569,6 +620,48 @@ fn parse_update_command_blank_returns_error() {
         Intent::Invalid
     );
     assert!(String::from_utf8_lossy(&buf).contains("requires a command"));
+}
+
+#[test]
+fn parse_nom_takes_a_boolean() {
+    let mut buf = Vec::new();
+    let off = Config {
+        nom: Some(false),
+        ..default_config()
+    };
+    assert_eq!(
+        parse(&args(&["rx", "--nom=false"]), &mut buf),
+        Intent::Run(off.clone())
+    );
+    assert_eq!(
+        parse(&args(&["rx", "--nom", "false"]), &mut buf),
+        Intent::Run(off)
+    );
+    let on = Config {
+        nom: Some(true),
+        ..default_config()
+    };
+    assert_eq!(
+        parse(&args(&["rx", "--nom=true"]), &mut buf),
+        Intent::Run(on)
+    );
+}
+
+#[test]
+fn parse_nom_rejects_other_values() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--nom=maybe"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("true or false"));
+}
+
+#[test]
+fn parse_nom_without_a_value_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(parse(&args(&["rx", "--nom"]), &mut buf), Intent::Invalid);
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
 }
 
 #[test]

@@ -18,7 +18,9 @@ closure diff. It is a small single binary with **zero Rust dependencies**, a pro
 anything destructive, and a `--dry-run` that prints every command it would run
 (the released builds are static).
 
-Built for one person and their laptop. Needs NixOS, `git`, `nix`, and `sudo`.
+Built for one person and their laptop. Needs NixOS, `git`, `nix` and `sudo`. The
+rebuild goes through `nix-output-monitor` (`nom`) **when it is installed**: the
+flake package ships it, other installs can add it or use `--nom=false`.
 
 ## Install
 
@@ -57,8 +59,8 @@ As a flake input:
 }
 ```
 
-The flake also installs the man page (`man rx`) and completions for bash, zsh
-and fish.
+The flake also installs the man page (`man rx`), completions for bash, zsh and
+fish, and wraps the binary so `nix build`/`nix run` carry `nix-output-monitor`.
 
 ## Usage
 
@@ -85,6 +87,7 @@ rx -u --update-command 'tack update'   # ...with another updater
 rx -d                # also show the closure diff at the end
 rx --only diff       # nothing but the closure diff
 rx --dry-run -y      # print every command, run none
+rx --nom=false       # rebuild without nix-output-monitor
 ```
 
 | Flag            | Short | What it does                                      | Default       |
@@ -100,7 +103,8 @@ rx --dry-run -y      # print every command, run none
 | `--yes`         | `-y`  | Assume yes for every prompt                       | `false`       |
 | `--only`        |       | Run only the listed steps                         | default steps |
 | `--dry-run`     |       | Print commands instead of executing them          | `false`       |
-| `--no-color`    |       | Disable ANSI colours                              | auto          |
+| `--nom`         |       | Pipe the rebuild through `nix-output-monitor`     | when installed |
+| `--color`       |       | ANSI colours, `true`/`false`                      | auto          |
 | `--completions` |       | Print a completion script (`bash`/`zsh`/`fish`)   | —             |
 | `--help`        | `-h`  | Print the help banner                             | —             |
 | `--version`     | `-v`  | Print the version                                 | —             |
@@ -120,7 +124,7 @@ over `--update`/`--diff`, so the summary always matches what runs.
 | **Pull** | `git -C <repo> pull --ff-only` | default |
 | **Flake** | `nix flake update --flake <repo>`, or `--update-command` | `--update` / `--only flake` |
 | **Stage** | `git -C <repo> status --porcelain`, then `git add .` after a prompt | default |
-| **Rebuild** | `nixos-rebuild switch --flake <repo>#<host>` | default |
+| **Rebuild** | `nixos-rebuild switch --flake <repo>#<host>` (through `nom` when installed, unless `--nom=false`) | default |
 | **Cleanup** | `nix-env --delete-generations +N`, then `nix store gc` | default |
 | **Diff** | `nix profile diff-closures` | `--diff` / `--only diff` |
 
@@ -154,7 +158,7 @@ the self-rebuild re-exec is skipped.
   badge the tab too. `TERM=dumb` turns both off.
 - **The repo must be the work-tree root.** A subdirectory of another
   repository is rejected, so `pull`/`add` never touch the enclosing repo.
-- **`NO_COLOR`, non-TTY and `--no-color`** each disable colour per stream.
+- **Colour** is decided per stream: `COLOR=true`/`COLOR=false` (or `--color=true|false`) override, and without them a stream is coloured only when it is a terminal.
 
 > [!TIP]
 > `--dry-run` executes nothing except the read-only `nixos-rebuild` probe. It

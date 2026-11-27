@@ -17,6 +17,6 @@ pub(crate) fn run(
         ui,
         config.dry_run,
         "Rebuilding the system",
-        &mut || nix.rebuild(&config.repo, hostname, config.build_options()),
+        &mut || nix.rebuild(&config.repo, hostname, config.build_options(), config.nom),
     )
 }

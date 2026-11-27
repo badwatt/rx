@@ -45,6 +45,7 @@ impl Write for FlushFailingWriter {
 
 type RunFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 type RunInFn = Box<dyn Fn(&str, &[String]) -> Result<i32, Error>>;
+type RunThroughFn = Box<dyn Fn(&[String], &[String]) -> Result<i32, Error>>;
 type RunEnvFn = Box<dyn Fn(&[String], &str, &str) -> Result<i32, Error>>;
 type CaptureFn = Box<dyn Fn(&[String]) -> Result<(i32, String), Error>>;
 type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
@@ -54,6 +55,7 @@ type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 pub(crate) struct StubRunner {
     run: RunFn,
     run_in: RunInFn,
+    run_through: RunThroughFn,
     run_env: RunEnvFn,
     capture: CaptureFn,
     probe: ProbeFn,
@@ -64,6 +66,7 @@ impl StubRunner {
         Self {
             run: Box::new(no_run),
             run_in: Box::new(no_run_in),
+            run_through: Box::new(no_run_through),
             run_env: Box::new(no_run_env),
             capture: Box::new(no_capture),
             probe: Box::new(no_probe),
@@ -83,6 +86,14 @@ impl StubRunner {
         f: impl Fn(&str, &[String]) -> Result<i32, Error> + 'static,
     ) -> Self {
         self.run_in = Box::new(f);
+        self
+    }
+
+    pub(crate) fn with_run_through(
+        mut self,
+        f: impl Fn(&[String], &[String]) -> Result<i32, Error> + 'static,
+    ) -> Self {
+        self.run_through = Box::new(f);
         self
     }
 
@@ -118,6 +129,9 @@ impl CommandRunner for StubRunner {
     fn run_in(&self, dir: &str, cmd: &[String]) -> Result<i32, Error> {
         (self.run_in)(dir, cmd)
     }
+    fn run_through(&self, cmd: &[String], consumer: &[String]) -> Result<i32, Error> {
+        (self.run_through)(cmd, consumer)
+    }
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
         (self.run_env)(cmd, var, value)
     }
@@ -142,6 +156,14 @@ fn no_run(_: &[String]) -> Result<i32, Error> {
     reason = "stub must match the CommandRunner trait signature"
 )]
 fn no_run_in(_: &str, _: &[String]) -> Result<i32, Error> {
+    Ok(0)
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "stub must match the CommandRunner trait signature"
+)]
+fn no_run_through(_: &[String], _: &[String]) -> Result<i32, Error> {
     Ok(0)
 }
 
@@ -179,6 +201,12 @@ mod tests {
         assert_eq!(runner.run(&[String::from("x")]).expect("run"), 0);
         assert_eq!(
             runner.run_in("/tmp", &[String::from("x")]).expect("run in"),
+            0
+        );
+        assert_eq!(
+            runner
+                .run_through(&[String::from("x")], &[String::from("nom")])
+                .expect("run through"),
             0
         );
         assert_eq!(

@@ -68,7 +68,7 @@ _rx() {
     local cur words
     cur="${COMP_WORDS[COMP_CWORD]}"
     words="--repo --hostname --keep --jobs --cores --update \
---update-command --diff --yes --only --dry-run --no-color --completions \
+--update-command --diff --yes --only --dry-run --nom --color --completions \
 --help --version \
 -r -n -k -j -c -u -d -y -h -v"
 
@@ -83,6 +83,10 @@ _rx() {
             ;;
         --completions)
             COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
+            return
+            ;;
+        --nom|--color)
+            COMPREPLY=( $(compgen -W "true false" -- "$cur") )
             return
             ;;
     esac
@@ -109,7 +113,8 @@ _rx() {
         '(-y --yes)'{-y,--yes}'[assume yes for all prompts]' \
         '--only[run only these steps]:steps:(pull flake stage rebuild cleanup diff)' \
         '--dry-run[print commands without executing them]' \
-        '--no-color[disable colored output]' \
+        '--nom=[pipe the rebuild through nix-output-monitor]:bool:(true false)' \
+        '--color=[color output]:bool:(true false)' \
         '--completions[print shell completions]:shell:(bash zsh fish)' \
         '(-h --help)'{-h,--help}'[print help]' \
         '(-v --version)'{-v,--version}'[print the version]'
@@ -131,7 +136,8 @@ complete -c rx -s d -l diff -d 'show the closure diff'
 complete -c rx -s y -l yes -d 'assume yes for all prompts'
 complete -c rx -l only -d 'run only these steps' -r -f -a "pull flake stage rebuild cleanup diff"
 complete -c rx -l dry-run -d 'print commands without executing them'
-complete -c rx -l no-color -d 'disable colored output'
+complete -c rx -l nom -d 'pipe the rebuild through nix-output-monitor' -r -f -a "true false"
+complete -c rx -l color -d 'color output' -r -f -a "true false"
 complete -c rx -l completions -d 'print shell completions' -r -f -a "bash zsh fish"
 complete -c rx -s h -l help -d 'print help'
 complete -c rx -s v -l version -d 'print the version'
@@ -176,7 +182,7 @@ mod tests {
     #[test]
     fn every_script_completes_the_binary_every_flag_and_every_step() {
         let flags = parser_long_flags();
-        assert_eq!(flags.len(), 15);
+        assert_eq!(flags.len(), 16);
         for shell in Shell::ALL {
             let script = shell.script();
             assert!(script.contains("rx"));

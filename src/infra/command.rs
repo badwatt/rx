@@ -9,6 +9,9 @@ pub(crate) trait CommandRunner {
     fn run(&self, cmd: &[String]) -> Result<i32, Error>;
     /// Run a command inheriting stdio with `dir` as its working directory.
     fn run_in(&self, dir: &str, cmd: &[String]) -> Result<i32, Error>;
+    /// Run a command with its output piped through `consumer`, returning the
+    /// command's exit code.
+    fn run_through(&self, cmd: &[String], consumer: &[String]) -> Result<i32, Error>;
     /// Run a command inheriting stdio with `var=value` in its environment.
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error>;
     /// Run a command and capture its exit code and stdout.

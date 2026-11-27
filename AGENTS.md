@@ -56,11 +56,12 @@ tests/integration.rs       binario real, sin efectos
 - Puertos **semánticos** (`Repo`, `Nix`, `UserIo`); los adaptadores son dueños del argv. `CommandRunner` **no** es un puerto: es un seam interno de adaptador para que `--dry-run` decore una sola implementación.
 - Composición en `main`; `cli` solo parsea (`Intent`) y nunca importa adaptadores del feature.
 - **Un solo canal de salida**: todo lo del usuario va por `UserIo`; los errores de parseo y el único error de nivel superior van a **stderr**.
-- `NO_COLOR` (no vacío) + `is_terminal()` por stream deciden la `Palette`; `--no-color` fuerza plano en ambos.
+- `COLOR=true|false` (o `--color=true|false`, que gana) fuerzan color/plano en ambos streams; sin ellos, `is_terminal()` decide por stream. `NO_COLOR` ya no se lee.
 - **Exit codes**: `2` args/config inválidos, `141` (128 + SIGPIPE) al cerrar stdout, `128 + N` si el hijo muere por señal, si no `1`.
-- **Error enum**: una variante por modo de fallo — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `PasswordFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
+- **Error enum**: una variante por modo de fallo — `Io`, `GitPullFailed`, `GitStatusFailed`, `NotAGitRepo`, `FlakeUpdateFailed`, `RebuildFailed`, `NomMissing`, `PasswordFailed`, `HostnameUnknown`, `CleanupFailed`, `GitAddFailed`, `DiffFailed`, `InvalidArgs`, `InvalidConfig`.
 - **Sin shell**: todo comando externo por argv. El filtrado del diff se hace en Rust.
 - **Fail-fast**: cada paso comprueba el exit status; un fallo aborta antes del siguiente, así el cleanup nunca corre tras un rebuild fallido.
+- **Rebuild con nom**: si `nom` está instalado (probe `nom --version`) el log del rebuild (su stderr) va por él con argv, sin shell; stdin/stdout del hijo se heredan, así el prompt de sudo sigue funcionando y el exit que cuenta es el del rebuild. `--nom=true` lo exige (`NomMissing` si falta) y `--nom=false` lo desactiva.
 - **Rebuild probado por capacidad**: probe `nixos-rebuild --elevate=none list-generations`; exit 0 → `-ng` (`--elevate=sudo --no-reexec`), otro → clásico (`sudo … --fast`). Ambos evitan el re-exec.
 - **Config validada** (`Config::validate` → exit 2): repo vacío, hostname explícitamente vacío, `keep == 0`, `jobs`/`cores == 0`. Un hostname no detectado (`None`) es válido aquí; el workflow lo convierte en `HostnameUnknown` antes de cualquier efecto.
 - **Declinar / EOF**: declinar el prompt imprime `Aborted.` y sale 0; un stdin cerrado **nunca** es un sí. Declinar el staging aborta antes del rebuild.
@@ -118,7 +119,7 @@ tests/integration.rs       binario real, sin efectos
 - La versión de Rust sale de `rust-toolchain.toml` vía `rust-overlay` (`rust-bin.fromRustupToolchainFile`), para el shell **y** para el paquete; nixpkgs va por detrás de un release estable.
 - Salidas que deben seguir funcionando: `nix build`, `nix develop`, `nix flake check`, y los cross builds en `legacyPackages.<system>.cross.<target>`.
 - `checks.<system>.default` refleja el paquete, así `nix flake check` construye algo real (no re-declara fmt/clippy/test: eso lo corre el CI).
-- El paquete instala `rx.1` y las completions generadas por el propio binario, así no divergen del parser.
+- El paquete instala `rx.1` y las completions generadas por el propio binario, así no divergen del parser; `postFixup` lo envuelve con `nix-output-monitor` en el `PATH` (y el devShell lo incluye), así `--nom` funciona sin instalar nada. Los binarios de release y `cargo install` no van envueltos: ahí `nom` debe estar en el `PATH` o se usa `--nom=false`.
 - Uso diario: `nix develop` (o `direnv` + `use flake`). Un comando suelto: `nix develop -c <cmd>`.
 - `flake.lock` se commitea. Actualizar es una decisión explícita (`nix flake update`) revisando el diff de inputs.
 - La versión de Rust la fija `rust-toolchain.toml` dentro del shell; ⛔ `rustup default` global.

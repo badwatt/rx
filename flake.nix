@@ -48,6 +48,7 @@
           inherit version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          nativeBuildInputs = [ pkgs.makeWrapper ];
           postInstall = ''
             # The version lives in Cargo.toml: render it into the man page.
             install -d "$out/share/man/man1"
@@ -60,6 +61,12 @@
             "$out/bin/rx" --completions bash > "$out/share/bash-completion/completions/rx"
             "$out/bin/rx" --completions zsh  > "$out/share/zsh/site-functions/_rx"
             "$out/bin/rx" --completions fish > "$out/share/fish/vendor_completions.d/rx.fish"
+          '';
+          # The rebuild pipes its log through nom: ship it with the binary, so
+          # `nix run`/`nix build` users need nothing on their PATH.
+          postFixup = ''
+            wrapProgram "$out/bin/rx" \
+              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.nix-output-monitor ]}
           '';
           meta = {
             description = "A minimal CLI to pull, stage, rebuild and clean up your NixOS system";
@@ -130,11 +137,12 @@
 
             packages = with pkgs; [
               actionlint
-              rust
               cargo-llvm-cov
               gcc
               gnumake
+              nix-output-monitor
               pkg-config
+              rust
               rust-analyzer
             ];
           };

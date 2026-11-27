@@ -69,6 +69,9 @@ pub(crate) struct Config {
     pub(crate) yes: bool,
     /// Print commands instead of executing them.
     pub(crate) dry_run: bool,
+    /// Pipe the rebuild through `nix-output-monitor`: `None` when it is
+    /// installed, `Some(true)` to insist, `Some(false)` to never.
+    pub(crate) nom: Option<bool>,
     /// `--max-jobs` cap for the rebuild.
     pub(crate) jobs: Option<u16>,
     /// `--cores` cap for the rebuild.
@@ -191,6 +194,7 @@ mod tests {
             keep: 5,
             yes: false,
             dry_run: false,
+            nom: None,
             jobs: None,
             cores: None,
             update_command: None,

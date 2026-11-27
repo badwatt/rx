@@ -32,13 +32,14 @@ pub(crate) fn report_error(writer: &mut dyn Write, palette: Palette, error: &Err
     true
 }
 
-/// Palettes for this process. `--no-color` forces plain output for both
-/// streams; otherwise each stream decides from `NO_COLOR` and its own TTY.
-pub(crate) fn palettes(no_color: bool) -> (Palette, Palette) {
-    if no_color {
-        (Palette::PLAIN, Palette::PLAIN)
-    } else {
-        (Palette::for_stdout(), Palette::for_stderr())
+/// Palettes for this process. `--color=false` forces plain output for both
+/// streams, `--color=true` forces colour, and otherwise each stream decides
+/// from `COLOR` and its own TTY.
+pub(crate) fn palettes(color: Option<bool>) -> (Palette, Palette) {
+    match color {
+        Some(true) => (Palette::COLOR, Palette::COLOR),
+        Some(false) => (Palette::PLAIN, Palette::PLAIN),
+        None => (Palette::for_stdout(), Palette::for_stderr()),
     }
 }
 
@@ -47,12 +48,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn palettes_honor_no_color_flag() {
-        assert_eq!(palettes(true), (Palette::PLAIN, Palette::PLAIN));
+    fn palettes_honor_the_flag() {
+        assert_eq!(palettes(Some(true)), (Palette::COLOR, Palette::COLOR));
+        assert_eq!(palettes(Some(false)), (Palette::PLAIN, Palette::PLAIN));
     }
     #[test]
     fn palettes_use_detected_streams_by_default() {
-        let (out, err) = palettes(false);
+        let (out, err) = palettes(None);
         assert_eq!(out, Palette::for_stdout());
         assert_eq!(err, Palette::for_stderr());
     }
