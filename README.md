@@ -40,9 +40,9 @@ Prebuilt static binaries (Linux x86_64/aarch64 musl, macOS x86_64/aarch64) and
 `SHA256SUMS` are attached to every [release](https://github.com/badwatt/rx/releases/latest):
 
 ```bash
-gh release download v26.11.5 --pattern '*x86_64-unknown-linux-musl*'
-tar -xzf rx-v26.11.5-x86_64-unknown-linux-musl.tar.gz
-./rx-v26.11.5-x86_64-unknown-linux-musl/rx --version
+gh release download v26.11.6 --pattern '*x86_64-unknown-linux-musl*'
+tar -xzf rx-v26.11.6-x86_64-unknown-linux-musl.tar.gz
+./rx-v26.11.6-x86_64-unknown-linux-musl/rx --version
 ```
 
 As a flake input:
