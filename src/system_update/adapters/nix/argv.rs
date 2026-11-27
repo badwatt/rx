@@ -309,14 +309,49 @@ mod tests {
     #[test]
     fn update_ok_on_zero() {
         let runner = StubRunner::new();
-        assert!(NixCli::new(&runner).update("/repo").is_ok());
+        assert!(NixCli::new(&runner).update("/repo", None).is_ok());
+    }
+
+    #[test]
+    fn update_runs_the_configured_command_at_the_repo_root() {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let recorder = Rc::clone(&seen);
+        let runner = StubRunner::new().with_run_in(move |dir, cmd| {
+            recorder.borrow_mut().push(dir.to_owned());
+            recorder.borrow_mut().extend_from_slice(cmd);
+            Ok(0)
+        });
+        let command = vec![String::from("tack"), String::from("update")];
+        assert!(NixCli::new(&runner).update("/repo", Some(&command)).is_ok());
+        assert_eq!(seen.borrow().join(" "), "/repo tack update");
+    }
+
+    #[test]
+    fn update_errs_when_the_configured_command_fails() {
+        let runner = StubRunner::new().with_run_in(|_, _| Ok(1));
+        let command = vec![String::from("tack")];
+        let err = NixCli::new(&runner)
+            .update("/repo", Some(&command))
+            .expect_err("custom command failure");
+        assert_eq!(err.to_string(), "Failed to update flake inputs");
+    }
+
+    #[test]
+    fn update_propagates_a_configured_command_run_error() {
+        let runner =
+            StubRunner::new().with_run_in(|_, _| Err(Error::Io(std::io::Error::other("x"))));
+        let command = vec![String::from("tack")];
+        let err = NixCli::new(&runner)
+            .update("/repo", Some(&command))
+            .expect_err("run error");
+        assert!(err.to_string().contains("IO error"));
     }
 
     #[test]
     fn update_errs_on_nonzero() {
         let runner = StubRunner::new().with_run(|_| Ok(1));
         let err = NixCli::new(&runner)
-            .update("/repo")
+            .update("/repo", None)
             .expect_err("update failure");
         assert_eq!(err.to_string(), "Failed to update flake inputs");
     }
@@ -324,7 +359,9 @@ mod tests {
     #[test]
     fn update_propagates_run_error() {
         let runner = StubRunner::new().with_run(|_| Err(Error::Io(std::io::Error::other("x"))));
-        let err = NixCli::new(&runner).update("/repo").expect_err("run error");
+        let err = NixCli::new(&runner)
+            .update("/repo", None)
+            .expect_err("run error");
         assert!(err.to_string().contains("IO error"));
     }
 

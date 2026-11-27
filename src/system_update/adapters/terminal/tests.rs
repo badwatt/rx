@@ -43,6 +43,7 @@ fn test_config() -> Config {
         dry_run: false,
         jobs: None,
         cores: None,
+        update_command: None,
     }
 }
 
@@ -252,6 +253,7 @@ fn print_config_renders_all_fields() {
         dry_run: false,
         jobs: None,
         cores: None,
+        update_command: None,
     };
     assert!(print_config(&mut buf, &config).is_ok());
     let s = String::from_utf8_lossy(&buf);
@@ -287,6 +289,26 @@ fn print_config_omits_dry_run_when_disabled() {
     let mut buf = Vec::new();
     assert!(print_config(&mut buf, &test_config()).is_ok());
     assert!(!String::from_utf8_lossy(&buf).contains("dry-run"));
+}
+
+#[test]
+fn print_config_shows_the_update_command() {
+    let mut buf = Vec::new();
+    let config = Config {
+        update_command: Some(vec![String::from("tack"), String::from("update")]),
+        ..test_config()
+    };
+    assert!(print_config(&mut buf, &config).is_ok());
+    let rendered = String::from_utf8_lossy(&buf);
+    assert!(rendered.contains("update-command"));
+    assert!(rendered.contains("tack update"));
+}
+
+#[test]
+fn print_config_omits_the_update_command_by_default() {
+    let mut buf = Vec::new();
+    assert!(print_config(&mut buf, &test_config()).is_ok());
+    assert!(!String::from_utf8_lossy(&buf).contains("update-command"));
 }
 
 #[test]

@@ -112,6 +112,13 @@ fn parse_long<'a>(
             config.set_only(parse_steps(value, writer)?);
             return Ok(consumed);
         }
+        "--update-command" => {
+            let (value, consumed) = long_value(name, inline, args, i, writer)?;
+            config.set_update_command(parse_command(value, writer)?);
+            // Configuring the command is a request to run that step.
+            config.set_update(true);
+            return Ok(consumed);
+        }
         _ => {}
     }
     if let Some(key) = long_value_key(name) {
@@ -280,6 +287,18 @@ fn set_value(
         }
     }
     Ok(())
+}
+
+/// Split a whitespace-separated command line, or report an empty one.
+///
+/// There is no shell: each word is one argument, so quotes are literal.
+fn parse_command(value: &str, writer: &mut dyn Write) -> Result<Vec<String>, Intent> {
+    let argv: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
+    if argv.is_empty() {
+        write_parse_error(writer, "\"--update-command\" flag requires a command");
+        return Err(Intent::Invalid);
+    }
+    Ok(argv)
 }
 
 /// Parse a comma-separated `--only` step list, or report an unknown name.

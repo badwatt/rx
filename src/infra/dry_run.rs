@@ -27,6 +27,11 @@ impl CommandRunner for DryRunRunner<'_> {
         Ok(0)
     }
 
+    fn run_in(&self, dir: &str, cmd: &[String]) -> Result<i32, Error> {
+        echo_in(dir, cmd);
+        Ok(0)
+    }
+
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
         echo(cmd, Some((var, value)));
         Ok(0)
@@ -40,6 +45,12 @@ impl CommandRunner for DryRunRunner<'_> {
     fn probe(&self, cmd: &[String]) -> Result<i32, Error> {
         self.probe_runner.probe(cmd)
     }
+}
+
+/// Print the command a real run would execute in `dir`, best-effort.
+fn echo_in(dir: &str, cmd: &[String]) {
+    let mut out = std::io::stdout();
+    let _ = print_command_in(&mut out, dir, cmd);
 }
 
 /// Print the command a real run would execute, with an optional environment
@@ -100,6 +111,15 @@ fn print_command(writer: &mut dyn Write, cmd: &[String]) -> Result<(), Error> {
     Ok(())
 }
 
+/// Print a command that runs in `dir`, as `$ (cd dir && prog arg1 arg2 …)`.
+fn print_command_in(writer: &mut dyn Write, dir: &str, cmd: &[String]) -> Result<(), Error> {
+    ansi::write_flush(
+        writer,
+        &format!("$ (cd {} && {})\n", quote_arg(dir), render(cmd)),
+    )?;
+    Ok(())
+}
+
 /// Print a command with an environment assignment, as
 /// `$ VAR=value prog arg1 arg2 …`.
 fn print_command_env(
@@ -130,6 +150,40 @@ mod tests {
         let mut buf = Vec::new();
         assert!(print_command_env(&mut buf, &["git".into(), "pull".into()], "K", "v").is_ok());
         assert_eq!(buf, b"$ K=v git pull\n");
+    }
+
+    #[test]
+    fn print_command_in_writes_a_subshell_with_the_directory() {
+        let mut buf = Vec::new();
+        let cmd = vec![String::from("tack"), String::from("update")];
+        assert!(print_command_in(&mut buf, "/repo", &cmd).is_ok());
+        assert_eq!(buf, b"$ (cd /repo && tack update)\n");
+    }
+
+    #[test]
+    fn print_command_in_quotes_the_directory() {
+        let mut buf = Vec::new();
+        let cmd = vec![String::from("tack"), String::from("update")];
+        assert!(print_command_in(&mut buf, "/two words", &cmd).is_ok());
+        assert_eq!(buf, b"$ (cd '/two words' && tack update)\n".as_slice());
+    }
+
+    #[test]
+    fn print_command_in_error_propagation() {
+        let mut writer = crate::test_support::FailingWriter;
+        let cmd = vec![String::from("tack")];
+        assert!(print_command_in(&mut writer, "/repo", &cmd).is_err());
+    }
+
+    #[test]
+    fn dry_run_runner_run_in_does_not_panic() {
+        let probes = StubRunner::new();
+        assert_eq!(
+            DryRunRunner::new(&probes)
+                .run_in("/repo", &["tack".into(), "update".into()])
+                .expect("run in"),
+            0
+        );
     }
 
     #[test]

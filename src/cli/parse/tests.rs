@@ -528,6 +528,50 @@ fn parse_help_long_with_value_returns_error() {
 }
 
 #[test]
+fn parse_update_command_sets_it_and_enables_the_update() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.set_update_command(vec![String::from("tack"), String::from("update")]);
+    expected.set_update(true);
+    assert_eq!(
+        parse(&args(&["rx", "--update-command", "tack update"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_update_command_inline_form() {
+    let mut buf = Vec::new();
+    let mut expected = default_config();
+    expected.set_update_command(vec![String::from("tack")]);
+    expected.set_update(true);
+    assert_eq!(
+        parse(&args(&["rx", "--update-command=tack"]), &mut buf),
+        Intent::Run(expected)
+    );
+}
+
+#[test]
+fn parse_update_command_missing_value_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--update-command"]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("requires an argument"));
+}
+
+#[test]
+fn parse_update_command_blank_returns_error() {
+    let mut buf = Vec::new();
+    assert_eq!(
+        parse(&args(&["rx", "--update-command", "   "]), &mut buf),
+        Intent::Invalid
+    );
+    assert!(String::from_utf8_lossy(&buf).contains("requires a command"));
+}
+
+#[test]
 fn parse_only_sets_the_step_selection() {
     let mut buf = Vec::new();
     let mut expected = default_config();

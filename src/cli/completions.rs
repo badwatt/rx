@@ -67,8 +67,9 @@ const BASH: &str = r#"# bash completion for rx
 _rx() {
     local cur words
     cur="${COMP_WORDS[COMP_CWORD]}"
-    words="--repo --hostname --keep --jobs --cores --update --diff --yes \
---only --dry-run --no-color --completions --help --version \
+    words="--repo --hostname --keep --jobs --cores --update \
+--update-command --diff --yes --only --dry-run --no-color --completions \
+--help --version \
 -r -n -k -j -c -u -d -y -h -v"
 
     case "${COMP_WORDS[COMP_CWORD-1]}" in
@@ -103,6 +104,7 @@ _rx() {
         '(-j --jobs)'{-j,--jobs}'[cap nix max-jobs]:count:' \
         '(-c --cores)'{-c,--cores}'[cap nix cores]:count:' \
         '(-u --update)'{-u,--update}'[update flake inputs first]' \
+        '--update-command[replace nix flake update]:command:' \
         '(-d --diff)'{-d,--diff}'[show the closure diff]' \
         '(-y --yes)'{-y,--yes}'[assume yes for all prompts]' \
         '--only[run only these steps]:steps:(pull flake stage rebuild cleanup diff)' \
@@ -124,6 +126,7 @@ complete -c rx -s k -l keep -d 'generations to keep' -r
 complete -c rx -s j -l jobs -d 'cap nix max-jobs' -r
 complete -c rx -s c -l cores -d 'cap nix cores' -r
 complete -c rx -s u -l update -d 'update flake inputs first'
+complete -c rx -l update-command -d 'replace nix flake update' -r
 complete -c rx -s d -l diff -d 'show the closure diff'
 complete -c rx -s y -l yes -d 'assume yes for all prompts'
 complete -c rx -l only -d 'run only these steps' -r -f -a "pull flake stage rebuild cleanup diff"
@@ -151,10 +154,18 @@ mod tests {
     /// Every long flag the parser accepts, read from its source so a new flag
     /// cannot silently miss the completion scripts.
     fn parser_long_flags() -> Vec<&'static str> {
-        include_str!("parse.rs")
-            .split('"')
-            .filter(|token| token.starts_with("--") && token.len() > 2)
-            .collect()
+        let mut flags = Vec::new();
+        for token in include_str!("parse.rs").split('"') {
+            // A flag is `--` plus lower-case words; this skips the `"--"` prefix
+            // literal and the escaped occurrences inside error messages.
+            let is_flag = token.len() > 2
+                && token.starts_with("--")
+                && token.chars().all(|c| c.is_ascii_lowercase() || c == '-');
+            if is_flag && !flags.contains(&token) {
+                flags.push(token);
+            }
+        }
+        flags
     }
 
     /// Fish spells long options `-l only`, the others `--only`.
@@ -165,7 +176,7 @@ mod tests {
     #[test]
     fn every_script_completes_the_binary_every_flag_and_every_step() {
         let flags = parser_long_flags();
-        assert_eq!(flags.len(), 14);
+        assert_eq!(flags.len(), 15);
         for shell in Shell::ALL {
             let script = shell.script();
             assert!(script.contains("rx"));

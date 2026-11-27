@@ -22,6 +22,10 @@ impl CommandRunner for ProcessRunner {
         run_cmd(cmd)
     }
 
+    fn run_in(&self, dir: &str, cmd: &[String]) -> Result<i32, Error> {
+        run_cmd_in(dir, cmd)
+    }
+
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
         run_cmd_env(cmd, var, value)
     }
@@ -39,22 +43,30 @@ impl CommandRunner for ProcessRunner {
 ///
 /// A process killed by a signal returns `1`.
 pub(crate) fn run_cmd(cmd: &[String]) -> Result<i32, Error> {
-    run_cmd_env_impl(cmd, None)
+    run_impl(cmd, None, None)
+}
+
+/// Run a command via argv list with `dir` as its working directory.
+pub(crate) fn run_cmd_in(dir: &str, cmd: &[String]) -> Result<i32, Error> {
+    run_impl(cmd, Some(dir), None)
 }
 
 /// Run a command via argv list with `var=value` in its environment.
 pub(crate) fn run_cmd_env(cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
-    run_cmd_env_impl(cmd, Some((var, value)))
+    run_impl(cmd, None, Some((var, value)))
 }
 
-/// Shared body of [`run_cmd`] and [`run_cmd_env`].
-fn run_cmd_env_impl(cmd: &[String], env: Option<(&str, &str)>) -> Result<i32, Error> {
+/// Shared body of [`run_cmd`], [`run_cmd_in`] and [`run_cmd_env`].
+fn run_impl(cmd: &[String], dir: Option<&str>, env: Option<(&str, &str)>) -> Result<i32, Error> {
     let mut command = Command::new(program(cmd)?);
     command
         .args(&cmd[1..])
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
+    if let Some(dir) = dir {
+        command.current_dir(dir);
+    }
     if let Some((var, value)) = env {
         command.env(var, value);
     }
@@ -103,6 +115,26 @@ mod tests {
     #[test]
     fn run_cmd_false_returns_one() {
         assert_eq!(run_cmd(&["false".into()]).expect("run false"), 1);
+    }
+
+    #[test]
+    fn run_cmd_in_uses_the_working_directory() {
+        let cmd = vec!["sh".into(), "-c".into(), "test \"$(pwd)\" = /".into()];
+        assert_eq!(run_cmd_in("/", &cmd).expect("run in root"), 0);
+    }
+
+    #[test]
+    fn run_cmd_in_missing_directory_returns_io_error() {
+        let cmd = vec!["true".into()];
+        assert!(run_cmd_in("/nonexistent_rx_dir_xyz", &cmd).is_err());
+    }
+
+    #[test]
+    fn process_runner_run_in_returns_zero() {
+        assert_eq!(
+            ProcessRunner.run_in("/", &["true".into()]).expect("run in"),
+            0
+        );
     }
 
     #[test]

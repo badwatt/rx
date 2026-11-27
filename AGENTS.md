@@ -65,6 +65,7 @@ tests/integration.rs       binario real, sin efectos
 - **Config validada** (`Config::validate` → exit 2): repo vacío, hostname explícitamente vacío, `keep == 0`, `jobs`/`cores == 0`. Un hostname no detectado (`None`) es válido aquí; el workflow lo convierte en `HostnameUnknown` antes de cualquier efecto.
 - **Declinar / EOF**: declinar el prompt imprime `Aborted.` y sale 0; un stdin cerrado **nunca** es un sí. Declinar el staging aborta antes del rebuild.
 - **Selección de pasos**: `--only pull,flake,stage,rebuild,cleanup,diff`; la lista gana sobre `--update`/`--diff`. Las flags largas aceptan `--flag=value`.
+- **Update command**: `--update-command` sustituye `nix flake update`; se ejecuta con cwd = repo, argv partido por whitespace (sin shell, comillas literales) e implica `--update` en el pipeline por defecto (`--only` sigue mandando).
 - **Una sola voz de error**: `UserIo` no tiene `error()`; solo `main` reporta.
 - **Git no interactivo**: `git pull --ff-only` con `GIT_TERMINAL_PROMPT=0`, así una rama divergida o sin credenciales falla en vez de colgarse.
 - **Raíz del repo obligatoria**: `git rev-parse --show-prefix` vacío; un subdirectorio de otro repo se rechaza.

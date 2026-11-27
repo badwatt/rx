@@ -35,6 +35,14 @@ fn no_changes(_: &str) -> Result<String, Error> {
     clippy::unnecessary_wraps,
     reason = "mock must match the port trait signature"
 )]
+fn ok_update(_: &str, _: Option<&[String]>) -> Result<(), Error> {
+    Ok(())
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "mock must match the port trait signature"
+)]
 fn ok_rebuild(_: &str, _: &str, _: BuildOptions) -> Result<(), Error> {
     Ok(())
 }
@@ -85,6 +93,7 @@ fn rebuild_errs(_: &str, _: &str, _: BuildOptions) -> Result<(), Error> {
 
 type IsRepoFn = Box<dyn Fn(&str) -> Result<bool, Error>>;
 type StrFn = Box<dyn Fn(&str) -> Result<(), Error>>;
+type UpdateFn = Box<dyn Fn(&str, Option<&[String]>) -> Result<(), Error>>;
 type ChangesFn = Box<dyn Fn(&str) -> Result<String, Error>>;
 
 struct MockRepo {
@@ -128,7 +137,7 @@ type GcFn = Box<dyn Fn() -> Result<(), Error>>;
 type DiffFn = Box<dyn Fn() -> Result<String, Error>>;
 
 struct MockNix {
-    update: StrFn,
+    update: UpdateFn,
     rebuild: RebuildFn,
     password_pending: PendingFn,
     refresh_credentials: RefreshFn,
@@ -138,8 +147,8 @@ struct MockNix {
 }
 
 impl Nix for MockNix {
-    fn update(&self, repo: &str) -> Result<(), Error> {
-        (self.update)(repo)
+    fn update(&self, repo: &str, command: Option<&[String]>) -> Result<(), Error> {
+        (self.update)(repo, command)
     }
     fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error> {
         (self.rebuild)(repo, hostname, options)
@@ -164,7 +173,7 @@ impl Nix for MockNix {
 impl Default for MockNix {
     fn default() -> Self {
         Self {
-            update: Box::new(ok_str),
+            update: Box::new(ok_update),
             rebuild: Box::new(ok_rebuild),
             password_pending: Box::new(no_password_pending),
             refresh_credentials: Box::new(ok_gc),
@@ -246,6 +255,7 @@ fn default_config() -> Config {
         dry_run: false,
         jobs: None,
         cores: None,
+        update_command: None,
     }
 }
 
@@ -414,6 +424,32 @@ fn run_update_and_diff_true_runs_extra_commands() {
         ..default_config()
     };
     assert!(run_ok(&config, &ok_ui(&Log::default())).is_ok());
+}
+
+#[test]
+fn run_passes_the_update_command_to_the_port() {
+    let seen = Rc::new(RefCell::new(String::new()));
+    let recorder = Rc::clone(&seen);
+    let config = Config {
+        pipeline: Pipeline::Default {
+            update: true,
+            diff: false,
+        },
+        update_command: Some(vec![String::from("tack"), String::from("update")]),
+        ..default_config()
+    };
+    let nix = MockNix {
+        update: Box::new(move |repo, command| {
+            let mut seen = recorder.borrow_mut();
+            seen.push_str(repo);
+            seen.push(' ');
+            seen.push_str(&command.expect("configured command").join(" "));
+            Ok(())
+        }),
+        ..MockNix::default()
+    };
+    assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&Log::default())).is_ok());
+    assert_eq!(seen.borrow().as_str(), "r tack update");
 }
 
 #[test]
@@ -936,7 +972,7 @@ fn run_flake_error_propagates() {
         ..default_config()
     };
     let nix = MockNix {
-        update: Box::new(|_| Err(Error::FlakeUpdateFailed)),
+        update: Box::new(|_, _| Err(Error::FlakeUpdateFailed)),
         ..MockNix::default()
     };
     assert!(run(&config, &MockRepo::default(), &nix, &ok_ui(&Log::default())).is_err());

@@ -73,6 +73,8 @@ pub(crate) struct Config {
     pub(crate) jobs: Option<u16>,
     /// `--cores` cap for the rebuild.
     pub(crate) cores: Option<u16>,
+    /// Command that replaces `nix flake update`, run at the repo root.
+    pub(crate) update_command: Option<Vec<String>>,
     /// Which steps this run performs.
     pub(crate) pipeline: Pipeline,
 }
@@ -108,6 +110,9 @@ impl Config {
         }
         if self.cores == Some(0) {
             return Err(Error::InvalidConfig("cores must be > 0"));
+        }
+        if matches!(self.update_command.as_deref(), Some([])) {
+            return Err(Error::InvalidConfig("update command cannot be empty"));
         }
         Ok(())
     }
@@ -152,6 +157,11 @@ impl Config {
         }
     }
 
+    /// `--update-command`: replace `nix flake update`.
+    pub(crate) fn set_update_command(&mut self, argv: Vec<String>) {
+        self.update_command = Some(argv);
+    }
+
     /// `--only`: an explicit list wins over the flags.
     pub(crate) fn set_only(&mut self, steps: Vec<Step>) {
         self.pipeline = Pipeline::Only(steps);
@@ -183,6 +193,7 @@ mod tests {
             dry_run: false,
             jobs: None,
             cores: None,
+            update_command: None,
         }
     }
 
@@ -270,6 +281,18 @@ mod tests {
         assert_eq!(
             config.validate().expect_err("zero jobs").to_string(),
             "jobs must be > 0"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_an_empty_update_command() {
+        let config = Config {
+            update_command: Some(Vec::new()),
+            ..sample()
+        };
+        assert_eq!(
+            config.validate().expect_err("empty command").to_string(),
+            "update command cannot be empty"
         );
     }
 

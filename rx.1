@@ -38,6 +38,12 @@ Cap \fBnix\fR \fB\-\-cores\fR for the rebuild (1\-65535).
 .BR \-u ", " \-\-update
 Run \fBnix flake update\fR before staging.
 .TP
+.BI \-\-update\-command " " \fICOMMAND\fR
+Replace \fBnix flake update\fR with \fICOMMAND\fR, run with the repository as
+its working directory. Words are split on whitespace and run via argv: there is
+no shell, so quotes are literal. Setting it also enables the update step,
+unless \fB\-\-only\fR says otherwise.
+.TP
 .BR \-d ", " \-\-diff
 Show the closure diff between the previous and current generation.
 .TP

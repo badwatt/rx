@@ -44,6 +44,7 @@ impl Write for FlushFailingWriter {
 }
 
 type RunFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
+type RunInFn = Box<dyn Fn(&str, &[String]) -> Result<i32, Error>>;
 type RunEnvFn = Box<dyn Fn(&[String], &str, &str) -> Result<i32, Error>>;
 type CaptureFn = Box<dyn Fn(&[String]) -> Result<(i32, String), Error>>;
 type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
@@ -52,6 +53,7 @@ type ProbeFn = Box<dyn Fn(&[String]) -> Result<i32, Error>>;
 /// defaults succeed.
 pub(crate) struct StubRunner {
     run: RunFn,
+    run_in: RunInFn,
     run_env: RunEnvFn,
     capture: CaptureFn,
     probe: ProbeFn,
@@ -61,6 +63,7 @@ impl StubRunner {
     pub(crate) fn new() -> Self {
         Self {
             run: Box::new(no_run),
+            run_in: Box::new(no_run_in),
             run_env: Box::new(no_run_env),
             capture: Box::new(no_capture),
             probe: Box::new(no_probe),
@@ -72,6 +75,14 @@ impl StubRunner {
         f: impl Fn(&[String]) -> Result<i32, Error> + 'static,
     ) -> Self {
         self.run = Box::new(f);
+        self
+    }
+
+    pub(crate) fn with_run_in(
+        mut self,
+        f: impl Fn(&str, &[String]) -> Result<i32, Error> + 'static,
+    ) -> Self {
+        self.run_in = Box::new(f);
         self
     }
 
@@ -104,6 +115,9 @@ impl CommandRunner for StubRunner {
     fn run(&self, cmd: &[String]) -> Result<i32, Error> {
         (self.run)(cmd)
     }
+    fn run_in(&self, dir: &str, cmd: &[String]) -> Result<i32, Error> {
+        (self.run_in)(dir, cmd)
+    }
     fn run_with_env(&self, cmd: &[String], var: &str, value: &str) -> Result<i32, Error> {
         (self.run_env)(cmd, var, value)
     }
@@ -120,6 +134,14 @@ impl CommandRunner for StubRunner {
     reason = "stub must match the CommandRunner trait signature"
 )]
 fn no_run(_: &[String]) -> Result<i32, Error> {
+    Ok(0)
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "stub must match the CommandRunner trait signature"
+)]
+fn no_run_in(_: &str, _: &[String]) -> Result<i32, Error> {
     Ok(0)
 }
 
@@ -145,4 +167,27 @@ fn no_capture(_: &[String]) -> Result<(i32, String), Error> {
 )]
 fn no_probe(_: &[String]) -> Result<i32, Error> {
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stub_runner_defaults_succeed() {
+        let runner = StubRunner::new();
+        assert_eq!(runner.run(&[String::from("x")]).expect("run"), 0);
+        assert_eq!(
+            runner.run_in("/tmp", &[String::from("x")]).expect("run in"),
+            0
+        );
+        assert_eq!(
+            runner
+                .run_with_env(&[String::from("x")], "K", "v")
+                .expect("run env"),
+            0
+        );
+        assert_eq!(runner.capture(&[String::from("x")]).expect("capture").0, 0);
+        assert_eq!(runner.probe(&[String::from("x")]).expect("probe"), 0);
+    }
 }

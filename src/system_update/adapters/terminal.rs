@@ -189,6 +189,9 @@ pub(crate) fn print_config(
     push_config_line(&mut text, "hostname", hostname, palette);
     push_config_line(&mut text, "keep", &config.keep.to_string(), palette);
     push_config_line(&mut text, "update", &config.update().to_string(), palette);
+    if let Some(command) = &config.update_command {
+        push_config_line(&mut text, "update-command", &command.join(" "), palette);
+    }
     push_config_line(&mut text, "diff", &config.diff().to_string(), palette);
     if let Some(jobs) = config.jobs {
         push_config_line(&mut text, "jobs", &jobs.to_string(), palette);

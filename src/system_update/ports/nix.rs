@@ -4,7 +4,10 @@ use crate::domain::error::Error;
 /// Driven port: Nix / NixOS operations.
 pub(crate) trait Nix {
     /// Update the flake inputs for `repo`.
-    fn update(&self, repo: &str) -> Result<(), Error>;
+    ///
+    /// `command` replaces the default `nix flake update` when the user
+    /// configured one; it runs at the repo root.
+    fn update(&self, repo: &str, command: Option<&[String]>) -> Result<(), Error>;
     /// Rebuild and switch the system for `hostname`.
     fn rebuild(&self, repo: &str, hostname: &str, options: BuildOptions) -> Result<(), Error>;
     /// Whether the next elevated command will ask for a sudo password.

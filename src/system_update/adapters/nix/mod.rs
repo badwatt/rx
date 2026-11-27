@@ -75,8 +75,11 @@ impl<'a> NixCli<'a> {
 }
 
 impl Nix for NixCli<'_> {
-    fn update(&self, repo: &str) -> Result<(), Error> {
-        let status = self.runner.run(&cmd_update(repo))?;
+    fn update(&self, repo: &str, command: Option<&[String]>) -> Result<(), Error> {
+        let status = match command {
+            Some(argv) => self.runner.run_in(repo, argv)?,
+            None => self.runner.run(&cmd_update(repo))?,
+        };
         ensure_success(status, Error::FlakeUpdateFailed)
     }
 

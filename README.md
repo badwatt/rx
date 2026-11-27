@@ -81,6 +81,7 @@ Proceed? (Y/n)
 ```bash
 rx                   # pull → stage → rebuild → cleanup
 rx -u                # also update the flake inputs first
+rx -u --update-command 'tack update'   # ...with another updater
 rx -d                # also show the closure diff at the end
 rx --only diff       # nothing but the closure diff
 rx --dry-run -y      # print every command, run none
@@ -94,6 +95,7 @@ rx --dry-run -y      # print every command, run none
 | `--jobs`        | `-j`  | Cap `nix --max-jobs` for the rebuild              | unset         |
 | `--cores`       | `-c`  | Cap `nix --cores` for the rebuild                 | unset         |
 | `--update`      | `-u`  | Run `nix flake update` before staging             | `false`       |
+| `--update-command` |    | Replace `nix flake update` (runs at the repo root) | —           |
 | `--diff`        | `-d`  | Show the closure diff after the rebuild           | `false`       |
 | `--yes`         | `-y`  | Assume yes for every prompt                       | `false`       |
 | `--only`        |       | Run only the listed steps                         | default steps |
@@ -116,13 +118,16 @@ over `--update`/`--diff`, so the summary always matches what runs.
 | Step | Command | When |
 |------|---------|------|
 | **Pull** | `git -C <repo> pull --ff-only` | default |
-| **Flake** | `nix flake update --flake <repo>` | `--update` / `--only flake` |
+| **Flake** | `nix flake update --flake <repo>`, or `--update-command` | `--update` / `--only flake` |
 | **Stage** | `git -C <repo> status --porcelain`, then `git add .` after a prompt | default |
 | **Rebuild** | `nixos-rebuild switch --flake <repo>#<host>` | default |
 | **Cleanup** | `nix-env --delete-generations +N`, then `nix store gc` | default |
 | **Diff** | `nix profile diff-closures` | `--diff` / `--only diff` |
 
-The installed `nixos-rebuild` is probed with a read-only call
+`--update-command` replaces the flake step with your own command (`tack update`,
+for example): it runs at the repository root, split on whitespace with no shell,
+and setting it enables the update step. The installed `nixos-rebuild` is probed
+with a read-only call
 (`--elevate=none list-generations`): the `-ng` rewrite runs as your user with
 `--elevate=sudo --no-reexec`, the classic script as `sudo … --fast`. Either way
 the self-rebuild re-exec is skipped.
